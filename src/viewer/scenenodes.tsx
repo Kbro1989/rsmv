@@ -1135,12 +1135,14 @@ function ExportSceneMenu(p: { ctx: UIContextReady, renderopts: ThreeJsSceneEleme
 
 	let saveGltf = async () => {
 		let file = await exportThreeJsGltf(p.ctx.renderer.getModelNode());
-		downloadBlob("model.glb", new Blob([file]));
+		// Convert Buffer to ArrayBuffer for Blob
+		downloadBlob("model.glb", new Blob([file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)] as any));
 	}
 
 	let saveStl = async () => {
 		let file = await exportThreeJsStl(p.ctx.renderer.getModelNode());
-		downloadBlob("model.stl", new Blob([file]));
+		// Convert Uint8Array to ArrayBuffer for Blob
+		downloadBlob("model.stl", new Blob([file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)] as any));
 	}
 
 	let clicktab = (v: typeof tab) => {

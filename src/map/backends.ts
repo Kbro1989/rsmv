@@ -92,7 +92,8 @@ export class MapRenderFsBacked extends MapRender {
 			let mimetype = (ext ? ext[1] == "svg" ? "image/svg+xml" : `image/${ext[1]}` : "");
 			await this.fs.mkDir(naiveDirname(name));
 			let file = await this.fs.readFileBuffer(name);
-			return new Response(file, { headers: { "content-type": mimetype } });
+			// Convert Buffer to Uint8Array for fetch compatibility
+			return new Response(new Uint8Array(file.buffer, file.byteOffset, file.byteLength) as any, { headers: { "content-type": mimetype } });
 		} catch {
 			return new Response(null, { status: 404 });
 		}
@@ -156,7 +157,8 @@ export class MapRenderDatabaseBacked extends MapRender {
 		let send = await this.postThrottler.apiRequest(`${this.endpoint}/upload?file=${encodeURIComponent(name)}&hash=${hash}&buildnr=${version}&mapid=${this.uploadmapid}`, {
 			method: "post",
 			headers: { "Authorization": this.auth },
-			body: data
+			// Convert Buffer to ArrayBuffer for fetch compatibility
+			body: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any
 		});
 		if (!send.ok) { throw new Error("file upload failed"); }
 	}

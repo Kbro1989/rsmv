@@ -55,7 +55,7 @@ type CameraControlMode = "free" | "world";
 type AutoFrameMode = "forced" | "continuous" | "never";
 export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown";
 
-export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
+export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private renderer: THREE.WebGLRenderer;
 	private canvas: HTMLCanvasElement;
 	private skybox: { scene: THREE.Scene, camera: THREE.Camera } | null = null;
@@ -121,8 +121,8 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
 		scene.add(this.topdowncam);
 
 		//three typings are outdated
-		renderer.useLegacyLights = false;
-		renderer.outputColorSpace = THREE.SRGBColorSpace;
+		(renderer as any).useLegacyLights = false;
+		renderer.outputColorSpace = THREE.SRGBColorSpace as any;
 
 		const planeSize = 11;
 

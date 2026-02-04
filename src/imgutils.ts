@@ -12,9 +12,9 @@ export function makeImageData(data: Uint8ClampedArray | Uint8Array | null, width
 		data = new Uint8ClampedArray(data.buffer, data.byteOffset, data.length);
 	}
 	if (typeof ImageData != "undefined") {
-		return new ImageData(data, width, height);
+		return new ImageData(data as any, width, height);
 	} else {
-		return { data, width, height, colorSpace: "srgb" };
+		return { data: data as any, width, height, colorSpace: "srgb" } as any;
 	}
 }
 
@@ -75,7 +75,7 @@ export async function fileToImageData(file: Uint8Array, mimetype: "image/png" | 
 			console.warn("can not strip alpha in browser context that does not support ImageDecoder");
 		}
 		let img = new Image();
-		let blob = new Blob([file], { type: mimetype });
+		let blob = new Blob([file as any], { type: mimetype });
 		let url = URL.createObjectURL(blob);
 		img.src = url;
 		await img.decode();
@@ -270,9 +270,10 @@ export function drawTexture(ctx: CanvasRenderingContext2D, img: ImageData | Text
 		cnv.height = img.height;
 		ctx.putImageData(img, 0, 0);
 	} else if ("source" in img) {
-		cnv.width = img.source.data.width;
-		cnv.height = img.source.data.height;
-		ctx.drawImage(img.source.data, 0, 0);
+		const sourceData = (img.source as any).data;
+		cnv.width = sourceData.width;
+		cnv.height = sourceData.height;
+		ctx.drawImage(sourceData, 0, 0);
 	} else {
 		cnv.width = img.width;
 		cnv.height = img.height

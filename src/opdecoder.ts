@@ -1,7 +1,7 @@
 // import * as fs from "fs";
 import * as opcode_reader from "./opcode_reader";
 import commentJson from "comment-json";
-import type { CacheFileSource } from "cache";
+import type { CacheFileSource } from "./cache";
 
 const typedef = commentJson.parse(require("./opcodes/typedef.jsonc")) as any;
 

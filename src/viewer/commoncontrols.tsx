@@ -2,8 +2,8 @@ import * as React from "react";
 import { boundMethod } from "autobind-decorator";
 import prettyJson from "json-stringify-pretty-compact";
 import classNames from "classnames";
-import { EngineCache } from "3d/modeltothree";
-import { cacheFileJsonModes } from "scripts/filetypes";
+import { EngineCache } from "../3d/modeltothree";
+import { cacheFileJsonModes } from "../scripts/filetypes";
 import { JsonSearch, JsonSearchFilter, useJsonCacheSearch } from "./jsonsearch";
 
 
@@ -23,7 +23,7 @@ export function BlobImage(p: { file: Uint8Array, ext: string, fillHeight?: boole
 	let urlref = React.useRef("");
 	let ref = React.useCallback((el: HTMLImageElement | null) => {
 		if (el) {
-			let blob = new Blob([p.file], { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
+			let blob = new Blob([p.file] as any, { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;
@@ -45,7 +45,7 @@ export function BlobAudio(p: { file: Uint8Array, autoplay: boolean }) {
 
 	let ref = React.useCallback((el: HTMLAudioElement | null) => {
 		if (el) {
-			let blob = new Blob([p.file], { type: `audio/ogg` });
+			let blob = new Blob([p.file] as any, { type: `audio/ogg` });
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;
@@ -193,7 +193,7 @@ export function PasteButton(p: { onPaste: (str: string) => void }) {
 	);
 }
 
-export class InputCommitted extends React.Component<React.DetailedHTMLProps<React.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>>{
+export class InputCommitted extends React.Component<React.DetailedHTMLProps<React.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>> {
 	el: HTMLInputElement | null = null;
 	stale = false;
 
