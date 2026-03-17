@@ -63,7 +63,7 @@ Jagex is generally aware of the existence of cache decoding tools like this one 
 * properly implement caching, currrently doesn't clear texture/model cache
 
 ## Credits
-Modern rewrite by Skillbert
+Modern rewrite by Kbro1989
 
 Based on downloader/3d viewer by Sahima, ui by [manpaint](https://github.com/manpaint)
 

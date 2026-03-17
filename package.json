@@ -21,7 +21,7 @@
 		"clean": "rimraf dist",
 		"nodegl": "electron dist/runbrowser"
 	},
-	"author": "Skillbert",
+	"author": "Kbro1989",
 	"license": "GPL-4",
 	"devDependencies": {
 		"@types/crc": "^3.4.0",

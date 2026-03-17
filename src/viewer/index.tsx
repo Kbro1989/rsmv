@@ -151,7 +151,7 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 							<CacheSelector onOpen={this.openCache} />
 							<div style={{ flex: "1" }} />
 							<div style={{ textAlign: "center" }}>
-								Go to <a href="https://runeapps.org/modelviewer_about">RuneApps</a> for more info. Source code hosted at <a href="https://github.com/skillbert/rsmv" target="_blank">github.com/skillbert/rsmv</a>
+								Go to <a href="https://runeapps.org/modelviewer_about">RuneApps</a> for more info. Source code hosted at <a href="https://github.com/Kbro1989/POG2/blob/main/tmp_rsmv_inspect" target="_blank">https://github.com/Kbro1989/POG2.git/tmp_rsmv_inspect</a>
 							</div>
 						</React.Fragment>
 					)}
