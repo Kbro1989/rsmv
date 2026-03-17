@@ -20,7 +20,8 @@
 		"resolveJsonModule": true,
 		"noImplicitThis": true,
 		"strictFunctionTypes": true,
-		"strictPropertyInitialization":true
+		"strictPropertyInitialization": true,
+		"skipLibCheck": true
 	},
 	"exclude": [
 		"node_modules",

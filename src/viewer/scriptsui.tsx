@@ -59,24 +59,23 @@ export class WebFsScriptFS implements ScriptFS {
 	}
 	async readDir(dirname: string) {
 		let dir = await this.getDir(dirname, false);
-		let files: { name: string, kind: "file" | "directory" }[] = [];
-		for await (let [name, v] of dir.entries()) {
-			files.push({ name, kind: v.kind });
+		let res: { name: string, kind: "file" | "directory" }[] = [];
+		for await (let [name, handle] of (dir as any).entries()) {
+			res.push({ name, kind: handle.kind });
 		}
-		return files;
+		return res;
 	}
 	async writeFile(name: string, data: Buffer | string) {
 		let file = await this.getFile(name, true);
-		let str = await file.createWritable({ keepExistingData: false });
-		await str.write(data);
-		await str.close();
+		let writable = await (file as any).createWritable();
+		await writable.write(data);
+		await writable.close();
 	}
 	async unlink(name: string) {
-		throw new Error("not implemented");
-		// let parts = name.split("/");
-		// let filename = parts.pop()!;
-		// let dir = await this.getDir(parts.join("/"), false);
-		// dir.removeEntry(filename);
+		let parts = name.split("/");
+		let filename = parts.pop()!;
+		let dir = await this.getDir(parts.join("/"), false);
+		await dir.removeEntry(filename);
 	}
 	async copyFile(from: string, to: string, symlink: boolean) {
 		await this.writeFile(to, await this.readFileBuffer(from));
@@ -534,7 +533,7 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null, ctx: UIContext }) {
 				if (dir.canceled || !dir.filePaths[0]) { return; }
 				subfs = new CLIScriptFS(dir.filePaths[0]);
 			} else {
-				let dir = await showDirectoryPicker({ mode: "readwrite", startIn: "downloads" });
+				let dir = await (window as any).showDirectoryPicker({ mode: "readwrite", startIn: "downloads" });
 				await dir.requestPermission({ mode: "readwrite" });
 				subfs = new WebFsScriptFS(dir);
 			}

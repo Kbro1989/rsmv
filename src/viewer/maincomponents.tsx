@@ -712,7 +712,11 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
 			<div className="mv-modal-head">
 				<span>{p.file.name}</span>
+<<<<<<< HEAD
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([p.file.data as any]))}>download</span>
+=======
+				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([typeof p.file.data === "string" ? p.file.data : new Uint8Array(p.file.data.buffer, p.file.data.byteOffset, p.file.data.byteLength)]))}>download</span>
+>>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>

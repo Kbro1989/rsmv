@@ -9,13 +9,16 @@ import { appearanceUrl, avatarStringToBytes, avatarToModel } from "../3d/avatar"
 import { pixelsToImageFile } from "../imgutils";
 
 //TODO remove bypass cors, since we are in a browser context and the runeapps server isn't cooperating atm
-globalThis.fetch = require("node-fetch").default;
+// Use globalThis.fetch; if not available (node-fetch), it should be polyfilled/imported in the entry point.
+// @ts-ignore
+const fetchPolyfill = globalThis.fetch;
 
 export { CacheDownloader } from "../cache/downloader";
 export { GameCacheLoader } from "../cache/sqlite";
 export { CallbackCacheLoader } from "../cache";
 export * as map from "../map/index";
-export { ScriptOutput, CLIScriptOutput } from "../scriptrunner";
+import type { ScriptOutput, CLIScriptOutput } from "../scriptrunner";
+export type { ScriptOutput, CLIScriptOutput };
 //export buffer since we're polyfilling it in browsers
 export const BufferPoly = Buffer;
 
