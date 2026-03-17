@@ -41,7 +41,7 @@
 		"buffer": "^6.0.3",
 		"classnames": "^2.3.1",
 		"copy-webpack-plugin": "^10.2.4",
-		"electron": "^26.3.0",
+		"electron": "^35.7.5",
 		"electron-rebuild": "^3.2.7",
 		"file-loader": "^6.2.0",
 		"idb-keyval": "^6.1.0",
@@ -59,9 +59,9 @@
 		"ts-loader": "^9.2.8",
 		"typescript": "^5.7.3",
 		"util": "^0.12.4",
-		"webpack": "^5.70.0",
+		"webpack": "^5.105.4",
 		"webpack-cli": "^4.9.2",
-		"webpack-dev-server": "^4.7.4"
+		"webpack-dev-server": "^5.2.1"
 	},
 	"dependencies": {
 		"cmd-ts": "^0.7.0",
@@ -71,7 +71,7 @@
 	},
 	"peerDependencies": {
 		"canvas": ">=2.10.2",
-		"electron": "^26.3.0",
+		"electron": "^35.7.5",
 		"lzma-native": "^8.0.1",
 		"sharp": ">=0.30.5",
 		"sqlite3": ">=5.0.8"
