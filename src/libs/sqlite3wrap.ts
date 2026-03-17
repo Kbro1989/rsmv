@@ -1,5 +1,7 @@
 import type * as sqlite3 from "sqlite3";
 
+// @ts-ignore
+declare var __non_webpack_require__: any;
 
 export function sqliteOpenDatabase(filepath: string, opts: { write?: boolean, create?: boolean }) {
     //only actually load the dependency when used

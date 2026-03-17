@@ -25,7 +25,7 @@ export class GameCacheLoader extends cache.CacheFileSource {
 
 	constructor(cachedir?: string, writable?: boolean) {
 		super();
-		this.cachedir = cachedir || path.resolve(process.env.ProgramData!, "jagex/runescape");
+		this.cachedir = cachedir || process.env['POG_RSMV_CACHE_DIR'] || path.resolve(process.env.ProgramData!, "jagex/runescape");
 		this.writable = !!writable;
 	}
 

@@ -2,7 +2,6 @@
 import { ThreeJsRenderer } from "./threejsrender";
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
-import { boundMethod } from "autobind-decorator";
 import * as datastore from "idb-keyval";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
 import { ModelBrowser, RendererControls } from "./scenenodes";
@@ -78,8 +77,7 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		})();
 	}
 
-	@boundMethod
-	async openCache(source: SavedCacheSource) {
+	openCache = async (source: SavedCacheSource) => {
 		let cache = await openSavedCache(source, true);
 		if (cache) {
 			globalThis.source = cache;
@@ -100,13 +98,11 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		};
 	}
 
-	@boundMethod
-	initCnv(cnv: HTMLCanvasElement | null) {
+	initCnv = (cnv: HTMLCanvasElement | null) => {
 		this.props.ctx.setRenderer(cnv ? new ThreeJsRenderer(cnv) : null);
 	}
 
-	@boundMethod
-	closeCache() {
+	closeCache = () => {
 		datastore.del("openedcache");
 		localStorage.rsmv_openedcache = "";
 		navigator.serviceWorker?.ready.then(q => q.active?.postMessage({ type: "sethandle", handle: null }));
@@ -115,13 +111,11 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		this.props.ctx.setSceneCache(null);
 	}
 
-	@boundMethod
-	stateChanged() {
+	stateChanged = () => {
 		this.forceUpdate();
 	}
 
-	@boundMethod
-	resized() {
+	resized = () => {
 		this.forceUpdate();
 	}
 
@@ -138,8 +132,7 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		this.closeCache();
 	}
 
-	@boundMethod
-	openFile(file: UIOpenedFile | null) {
+	openFile = (file: UIOpenedFile | null) => {
 		this.setState({ openedFile: file });
 	}
 

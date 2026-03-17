@@ -1,4 +1,3 @@
-import { boundMethod } from "autobind-decorator";
 import { AstNode, BranchingStatement, ClientScriptFunction, CodeBlockNode, ComposedOp, FunctionBindNode, IfStatementNode, RawOpcodeNode, SwitchStatementNode, VarAssignNode, WhileLoopStatementNode, getSingleChild, SubcallNode, ComposedopType, isNamedOp, RewriteCursor } from "./ast";
 import { ClientscriptObfuscation } from "./callibrator";
 import { ClientScriptSubtypeSolver } from "./subtypedetector";
@@ -87,8 +86,7 @@ export class TsWriterContext {
             return false;
         }
     }
-    @boundMethod
-    getCode(node: AstNode) {
+    getCode = (node: AstNode) => {
         let writer = writermap.get(node.constructor);
         if (!writer) { throw new Error(`no writer defined for ${node.constructor.name} node`); }
         return writer(node, this);

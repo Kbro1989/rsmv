@@ -27,7 +27,7 @@ export function BlobImage(p: { file: Uint8Array, ext: string, fillHeight?: boole
 	let urlref = React.useRef("");
 	let ref = React.useCallback((el: HTMLImageElement | null) => {
 		if (el) {
-			let blob = new Blob([p.file], { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
+			let blob = new Blob([p.file as any], { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;
@@ -49,7 +49,7 @@ export function BlobAudio(p: { file: Uint8Array, autoplay: boolean }) {
 
 	let ref = React.useCallback((el: HTMLAudioElement | null) => {
 		if (el) {
-			let blob = new Blob([p.file], { type: `audio/ogg` });
+			let blob = new Blob([p.file as any], { type: `audio/ogg` });
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;
@@ -208,19 +208,16 @@ export class InputCommitted extends React.Component<React.DetailedHTMLProps<Reac
 	el: HTMLInputElement | null = null;
 	stale = false;
 
-	@boundMethod
-	onInput() {
+	onInput = () => {
 		this.stale = true;
 	}
 
-	@boundMethod
-	onChange(e: Event) {
+	onChange = (e: Event) => {
 		this.props.onChange?.(e as any);
 		this.stale = false;
 	}
 
-	@boundMethod
-	ref(el: HTMLInputElement | null) {
+	ref = (el: HTMLInputElement | null) => {
 		if (this.el) {
 			this.el.removeEventListener("change", this.onChange);
 			this.el.removeEventListener("input", this.onInput);

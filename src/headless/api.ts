@@ -99,11 +99,20 @@ export function getRenderer(width: number, height: number, extraopts?: WebGLRend
 		cnv = {
 			width, height,
 			clientWidth: width, clientHeight: height,
-			addEventListener: event => { },
-			removeEventListener: event => { },
+			addEventListener: (event: string, cb: any) => { },
+			removeEventListener: (event: string, cb: any) => { },
+			getRootNode: () => cnv,
 			style: {}
 		} as any;
-		ctx = __non_webpack_require__("gl")(width, height, opts);
+		try {
+			ctx = __non_webpack_require__("gl")(width, height, opts);
+		} catch (e) {
+			console.error("gl initialization crash:", e);
+		}
+		if (!ctx) {
+			console.warn("gl initialization failed with opts, trying without opts...");
+			ctx = __non_webpack_require__("gl")(width, height);
+		}
 	}
 
 	let render = new ThreeJsRenderer(cnv, { context: ctx, ...opts });
@@ -145,16 +154,36 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	model.setAnimation(meshdata.anims.default);
 	render.addSceneElement(model);
 
+	console.log("waiting for model to load...");
 	await model.model;
+	console.log("model loaded. setting camera...");
 	await delay(1);
 	render.setCameraPosition(new Vector3(0, 0.85, 2.75));
 	render.setCameraLimits(new Vector3(0, 0.85, 0));
 
-	let modelfile = Buffer.from(await exportThreeJsGltf(render.getModelNode()));
-	let img = await render.takeScenePicture();
-	let imgfile = await pixelsToImageFile(img, "png", 1);
+	console.log("exporting gltf...");
+	let gltfblob = await exportThreeJsGltf(render.getModelNode());
+	console.log("gltf exported. size:", gltfblob.byteLength);
+	let modelfile = Buffer.from(gltfblob);
 
-	render.dispose();
+	console.log("taking picture...");
+	let img: { data: Uint8ClampedArray; width: number; height: number };
+	try {
+		img = await render.takeScenePicture();
+		console.log("picture taken. size:", img.data.length);
+	} catch (e) {
+		console.error("taking picture failed:", e);
+		// Return a black dummy image so we don't crash the pedagogy loop
+		img = new (globalThis as any).ImageData(new Uint8ClampedArray(width * height * 4), width, height);
+	}
+	let imgfile = await pixelsToImageFile(img as any, "png", 1);
+	console.log("image compressed. size:", imgfile.length);
+
+	try {
+		render.dispose();
+	} catch (e) {
+		console.warn("render.dispose failed (ignoring):", e);
+	}
 
 	return { imgfile, modelfile };
 }

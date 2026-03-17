@@ -3,14 +3,13 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { delay, TypedEmitter } from '../utils';
 import { dumpTexture, flipImage, makeImageData } from '../imgutils';
-import { boundMethod } from 'autobind-decorator';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
 import { ModelExtras, MeshTileInfo, ClickableMesh } from '../3d/mapsquare';
 import { AnimationClip, AnimationMixer, BufferGeometry, Camera, Clock, Color, CubeCamera, Group, Material, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D, OrthographicCamera, PerspectiveCamera, SkinnedMesh, Texture, Vector3 } from "three";
 import { VR360Render } from "./vr360camera";
 import { SkewOrthographicCamera } from "../map";
-import { UiCameraParams, updateItemCamera } from "./scenenodes";
+import { UiCameraParams, updateItemCamera } from "./camerautils";
 
 //TODO remove
 globalThis.THREE = THREE;
@@ -22,11 +21,12 @@ globalThis.speed = 100;
 //should in theory be able to get rid of these completely by enforcing autoframes=false
 function compatRequestAnimationFrame(cb: (timestamp: number) => void) {
 	if (typeof requestAnimationFrame != "undefined") { return requestAnimationFrame(cb); }
-	else { return +setTimeout(cb, 50, Date.now() + 50); }
+	else { return +setTimeout(() => cb(Date.now()), 50); }
 }
-function compatCancelAnimationFrame(id: number) {
+function compatCancelAnimationFrame(id: number | null) {
+	if (!id) { return; }
 	if (typeof cancelAnimationFrame != "undefined") { return cancelAnimationFrame(id); }
-	else { return +clearTimeout(id); }
+	else { return clearTimeout(id); }
 }
 
 export type ThreeJsRendererEvents = {
@@ -325,8 +325,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
 		this.topdowncam.updateProjectionMatrix();
 	}
 
-	@boundMethod
-	async guaranteeGlCalls<T>(glfunction: () => T | Promise<T>): Promise<T> {
+	guaranteeGlCalls = async <T>(glfunction: () => T | Promise<T>): Promise<T> => {
 		let waitContext = () => {
 			if (!this.renderer.getContext().isContextLost()) {
 				return;
@@ -361,8 +360,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
 		throw new Error("Failed to render frame after 5 retries");
 	}
 
-	@boundMethod
-	render(cam?: THREE.Camera) {
+	render = (cam?: THREE.Camera) => {
 		compatCancelAnimationFrame(this.queuedFrameId);
 		this.queuedFrameId = 0;
 
@@ -428,8 +426,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
 		render.cubeCamera.update(this.renderer, this.scene);
 	}
 
-	@boundMethod
-	forceFrame() {
+	forceFrame = () => {
 		if (!this.queuedFrameId && this.autoFrameMode != "never") {
 			this.queuedFrameId = compatRequestAnimationFrame(() => this.render());
 		}
@@ -543,8 +540,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents>{
 		// this.floormesh.position.setY(Math.min(0, box.min.y - 0.005));
 	}
 
-	@boundMethod
-	async mousedown(e: React.MouseEvent | MouseEvent) {
+	mousedown = async (e: React.MouseEvent | MouseEvent) => {
 		let x1 = e.screenX;
 		let y1 = e.screenY;
 		let cnvx = e.clientX;

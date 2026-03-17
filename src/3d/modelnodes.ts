@@ -3,7 +3,6 @@ import { appearanceUrl, avatarStringToBytes, avatarToModel } from "./avatar";
 import * as THREE from "three";
 import { ThreejsSceneCache, mergeModelDatas, ob3ModelToThree, mergeBoneids, constModelsIds } from '../3d/modeltothree';
 import { ModelModifications, TypedEmitter, CallbackPromise } from '../utils';
-import { boundMethod } from 'autobind-decorator';
 import { resolveMorphedObject, modifyMesh, MapRect, ParsemapOpts, RSMapChunkData, renderMapSquare, WorldLocation, ThreeJsRenderSection, tiledimensions, parseMapsquare } from '../3d/mapsquare';
 import { AnimationClip, AnimationMixer, Material, Mesh, MeshStandardMaterial, Object3D, Skeleton, SkeletonHelper, SkinnedMesh, Texture, Vector2 } from "three";
 import { mountBakedSkeleton, parseAnimationSequence4 } from "../3d/animationframes";
@@ -240,14 +239,13 @@ export class RSModel extends TypedEmitter<{ loaded: undefined, animchanged: numb
 		scene.addSceneElement(this);
 	}
 
-	onModelLoaded() {
+	onModelLoaded = () => {
 		this.emit("loaded", undefined);
 		this.renderscene?.forceFrame();
 		this.renderscene?.setCameraLimits();
 	}
 
-	@boundMethod
-	updateAnimation(delta: number, epochtime: number) {
+	updateAnimation = (delta: number, epochtime: number) => {
 		this.mixer.update(delta);
 		this.loaded?.matUvAnims.forEach(q => q.tex.offset.copy(q.v).multiplyScalar(epochtime));
 	}

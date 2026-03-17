@@ -1,6 +1,4 @@
-import { ThreejsSceneCache, EngineCache, constModelsIds } from '../3d/modeltothree';
 import { delay, packedHSL2HSL, HSL2RGB, RGB2HSL, HSL2packHSL, ModelModifications, stringToFileRange, stringToMapArea, checkObject } from '../utils';
-import { boundMethod } from 'autobind-decorator';
 import { CacheFileSource } from '../cache';
 import { MapRect, TileGrid, CombinedTileGrid, getTileHeight, rs2ChunkSize, classicChunkSize, RSMapChunkData } from '../3d/mapsquare';
 import { Euler, PerspectiveCamera, Quaternion, Vector3 } from "three";
@@ -35,8 +33,11 @@ import { MapRenderDatabaseBacked, MapRenderFsBacked, examplemapconfig, parseMapC
 import { compareFloorDependencies, compareLocDependencies, mapdiffmesh, mapsquareFloorDependencies, mapsquareLocDependencies } from '../map/chunksummary';
 import { previewAllFileTypes } from '../scripts/previewall';
 import { CliApiContext, cliApi } from '../clicommands';
-import * as cmdts from "cmd-ts";
 import * as commentjson from "comment-json";
+import { UiCameraParams, updateItemCamera } from "./camerautils";
+import { boundMethod } from "autobind-decorator";
+import * as cmdts from "cmd-ts";
+import { EngineCache, ThreejsSceneCache, constModelsIds } from "../3d/modeltothree";
 
 
 type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map" | "avatar" | "spotanim" | "scenario" | "scripts";
@@ -522,8 +523,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		for (let model of this.models.values()) { model.cleanup(); }
 	}
 
-	@boundMethod
-	async addComp(id: string) {
+	addComp = async (id: string) => {
 		if (!this.props.ctx) { return; }
 		if (this.state.addModelType == "map") {
 			let rect = stringToMapArea(id);
@@ -554,8 +554,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 			}
 		}
 	}
-	@boundMethod
-	addAction() {
+	addAction = () => {
 		let action: ScenarioAction;
 		switch (this.state.addActionType) {
 			case "anim":
@@ -579,8 +578,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		this.editAction(this.state.actions.length, action);
 	}
 
-	@boundMethod
-	getSceneJson(newstate: ScenarioState = this.state) {
+	getSceneJson = (newstate: ScenarioState = this.state) => {
 		return JSON.stringify({ components: newstate.components, actions: newstate.actions });
 	}
 
@@ -680,8 +678,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		return this.models.get(modelinfo);
 	}
 
-	@boundMethod
-	updateGrids() {
+	updateGrids = () => {
 		let grids: { src: TileGrid, rect: MapRect }[] = [];
 		for (let comp of Object.values(this.state.components)) {
 			if (comp.type != "map") { continue }
@@ -707,8 +704,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		this.restartAnims();
 	}
 
-	@boundMethod
-	async restartAnims() {
+	restartAnims = async () => {
 		//TODO ensure this function loops and only one instance is looping
 		//otherwise we might be using old data from before setstate
 		await delay(1);
@@ -752,8 +748,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		}
 	}
 
-	@boundMethod
-	advancedIdSelect() {
+	advancedIdSelect = () => {
 		if (!this.props.ctx) { return; }
 		if (this.state.addModelType == "npc") {
 			selectEntity(this.props.ctx, "npcs", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
@@ -1135,12 +1130,12 @@ function ExportSceneMenu(p: { ctx: UIContextReady, renderopts: ThreeJsSceneEleme
 
 	let saveGltf = async () => {
 		let file = await exportThreeJsGltf(p.ctx.renderer.getModelNode());
-		downloadBlob("model.glb", new Blob([file]));
+		downloadBlob("model.glb", new Blob([new Uint8Array(file as any)]));
 	}
 
 	let saveStl = async () => {
 		let file = await exportThreeJsStl(p.ctx.renderer.getModelNode());
-		downloadBlob("model.stl", new Blob([file]));
+		downloadBlob("model.stl", new Blob([new Uint8Array(file as any)]));
 	}
 
 	let clicktab = (v: typeof tab) => {
@@ -1333,12 +1328,12 @@ async function materialIshToModel(sceneCache: ThreejsSceneCache, reqid: Material
 	let underlay: mapsquare_underlays | null = null;
 	if (reqid.mode == "overlay") {
 		overlay = sceneCache.engine.mapOverlays[reqid.id];
-		if (overlay.material) { matid = overlay.material; }
-		if (overlay.color) { color = overlay.color; }
+		if (overlay?.material) { matid = overlay.material; }
+		if (overlay?.color) { color = overlay.color; }
 	} else if (reqid.mode == "underlay") {
 		underlay = sceneCache.engine.mapUnderlays[reqid.id];
-		if (underlay.material) { matid = underlay.material; }
-		if (underlay.color) { color = underlay.color; }
+		if (underlay?.material) { matid = underlay.material; }
+		if (underlay?.color) { color = underlay.color; }
 	} else if (reqid.mode == "material") {
 		matid = reqid.id;
 	} else if (reqid.mode == "texture") {
@@ -1461,56 +1456,6 @@ function SceneLocation(p: LookupModeProps) {
 	)
 }
 
-export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imgheight: number, centery: number, params: UiCameraParams) {
-	const defaultcamdist = 16;//found through testing
-
-	//fov such that the value 32 ends up in the projection matrix.yy
-	//not sure if coincidence that this is equal to height
-	cam.fov = Math.atan(1 / 32) / (Math.PI / 180) * 2;
-	cam.aspect = imgwidth / imgheight;
-	cam.updateProjectionMatrix();
-
-	let rot = new Quaternion().setFromEuler(new Euler(
-		-params.rotx / 2048 * 2 * Math.PI,
-		params.roty / 2048 * 2 * Math.PI,
-		-params.rotz / 2048 * 2 * Math.PI,
-		"ZYX"
-	));
-	let pos = new Vector3(
-		6,//no clue where the 6 comes from
-		0,
-		4 * -params.zoom
-	);
-	let quatx = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), params.rotx / 2048 * 2 * Math.PI);
-	let quaty = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -params.roty / 2048 * 2 * Math.PI);
-	let quatz = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -params.rotz / 2048 * 2 * Math.PI)
-	pos.applyQuaternion(quatx);
-	pos.add(new Vector3(
-		-params.translatex * 4,
-		params.translatey * 4,
-		-params.translatey * 4//yep this is y not z, i don't fucking know
-	));
-	pos.applyQuaternion(quaty);
-	pos.applyQuaternion(quatz);
-	pos.y += centery;
-	pos.divideScalar(512);
-	pos.z = -pos.z;
-
-	cam.position.copy(pos);
-	cam.quaternion.copy(rot);
-	cam.updateProjectionMatrix();
-	cam.updateMatrixWorld(true);
-	return cam;
-}
-
-export type UiCameraParams = {
-	rotx: number,
-	roty: number,
-	rotz: number,
-	translatex: number,
-	translatey: number,
-	zoom: number
-}
 
 function ItemCameraMode({ ctx, meta, centery }: { ctx: UIContextReady, meta?: items, centery: number }) {
 	let [translatex, settranslatex] = React.useState(meta?.modelTranslate_0 ?? 0);

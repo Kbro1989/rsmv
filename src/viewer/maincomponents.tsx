@@ -1,7 +1,6 @@
 
 import { ThreeJsRenderer } from "./threejsrender";
 import * as React from "react";
-import { boundMethod } from "autobind-decorator";
 import { WasmGameCacheLoader } from "../cache/sqlitewasm";
 import { CacheFileSource, CallbackCacheLoader } from "../cache";
 import * as datastore from "idb-keyval";
@@ -201,19 +200,16 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 		document.body.removeEventListener("drop", this.onFileDrop)
 	}
 
-	@boundMethod
-	onDragOver(e: DragEvent) {
+	onDragOver = (e: DragEvent) => {
 		e.preventDefault();
 	}
 
-	@boundMethod
-	async clickOpen() {
+	clickOpen = async () => {
 		let dir = await showDirectoryPicker();
 		this.props.onOpen({ type: "autohandle", handle: dir });
 	}
 
-	@boundMethod
-	async clickOpenNative() {
+	clickOpenNative = async () => {
 		if (!electron) { return; }
 		let dir: import("electron").OpenDialogReturnValue = await electron.ipcRenderer.invoke("openfolder", path.resolve(process.env.ProgramData!, "jagex/runescape"));
 		if (!dir.canceled) {
@@ -221,21 +217,18 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 		}
 	}
 
-	@boundMethod
-	async clickOpenLive() {
+	clickOpenLive = async () => {
 		this.props.onOpen({ type: "live" });
 	}
 
-	@boundMethod
-	async clickReopen() {
+	clickReopen = async () => {
 		if (!this.state.lastFolderOpen) { return; }
 		if (await this.state.lastFolderOpen.requestPermission() == "granted") {
 			this.props.onOpen({ type: "autohandle", handle: this.state.lastFolderOpen });
 		}
 	}
 
-	@boundMethod
-	async onFileDrop(e: DragEvent) {
+	onFileDrop = async (e: DragEvent) => {
 		e.preventDefault();
 		if (e.dataTransfer) {
 			let files: Record<string, Blob> = {};
@@ -276,8 +269,7 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 		}
 	}
 
-	@boundMethod
-	openOpenrs2Cache(cachename: number) {
+	openOpenrs2Cache = (cachename: number) => {
 		this.props.onOpen({ type: "openrs2", cachename: cachename + "" });
 	}
 
@@ -388,8 +380,7 @@ export class UIContext extends TypedEmitter<{ openfile: UIOpenedFile | null, sta
 		return !!this.source && !!this.sceneCache && !!this.renderer;
 	}
 
-	@boundMethod
-	openFile(file: UIOpenedFile | null) {
+	openFile = (file: UIOpenedFile | null) => {
 		this.openedfile = file;
 		this.emit("openfile", file);
 	}
@@ -721,7 +712,7 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
 			<div className="mv-modal-head">
 				<span>{p.file.name}</span>
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([p.file.data]))}>download</span>
+				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([p.file.data as any]))}>download</span>
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
