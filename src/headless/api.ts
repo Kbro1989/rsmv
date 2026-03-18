@@ -2,11 +2,25 @@
 import { exportThreeJsGltf, ThreeJsRenderer } from "../viewer/threejsrender";
 import { CacheFileSource } from "../cache";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
-import { itemToModel, npcToModel, RSModel, SimpleModelInfo } from "../3d/modelnodes";
+import { itemToModel, npcToModel, locToModel, spotAnimToModel, materialToModel, RSModel, SimpleModelInfo, RSMapChunk } from "../3d/modelnodes";
 import { delay } from "../utils";
 import { Vector3, WebGLRendererParameters } from "three";
 import { appearanceUrl, avatarStringToBytes, avatarToModel } from "../3d/avatar";
 import { pixelsToImageFile } from "../imgutils";
+import { parseMapsquare } from "../3d/mapsquare";
+import { parseMusic } from "../scripts/musictrack";
+import { parseSprite } from "../3d/sprite";
+import { cacheMajors } from "../constants";
+import { parse } from "../opdecoder";
+
+// Polyfill window and animation frames for Three.js headless context
+if (typeof globalThis.window === 'undefined') {
+	(globalThis as any).window = globalThis;
+	if (!globalThis.requestAnimationFrame) {
+		globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 1000 / 60) as any;
+		globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id as any);
+	}
+}
 
 //TODO remove bypass cors, since we are in a browser context and the runeapps server isn't cooperating atm
 // Use globalThis.fetch; if not available (node-fetch), it should be polyfilled/imported in the entry point.
@@ -119,12 +133,33 @@ export function getRenderer(width: number, height: number, extraopts?: WebGLRend
 	}
 
 	let render = new ThreeJsRenderer(cnv, { context: ctx, ...opts });
+	
+	// FIX: Force Three.js to use uniform-based skinning instead of texture-based skinning
+	// headless-gl only supports WebGL 1.0, but Three.js attempts to use texelFetch if it thinks
+	// float vertex textures are supported, causing shader compilation errors.
+	if (!document) {
+		render["renderer"].capabilities.floatVertexTextures = false;
+	}
+
 	return render;
 }
 
-export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc", argument: string, headmodel = false) {
+export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc" | "loc" | "spot" | "mat" | "map" | "sound" | "music" | "sprite", argument: string, headmodel = false) {
 	let width = 500;
 	let height = 700;
+
+	// Handle non-3D Assets first
+	if (mode == "sound" || mode == "music") {
+		let major = (mode == "sound" ? cacheMajors.sounds : cacheMajors.music);
+		let ogg = await parseMusic(scene.engine.rawsource, major, +argument, null, true);
+		return { modelfile: ogg, imgfile: Buffer.alloc(0), metadata: { type: mode, id: argument } };
+	}
+	if (mode == "sprite") {
+		let sprites = await parseSprite(await scene.engine.getFileById(cacheMajors.sprites, +argument));
+		let imgfile = await pixelsToImageFile(sprites[0].img as any, "png", 1);
+		return { modelfile: imgfile, imgfile, metadata: { type: "sprite", id: argument } };
+	}
+
 	let render = getRenderer(width, height);
 	render.addSceneElement({
 		getSceneElements() {
@@ -149,9 +184,47 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	} else if (mode == "npc") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
 		meshdata = await npcToModel(scene, { id: +argument, head: headmodel });
+	} else if (mode == "loc") {
+		if (isNaN(+argument)) { throw new Error("number expected"); }
+		meshdata = await locToModel(scene, +argument);
+	} else if (mode == "spot") {
+		if (isNaN(+argument)) { throw new Error("number expected"); }
+		meshdata = await spotAnimToModel(scene, +argument);
+	} else if (mode == "mat") {
+		if (isNaN(+argument)) { throw new Error("number expected"); }
+		meshdata = await materialToModel(scene, +argument);
+	} else if (mode == "map") {
+		let [x, z] = argument.split(",").map(Number);
+		let chunk = RSMapChunk.create(scene, x, z);
+		render.addSceneElement(chunk);
+		// Manual gltf export for map chunk since it's not a standard RSModel
+		await delay(100);
+		let gltfblob = await exportThreeJsGltf(render.getModelNode());
+		return { modelfile: Buffer.from(gltfblob), imgfile: Buffer.alloc(0), metadata: { type: "map", id: argument } };
 	} else {
 		throw new Error("unknown mode " + mode);
 	}
+
+	// Extract Semantic Metadata for NPCs/Items/Objects
+	let semantic: any = {};
+	try {
+		if (mode == "npc") {
+			let config: any = parse.npc.read(await scene.engine.getFileById(cacheMajors.npcs, +argument), scene.engine.rawsource);
+			semantic = { name: config.name, actions: [config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4].filter(Boolean) };
+		} else if (mode == "item") {
+			let config: any = parse.item.read(await scene.engine.getFileById(cacheMajors.items, +argument), scene.engine.rawsource);
+			semantic = { 
+				name: config.name, 
+				actions: [
+					config.ground_actions_0, config.ground_actions_1, config.ground_actions_2, config.ground_actions_3, config.ground_actions_4,
+					config.widget_actions_0, config.widget_actions_1, config.widget_actions_2, config.widget_actions_3, config.widget_actions_4
+				].filter(Boolean) 
+			};
+		} else if (mode == "loc") {
+			let config: any = parse.object.read(await scene.engine.getFileById(cacheMajors.objects, +argument), scene.engine.rawsource);
+			semantic = { name: config.name, actions: [config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4].filter(Boolean) };
+		}
+	} catch (e) { console.warn("metadata extraction failed:", e); }
 	// let player = await itemToModel(scene, 0);
 	let model = new RSModel(scene, meshdata.models, meshdata.name);
 	model.setAnimation(meshdata.anims.default);
@@ -185,8 +258,8 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	try {
 		render.dispose();
 	} catch (e) {
-		console.warn("render.dispose failed (ignoring):", e);
+		// Silently ignore headless dispose errors.
 	}
 
-	return { imgfile, modelfile };
+	return { imgfile, modelfile, semantic };
 }

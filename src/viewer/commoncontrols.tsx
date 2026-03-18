@@ -27,11 +27,7 @@ export function BlobImage(p: { file: Uint8Array, ext: string, fillHeight?: boole
 	let urlref = React.useRef("");
 	let ref = React.useCallback((el: HTMLImageElement | null) => {
 		if (el) {
-<<<<<<< HEAD
 			let blob = new Blob([p.file as any], { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
-=======
-			let blob = new Blob([p.file] as any, { type: `image/${p.ext == "svg" ? "svg+xml" : p.ext}` });
->>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;
@@ -53,11 +49,7 @@ export function BlobAudio(p: { file: Uint8Array, autoplay: boolean }) {
 
 	let ref = React.useCallback((el: HTMLAudioElement | null) => {
 		if (el) {
-<<<<<<< HEAD
 			let blob = new Blob([p.file as any], { type: `audio/ogg` });
-=======
-			let blob = new Blob([p.file] as any, { type: `audio/ogg` });
->>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
 			let url = URL.createObjectURL(blob);
 			urlref.current = url;
 			el.src = url;

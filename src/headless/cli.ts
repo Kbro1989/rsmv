@@ -162,26 +162,27 @@ let cmd = cmdts.command({
 		if (args.endpoint) {
 			await runServer(src, args.endpoint, args.auth);
 		} else {
-			const { StructuralAnalyzer } = await import("./StructuralAnalyzer.js");
+			const { StructuralAnalyzer } = await import("./StructuralAnalyzer.ts");
 			let engine = await EngineCache.create(src);
 			let scene = await ThreejsSceneCache.create(engine);
 
-			let ava: { imgfile: Buffer; modelfile: Buffer };
+			let ava: any;
 			const modelStr = args.model;
+			let ext = "glb";
+			if (modelStr.startsWith('sound:') || modelStr.startsWith('music:')) ext = "ogg";
+			if (modelStr.startsWith('sprite:')) ext = "png";
 
-			if (modelStr.startsWith('npc:')) {
-				const id = modelStr.split(':')[1];
-				ava = await renderAppearance(scene, 'npc', id, args.head);
-			} else if (modelStr.startsWith('item:')) {
-				const id = modelStr.split(':')[1];
-				ava = await renderAppearance(scene, 'item', id, args.head);
+			if (modelStr.includes(':')) {
+				const [m, id] = modelStr.split(':');
+				ava = await renderAppearance(scene, m as any, id, args.head);
 			} else {
-				let modelparts = modelStr.split(":");
-				ava = await renderAppearance(scene, modelparts[0] as any, modelparts[1], args.head);
+				ava = await renderAppearance(scene, 'appearance', modelStr, args.head);
 			}
 
-			await fs.writeFile("model.png", ava.imgfile);
-			await fs.writeFile("model.glb", Buffer.from(ava.modelfile));
+			if (ava.imgfile && ava.imgfile.length > 0) {
+				await fs.writeFile("model.png", ava.imgfile);
+			}
+			await fs.writeFile(`model.${ext}`, Buffer.from(ava.modelfile));
 
 			if (args.analyze) {
 				let wikiData = { role: 'Unknown', intent: 'Studied asset', url: '' };
@@ -197,7 +198,7 @@ let cmd = cmdts.command({
 						console.error("Failed to parse wiki data:", e);
 					}
 				}
-				const profile = await StructuralAnalyzer.analyze(modelStr, modelStr, "model.glb", wikiData);
+				const profile = await StructuralAnalyzer.analyze(modelStr, modelStr, `model.${ext}`, wikiData, ava.semantic);
 				await fs.writeFile("pedagogy_profile.json", JSON.stringify(profile, null, 2));
 				console.log("pedagogy profile generated.");
 			}
