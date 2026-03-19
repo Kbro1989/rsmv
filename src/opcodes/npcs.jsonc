@@ -2,8 +2,9 @@
 	"0x01": { "name":                              "models", "read": [ "array", ["match","buildnr",{">=669":"varuint",">=0":"ushort" }]]},
 	"0x02": { "name":                                "name", "read": "string" },
 	"0x03": { "name":                             "examine", "read": "string" },//last used 2006
-	"0x08": { "name":                          "unknown_08", "read": "unsigned byte" },//might be wrong and part of other op
-	"0x0B": { "name":                          "unknown_0B", "read": "unsigned byte" },//might be wrong and part of other op
+	"0x08": { "name":                          "unknown_08", "read": "unsigned byte" },
+	"0x09": { "name":                          "unknown_09", "read": "unsigned short" },
+	"0x0B": { "name":                          "unknown_0B", "read": "unsigned byte" },
 	"0x0C": { "name":                           "boundSize", "read": "unsigned byte" },
 	"0x0D": { "name":                              "unk_0D", "read": "ushort" },//last used 2006
 	"0x0E": { "name":                              "unk_0E", "read": "ushort" },//last used 2006

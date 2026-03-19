@@ -162,7 +162,7 @@ let cmd = cmdts.command({
 		if (args.endpoint) {
 			await runServer(src, args.endpoint, args.auth);
 		} else {
-			const { StructuralAnalyzer } = await import("./StructuralAnalyzer.ts");
+			const { StructuralAnalyzer } = await import("./StructuralAnalyzer.js");
 			let engine = await EngineCache.create(src);
 			let scene = await ThreejsSceneCache.create(engine);
 

@@ -1,0 +1,143 @@
+{
+  "id": "item:4151",
+  "name": "Abyssal whip",
+  "type": "ITEM",
+  "metrics": {
+    "polyCount": 223,
+    "boneCount": 0,
+    "nodeCount": 5,
+    "jointCount": 0,
+    "materialComplexity": 1,
+    "rigLogic": "STATIC",
+    "surfaceArea": 17,
+    "dimensions": {
+      "x": 196,
+      "y": 48,
+      "z": 216
+    }
+  },
+  "structure": {
+    "meshCount": 2,
+    "animationCount": 0,
+    "nodeHierarchyDepth": 4,
+    "bones": [],
+    "materials": [
+      {
+        "name": "unnamed",
+        "type": "PBR"
+      }
+    ]
+  },
+  "semantic": {
+    "name": "Abyssal whip",
+    "actions": [
+      "Wield"
+    ],
+    "examine": "Whip viciously at the target, draining their energy."
+  },
+  "mechanics": {
+    "params": [
+      {
+        "prop": 2195,
+        "intvalue": 24,
+        "stringvalue": null
+      },
+      {
+        "prop": 644,
+        "intvalue": 1578,
+        "stringvalue": null
+      },
+      {
+        "prop": 641,
+        "intvalue": 6720,
+        "stringvalue": null
+      },
+      {
+        "prop": 14,
+        "intvalue": 4,
+        "stringvalue": null
+      },
+      {
+        "prop": 3267,
+        "intvalue": 1486,
+        "stringvalue": null
+      },
+      {
+        "prop": 686,
+        "intvalue": 14935,
+        "stringvalue": null
+      },
+      {
+        "prop": 118,
+        "intvalue": 7186,
+        "stringvalue": null
+      },
+      {
+        "prop": 749,
+        "intvalue": 0,
+        "stringvalue": null
+      },
+      {
+        "prop": 750,
+        "intvalue": 70,
+        "stringvalue": null
+      },
+      {
+        "prop": 2825,
+        "intvalue": 1,
+        "stringvalue": null
+      },
+      {
+        "prop": 2820,
+        "intvalue": 74641,
+        "stringvalue": null
+      },
+      {
+        "prop": 4329,
+        "intvalue": 1,
+        "stringvalue": null
+      },
+      {
+        "prop": 4330,
+        "intvalue": 1,
+        "stringvalue": null
+      },
+      {
+        "prop": 4332,
+        "intvalue": 500,
+        "stringvalue": null
+      },
+      {
+        "prop": 4333,
+        "intvalue": null,
+        "stringvalue": "Energy Drain"
+      },
+      {
+        "prop": 4334,
+        "intvalue": null,
+        "stringvalue": "Whip viciously at the target, draining their energy."
+      },
+      {
+        "prop": 8170,
+        "intvalue": 1,
+        "stringvalue": null
+      },
+      {
+        "prop": 2796,
+        "intvalue": 0,
+        "stringvalue": null
+      },
+      {
+        "prop": 5551,
+        "intvalue": 36621,
+        "stringvalue": null
+      }
+    ]
+  },
+  "semantics": {
+    "role": "Unknown",
+    "intent": "Studied asset",
+    "wikiUrl": ""
+  },
+  "timestamp": 1773828705506
+}

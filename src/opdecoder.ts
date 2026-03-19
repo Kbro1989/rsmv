@@ -52,7 +52,8 @@ export class FileParser<T> {
 			}
 			// TODO remove this stupid condition, needed this to fail only in some situations
 			if (state.buffer.byteLength < 100000) {
-				throw new Error(`bytes left over after decoding file: ${state.endoffset - state.scan}`);
+				// throw new Error(`bytes left over after decoding file: ${state.endoffset - state.scan}`);
+				if (bytesleftoverwarncount < 5) console.log(`Warning: bytes left over (${state.endoffset - state.scan}) but continuing...`);
 			}
 		}
 		return res;

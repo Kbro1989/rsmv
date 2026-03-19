@@ -1,15 +1,10 @@
 
-import { exportThreeJsGltf, ThreeJsRenderer } from "../viewer/threejsrender";
 import { CacheFileSource } from "../cache";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
-import { itemToModel, npcToModel, locToModel, spotAnimToModel, materialToModel, RSModel, SimpleModelInfo, RSMapChunk } from "../3d/modelnodes";
 import { delay } from "../utils";
 import { Vector3, WebGLRendererParameters } from "three";
-import { appearanceUrl, avatarStringToBytes, avatarToModel } from "../3d/avatar";
+import { appearanceUrl, avatarStringToBytes } from "../3d/avatar";
 import { pixelsToImageFile } from "../imgutils";
-import { parseMapsquare } from "../3d/mapsquare";
-import { parseMusic } from "../scripts/musictrack";
-import { parseSprite } from "../3d/sprite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
@@ -101,7 +96,7 @@ function runConnection(source: CacheFileSource, endpoint: string, auth: string) 
 	});
 }
 
-export function getRenderer(width: number, height: number, extraopts?: WebGLRendererParameters) {
+export async function getRenderer(width: number, height: number, extraopts?: WebGLRendererParameters) {
 	let opts = Object.assign({ antialias: true, alpha: true } as WebGLRendererParameters, extraopts);
 
 	let cnv: HTMLCanvasElement;
@@ -132,6 +127,7 @@ export function getRenderer(width: number, height: number, extraopts?: WebGLRend
 		}
 	}
 
+	const { ThreeJsRenderer } = await import("../viewer/threejsrender.js") as any;
 	let render = new ThreeJsRenderer(cnv, { context: ctx, ...opts });
 	
 	// FIX: Force Three.js to use uniform-based skinning instead of texture-based skinning
@@ -150,57 +146,75 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 
 	// Handle non-3D Assets first
 	if (mode == "sound" || mode == "music") {
+		const { parseMusic } = await import("../scripts/musictrack.js");
 		let major = (mode == "sound" ? cacheMajors.sounds : cacheMajors.music);
 		let ogg = await parseMusic(scene.engine.rawsource, major, +argument, null, true);
 		return { modelfile: ogg, imgfile: Buffer.alloc(0), metadata: { type: mode, id: argument } };
 	}
 	if (mode == "sprite") {
+		const { parseSprite } = await import("../3d/sprite.js");
 		let sprites = await parseSprite(await scene.engine.getFileById(cacheMajors.sprites, +argument));
 		let imgfile = await pixelsToImageFile(sprites[0].img as any, "png", 1);
 		return { modelfile: imgfile, imgfile, metadata: { type: "sprite", id: argument } };
 	}
 
-	let render = getRenderer(width, height);
+	const { ThreeJsRenderer, exportThreeJsGltf } = await import("../viewer/threejsrender.js");
+	const { RSModel } = await import("../3d/modelnodes.js");
+	const { avatarToModel } = await import("../3d/avatar.js");
+
+	let render = await getRenderer(width, height);
 	render.addSceneElement({
 		getSceneElements() {
 			return { options: { autoFrames: "never", hideFloor: true } };
 		}
 	});
 
-	let meshdata: SimpleModelInfo<any, any>;
-	if (mode == "player" || mode == "appearance") {
-		let appearance = argument;
-		if (mode == "player") {
-			let url = appearanceUrl(argument);
-			appearance = await fetch(url).then(q => q.text());
-			if (appearance.indexOf("404 - Page not found") != -1) { throw new Error("player avatar not found"); }
-		}
-		console.log(appearance);
-		let ava = await avatarToModel(scene.engine, avatarStringToBytes(appearance), headmodel);
-		meshdata = { ...ava, id: argument };
-	} else if (mode == "item") {
+	let meshdata: any;
+	if (mode == "player") {
+		let url = appearanceUrl(argument);
+        let appearance = "";
+        try {
+		    appearance = await fetch(url).then(q => q.text());
+        } catch (e: any) {
+            throw new Error(`Avatar service blocked: ${e.message}. Consider using an appearance override string.`);
+        }
+		if (appearance.indexOf("404 - Page not found") != -1 || appearance.includes("303 See Other") || appearance.includes("Challenge")) { 
+            throw new Error("player avatar not found or blocked by Jagex (303/Challenge detected)."); 
+        }
+		const { avatarToModel } = await import("../3d/avatar.js");
+		meshdata = await avatarToModel(scene.engine, avatarStringToBytes(appearance), headmodel);
+	} else if (mode == "appearance") {
+		const { avatarToModel } = await import("../3d/avatar.js");
+		meshdata = await avatarToModel(scene.engine, avatarStringToBytes(argument), headmodel);
+	} else if (mode as string == "item") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
+		const { itemToModel } = await import("../3d/modelnodes.js");
 		meshdata = await itemToModel(scene, +argument);
-	} else if (mode == "npc") {
+	} else if (mode as string == "npc") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
+		const { npcToModel } = await import("../3d/modelnodes.js");
 		meshdata = await npcToModel(scene, { id: +argument, head: headmodel });
-	} else if (mode == "loc") {
+	} else if (mode as string == "loc") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
+		const { locToModel } = await import("../3d/modelnodes.js");
 		meshdata = await locToModel(scene, +argument);
-	} else if (mode == "spot") {
+	} else if (mode as string == "spot") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
+		const { spotAnimToModel } = await import("../3d/modelnodes.js");
 		meshdata = await spotAnimToModel(scene, +argument);
-	} else if (mode == "mat") {
+	} else if (mode as string == "mat") {
 		if (isNaN(+argument)) { throw new Error("number expected"); }
+		const { materialToModel } = await import("../3d/modelnodes.js");
 		meshdata = await materialToModel(scene, +argument);
-	} else if (mode == "map") {
+	} else if (mode as string == "map") {
+		const { RSMapChunk } = await import("../3d/modelnodes.js");
 		let [x, z] = argument.split(",").map(Number);
 		let chunk = RSMapChunk.create(scene, x, z);
 		render.addSceneElement(chunk);
 		// Manual gltf export for map chunk since it's not a standard RSModel
 		await delay(100);
 		let gltfblob = await exportThreeJsGltf(render.getModelNode());
-		return { modelfile: Buffer.from(gltfblob), imgfile: Buffer.alloc(0), metadata: { type: "map", id: argument } };
+		return { modelfile: Buffer.from(gltfblob), imgfile: Buffer.alloc(0), metadata: { type: mode, id: argument } };
 	} else {
 		throw new Error("unknown mode " + mode);
 	}
@@ -210,24 +224,41 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	try {
 		if (mode == "npc") {
 			let config: any = parse.npc.read(await scene.engine.getFileById(cacheMajors.npcs, +argument), scene.engine.rawsource);
-			semantic = { name: config.name, actions: [config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4].filter(Boolean) };
+			console.log("NPC CONFIG CAPTURED:", JSON.stringify(config, null, 2));
+			semantic = { 
+				name: config.name, 
+				actions: [
+					config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4,
+					config.members_actions_0, config.members_actions_1, config.members_actions_2, config.members_actions_3, config.members_actions_4
+				].filter(Boolean),
+				extra: config.extra
+			};
 		} else if (mode == "item") {
 			let config: any = parse.item.read(await scene.engine.getFileById(cacheMajors.items, +argument), scene.engine.rawsource);
+			console.log("ITEM CONFIG CAPTURED:", JSON.stringify(config, null, 2));
 			semantic = { 
 				name: config.name, 
 				actions: [
 					config.ground_actions_0, config.ground_actions_1, config.ground_actions_2, config.ground_actions_3, config.ground_actions_4,
 					config.widget_actions_0, config.widget_actions_1, config.widget_actions_2, config.widget_actions_3, config.widget_actions_4
-				].filter(Boolean) 
+				].filter(Boolean),
+				extra: config.extra
 			};
 		} else if (mode == "loc") {
 			let config: any = parse.object.read(await scene.engine.getFileById(cacheMajors.objects, +argument), scene.engine.rawsource);
-			semantic = { name: config.name, actions: [config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4].filter(Boolean) };
+			console.log("OBJECT CONFIG CAPTURED:", JSON.stringify(config, null, 2));
+			semantic = { 
+				name: config.name, 
+				actions: [config.actions_0, config.actions_1, config.actions_2, config.actions_3, config.actions_4].filter(Boolean),
+				extra: config.extra
+			};
 		}
 	} catch (e) { console.warn("metadata extraction failed:", e); }
 	// let player = await itemToModel(scene, 0);
 	let model = new RSModel(scene, meshdata.models, meshdata.name);
-	model.setAnimation(meshdata.anims.default);
+	if (meshdata.anims && !isNaN(meshdata.anims.default)) {
+		model.setAnimation(meshdata.anims.default);
+	}
 	render.addSceneElement(model);
 
 	console.log("waiting for model to load...");

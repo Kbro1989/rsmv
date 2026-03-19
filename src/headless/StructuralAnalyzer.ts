@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import type { PedagogyProfile } from './pedagogy_types.ts';
+import type { PedagogyProfile } from './pedagogy_types.js';
 
 /**
  * StructuralAnalyzer — Distills professional production norms from exported assets.
@@ -74,7 +74,10 @@ export class StructuralAnalyzer {
             semantic: {
                 name: cacheSemantic?.name,
                 actions: cacheSemantic?.actions,
-                examine: wikiData?.examine // Placeholder for examine
+                examine: this.extractExamineText(cacheSemantic?.extra) || wikiData?.examine
+            },
+            mechanics: {
+                params: cacheSemantic?.extra || []
             },
             semantics: {
                 role: wikiData.role || (id.includes(':') ? id.split(':')[0] : 'Production Asset'),
@@ -192,5 +195,23 @@ export class StructuralAnalyzer {
             y: Number((max[1] - min[1]).toFixed(3)),
             z: Number((max[2] - min[2]).toFixed(3))
         };
+    }
+
+    private static extractExamineText(extra: any[]): string | null {
+        if (!extra || !Array.isArray(extra)) return null;
+        // Known RS3 examine property IDs: 1019 (NPC), 2571 (Item), 2195 (Object), 4334 (Item Desc)
+        const examineIds = [1019, 2571, 2195, 4334];
+        for (const entry of extra) {
+            if (examineIds.includes(entry.prop) && entry.stringvalue) {
+                return entry.stringvalue;
+            }
+        }
+        // Fallback: look for ANY string property that isn't the name or empty
+        for (const entry of extra) {
+            if (entry.stringvalue && entry.stringvalue.length > 3) {
+                return entry.stringvalue;
+            }
+        }
+        return null;
     }
 }

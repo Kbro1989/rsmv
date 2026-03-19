@@ -1,15 +1,14 @@
-import * as cache from "./index";
-import { compressSqlite, decompress } from "./compression";
-import { cacheMajors } from "../constants";
-import { CacheIndex } from "./index";
+import * as cache from "./index.js";
+import { compressSqlite, decompress } from "./compression.js";
+import { cacheMajors } from "../constants.js";
+import { CacheIndex } from "./index.js";
+import sqlite from "sqlite3";
 import * as path from "path";
 import * as fs from "fs";
-//only type info, import the actual thing at runtime so it can be avoided if not used
-import type * as sqlite3 from "sqlite3";
 
 
 type CacheTable = {
-	db: sqlite3.Database | null,
+	db: sqlite.Database | null,
 	indices: Promise<cache.CacheIndexFile>,
 	readFile: (minor: number) => Promise<{ DATA: Buffer, CRC: number }>,
 	readIndexFile: () => Promise<{ DATA: Buffer, CRC: number }>,
@@ -63,7 +62,6 @@ export class GameCacheLoader extends cache.CacheFileSource {
 	}
 
 	openTable(major: number) {
-		let sqlite = __non_webpack_require__("sqlite3") as typeof import("sqlite3");
 		if (!this.opentables.get(major)) {
 			let db: CacheTable["db"] = null;
 			let indices: CacheTable["indices"];
@@ -123,6 +121,9 @@ export class GameCacheLoader extends cache.CacheFileSource {
 		if (major == cacheMajors.index) { return this.getIndexFile(minor); }
 		let { readFile: getFile } = this.openTable(major);
 		let row = await getFile(minor);
+		if (!row) {
+			throw new Error(`File ${major}.${minor} not found in cache.`);
+		}
 		if (typeof crc == "number" && row.CRC != crc) {
 			//TODO this is always off by either 1 or 2
 			// console.log(`crc from cache (${row.CRC}) did not match requested crc (${crc}) for ${major}.${minor}`);

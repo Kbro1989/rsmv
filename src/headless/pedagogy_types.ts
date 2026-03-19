@@ -24,7 +24,7 @@ export interface PedagogyProfile {
         animationGroup?: number;
     };
     mechanics?: {
-        params?: Record<string, any>;
+        params?: any;
         scriptOps?: string[];
         archetype?: string;
     };

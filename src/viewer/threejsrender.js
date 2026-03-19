@@ -1,0 +1,855 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ThreeJsRenderer = void 0;
+exports.disposeThreeTree = disposeThreeTree;
+exports.exportThreeJsGltf = exportThreeJsGltf;
+exports.exportThreeJsStl = exportThreeJsStl;
+exports.highlightModelGroup = highlightModelGroup;
+const THREE = __importStar(require("three"));
+const OrbitControls_1 = require("three/examples/jsm/controls/OrbitControls");
+const utils_1 = require("../utils");
+const imgutils_1 = require("../imgutils");
+const GLTFExporter_1 = require("three/examples/jsm/exporters/GLTFExporter");
+const STLExporter_1 = require("three/examples/jsm/exporters/STLExporter");
+const three_1 = require("three");
+const vr360camera_1 = require("./vr360camera");
+const map_1 = require("../map");
+const camerautils_1 = require("./camerautils");
+//TODO remove
+globalThis.THREE = THREE;
+//console hooks
+globalThis.logclicks = false;
+globalThis.speed = 100;
+//nodejs compatible animframe calls
+//should in theory be able to get rid of these completely by enforcing autoframes=false
+function compatRequestAnimationFrame(cb) {
+    if (typeof requestAnimationFrame != "undefined") {
+        return requestAnimationFrame(cb);
+    }
+    else {
+        return +setTimeout(() => cb(Date.now()), 50);
+    }
+}
+function compatCancelAnimationFrame(id) {
+    if (!id) {
+        return;
+    }
+    if (typeof cancelAnimationFrame != "undefined") {
+        return cancelAnimationFrame(id);
+    }
+    else {
+        return clearTimeout(id);
+    }
+}
+class ThreeJsRenderer extends utils_1.TypedEmitter {
+    renderer;
+    canvas;
+    skybox = null;
+    scene;
+    modelnode;
+    floormesh;
+    queuedFrameId = 0;
+    autoFrameMode = "forced";
+    contextLossCount = 0;
+    contextLossCountLastRender = 0;
+    clock = new three_1.Clock(true);
+    sceneElements = new Set();
+    animationCallbacks = new Set();
+    vr360cam = null;
+    forceAspectRatio = null;
+    standardLights;
+    camMode = "standard";
+    camera;
+    topdowncam;
+    standardControls;
+    orthoControls;
+    itemcam = new THREE.PerspectiveCamera();
+    constructor(canvas, params) {
+        super();
+        globalThis.render = this; //TODO remove
+        this.canvas = canvas;
+        this.renderer = new THREE.WebGLRenderer({
+            canvas,
+            alpha: true,
+            powerPreference: "high-performance",
+            antialias: true,
+            preserveDrawingBuffer: true,
+            ...params
+        });
+        const renderer = this.renderer;
+        canvas.addEventListener("webglcontextlost", () => this.contextLossCount++);
+        canvas.onmousedown = this.mousedown;
+        this.camera = new THREE.PerspectiveCamera(45, 2, 0.1, 1000);
+        this.camera.position.set(0, 10, 20);
+        this.standardControls = new OrbitControls_1.OrbitControls(this.camera, canvas);
+        this.standardControls.target.set(0, 5, 0);
+        this.standardControls.update();
+        this.standardControls.addEventListener("change", this.forceFrame);
+        this.topdowncam = new map_1.SkewOrthographicCamera(10, 0, 0);
+        this.topdowncam.position.copy(this.camera.position);
+        this.orthoControls = new OrbitControls_1.OrbitControls(this.topdowncam, canvas);
+        this.orthoControls.target.set(0, 5, 0);
+        this.orthoControls.screenSpacePanning = false;
+        this.orthoControls.update();
+        this.orthoControls.addEventListener("change", this.forceFrame);
+        const scene = new THREE.Scene();
+        this.scene = scene;
+        scene.add(this.camera);
+        scene.add(this.topdowncam);
+        //three typings are outdated
+        renderer.useLegacyLights = false;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        const planeSize = 11;
+        //floor mesh
+        //inline since nodejs doesn't have a texture loader
+        let floortex = (0, imgutils_1.makeImageData)(new Uint8ClampedArray([
+            128, 128, 128, 255, 192, 192, 192, 255,
+            192, 192, 192, 255, 128, 128, 128, 255
+        ]), 2, 2);
+        const texture = new three_1.Texture(floortex);
+        texture.needsUpdate = true;
+        // const loader = new THREE.TextureLoader();
+        // const texture = loader.load(new URL('../assets/checker.png', import.meta.url).href, () => this.forceFrame());
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.magFilter = THREE.NearestFilter;
+        const repeats = planeSize / 2;
+        texture.repeat.set(repeats, repeats);
+        const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+        const planeMat = new THREE.MeshPhongMaterial({ map: texture, side: THREE.DoubleSide, });
+        const floormesh = new THREE.Mesh(planeGeo, planeMat);
+        floormesh.rotation.x = Math.PI * -0.5;
+        floormesh.position.y = -0.01; //slight offset to reduce flickering
+        scene.add(floormesh);
+        this.floormesh = floormesh;
+        //model viewer root
+        this.modelnode = new THREE.Group();
+        this.modelnode.scale.set(1 / 512, 1 / 512, -1 / 512);
+        this.scene.add(this.modelnode);
+        //classic light config
+        this.standardLights = new three_1.Group();
+        let ambientlight = new THREE.AmbientLight(0xffffff, 0.7);
+        var dirLight = new THREE.DirectionalLight(0xffffff);
+        dirLight.position.set(75, 300, -75);
+        let hemilight = new THREE.HemisphereLight(0xffffff, 0x888844);
+        ambientlight.layers.enableAll();
+        dirLight.layers.enableAll();
+        hemilight.layers.enableAll();
+        this.standardLights.add(ambientlight);
+        this.standardLights.add(dirLight);
+        this.standardLights.add(hemilight);
+        scene.add(this.standardLights);
+        this.scene.fog = new THREE.Fog("#FFFFFF", 10000, 10000);
+        this.sceneElementsChanged();
+    }
+    getCurrent2dCamera() {
+        if (this.camMode == "standard") {
+            return this.getStandardCamera();
+        }
+        else if (this.camMode == "item") {
+            return this.getItemCamera();
+        }
+        else if (this.camMode == "topdown") {
+            return this.getTopdownCamera();
+        }
+        return null;
+    }
+    getStandardCamera() {
+        return this.camera;
+    }
+    getVr360Camera() {
+        if (!this.vr360cam) {
+            this.vr360cam = new vr360camera_1.VR360Render(this.renderer, 512, 0.1, 1000);
+            this.camera.add(this.vr360cam.cubeCamera);
+        }
+        return this.vr360cam;
+    }
+    getItemCamera() {
+        return this.itemcam;
+    }
+    getTopdownCamera() {
+        return this.topdowncam;
+    }
+    getModelNode() {
+        return this.modelnode;
+    }
+    addSceneElement(el) {
+        this.sceneElements.add(el);
+        this.sceneElementsChanged();
+    }
+    removeSceneElement(el) {
+        this.sceneElements.delete(el);
+        this.sceneElementsChanged();
+    }
+    sceneElementsChanged() {
+        let sky = null;
+        let aspect = null;
+        let cammode = "standard";
+        let controls = "free";
+        let hideFog = false;
+        let showfloor = true;
+        let autoframes = "auto";
+        let nodeDeleteList = new Set(this.modelnode.children);
+        this.animationCallbacks.clear();
+        for (let source of this.sceneElements) {
+            let elgroup = source.getSceneElements();
+            if (!Array.isArray(elgroup)) {
+                elgroup = [elgroup];
+            }
+            for (let el of elgroup) {
+                if (el.sky) {
+                    sky = el.sky;
+                }
+                if (el.updateAnimation) {
+                    this.animationCallbacks.add(el.updateAnimation);
+                }
+                if (el.options?.hideFog) {
+                    hideFog = true;
+                }
+                if (el.options?.hideFloor) {
+                    showfloor = false;
+                }
+                if (el.options?.camMode) {
+                    cammode = el.options.camMode;
+                }
+                if (el.options?.camControls) {
+                    controls = el.options.camControls;
+                }
+                if (el.options?.aspect) {
+                    aspect = el.options.aspect;
+                }
+                if (el.options?.autoFrames) {
+                    autoframes = el.options.autoFrames;
+                }
+                if (el.modelnode) {
+                    nodeDeleteList.delete(el.modelnode);
+                    if (el.modelnode.parent != this.modelnode) {
+                        this.modelnode.add(el.modelnode);
+                    }
+                }
+            }
+        }
+        nodeDeleteList.forEach(q => this.modelnode.remove(q));
+        this.autoFrameMode = (autoframes == "auto" ? (this.animationCallbacks.size == 0 ? "forced" : "continuous") : autoframes);
+        this.floormesh.visible = showfloor;
+        if (this.camMode == "topdown" && cammode == "standard") {
+            this.camera.position.copy(this.topdowncam.position);
+            this.camera.rotation.copy(this.topdowncam.rotation);
+            this.standardControls.update();
+        }
+        if (this.camMode == "standard" && cammode == "topdown") {
+            this.topdowncam.position.copy(this.camera.position);
+            this.topdowncam.rotation.copy(this.camera.rotation);
+            this.orthoControls.update();
+        }
+        this.camMode = cammode;
+        this.standardControls.enabled = this.camMode != "topdown";
+        this.orthoControls.enabled = this.camMode == "topdown";
+        this.standardControls.screenSpacePanning = controls == "free";
+        this.orthoControls.screenSpacePanning = controls == "free";
+        this.forceAspectRatio = aspect;
+        //fog/skybox
+        let fogobj = this.scene.fog;
+        if (sky?.fogColor) {
+            fogobj.color.setRGB(sky.fogColor[0] / 255, sky.fogColor[1] / 255, sky.fogColor[2] / 255);
+        }
+        else {
+            fogobj.color.setRGB(1, 1, 1);
+        }
+        if (!hideFog) {
+            fogobj.far = 250;
+            fogobj.near = 80;
+        }
+        else {
+            //can't actually remove fog from an already rendered scene, just make it not render instead
+            //still not clear if this is a bug in threejs or if it's intended, it used to work
+            fogobj.far = 100000;
+            fogobj.near = 100000;
+        }
+        if (sky?.skybox) {
+            let scene = this.skybox?.scene ?? new THREE.Scene();
+            let camera = this.skybox?.camera ?? new three_1.PerspectiveCamera().copy(this.camera, false);
+            let obj = new THREE.Object3D();
+            obj.scale.set(1 / 512, 1 / 512, -1 / 512);
+            obj.add(sky.skybox);
+            scene.clear();
+            scene.add(obj, camera, new THREE.AmbientLight(0xffffff));
+            scene.background = (sky.fogColor ? fogobj.color.clone() : null);
+            this.skybox = { scene, camera };
+        }
+        else {
+            this.skybox = null;
+        }
+        this.forceFrame();
+    }
+    resizeRendererToDisplaySize() {
+        const canvas = this.renderer.domElement;
+        if (!canvas.isConnected) {
+            return;
+        }
+        let width = canvas.clientWidth;
+        let height = canvas.clientHeight;
+        if (this.forceAspectRatio) {
+            height = Math.min(height, Math.floor(width / this.forceAspectRatio));
+            width = Math.min(width, Math.floor(height * this.forceAspectRatio));
+        }
+        const needResize = canvas.width !== width || canvas.height !== height;
+        if (needResize) {
+            this.renderer.setSize(width, height, false);
+            this.resizeViewToRendererSize();
+        }
+        return needResize;
+    }
+    resizeViewToRendererSize() {
+        let rendertarget = this.renderer.getRenderTarget();
+        let width = rendertarget?.width ?? this.canvas.width;
+        let height = rendertarget?.height ?? this.canvas.height;
+        let camscaling = width / height * (this.topdowncam.top - this.topdowncam.bottom) / (this.topdowncam.right - this.topdowncam.left);
+        this.topdowncam.left *= camscaling;
+        this.topdowncam.right *= camscaling;
+        this.topdowncam.updateProjectionMatrix();
+    }
+    guaranteeGlCalls = async (glfunction) => {
+        let waitContext = () => {
+            if (!this.renderer.getContext().isContextLost()) {
+                return;
+            }
+            console.log("frame stalled since context is lost");
+            return new Promise(resolve => {
+                this.renderer.domElement.addEventListener("webglcontextrestored", () => {
+                    console.log("context restored");
+                    //make sure three.js handles the event before we retry
+                    setTimeout(resolve, 1);
+                }, { once: true });
+            });
+        };
+        for (let retry = 0; retry < 5; retry++) {
+            await waitContext();
+            //it seems like the first render after a context loss is always failed, force 2 renders this way
+            let prerenderlosses = this.contextLossCountLastRender;
+            let res = await glfunction();
+            //new stack frame to let all errors resolve
+            await (0, utils_1.delay)(1);
+            if (this.renderer.getContext().isContextLost()) {
+                console.log("lost context during render " + new Date());
+                continue;
+            }
+            else if (prerenderlosses != this.contextLossCount) {
+                console.log("lost and regained context during render " + new Date());
+                continue;
+            }
+            return res;
+        }
+        throw new Error("Failed to render frame after 5 retries");
+    };
+    render = (cam) => {
+        compatCancelAnimationFrame(this.queuedFrameId);
+        this.queuedFrameId = 0;
+        let delta = this.clock.getDelta();
+        delta *= (globalThis.speed ?? 100) / 100; //TODO remove
+        this.animationCallbacks.forEach(q => q(delta, this.clock.elapsedTime));
+        this.resizeRendererToDisplaySize();
+        if (cam) {
+            this.renderScene(cam);
+        }
+        else if (this.camMode == "vr360") {
+            let cam = this.getVr360Camera();
+            this.renderCube(cam);
+            this.renderer.clearColor();
+            cam.render(this.renderer);
+        }
+        else {
+            this.renderScene(this.getCurrent2dCamera());
+        }
+        if (this.autoFrameMode == "continuous") {
+            this.forceFrame();
+        }
+    };
+    renderScene(cam) {
+        let size = this.renderer.getRenderTarget() ?? this.renderer.getContext().canvas ?? this.canvas;
+        let aspect = size.width / size.height;
+        if (cam instanceof THREE.PerspectiveCamera && cam.aspect != aspect) {
+            cam.aspect = aspect;
+            cam.updateProjectionMatrix();
+        }
+        let oldautoclear = this.renderer.autoClear;
+        if (cam == this.camera && this.skybox) {
+            this.skybox.camera.matrixAutoUpdate = false;
+            this.camera.updateWorldMatrix(true, true);
+            this.skybox.camera.matrix.copy(this.camera.matrixWorld);
+            this.skybox.camera.matrix.setPosition(0, 0, 0);
+            this.skybox.camera.projectionMatrix.copy(this.camera.projectionMatrix);
+            this.renderer.render(this.skybox.scene, this.skybox.camera);
+            //only clear depth for next render
+            //need to do this weird flipflop since threejs doesn't respect the autoclear color when manually calling renderer.clearColor() for the first time
+            this.renderer.clearDepth();
+            this.renderer.autoClear = false;
+        }
+        this.renderer.render(this.scene, cam);
+        this.renderer.autoClear = oldautoclear;
+        this.contextLossCountLastRender = this.contextLossCount;
+    }
+    renderCube(render) {
+        render.cubeRenderTarget.clear(this.renderer, true, true, false);
+        if (this.skybox) {
+            render.skyCubeCamera.matrixAutoUpdate = false;
+            render.cubeCamera.updateWorldMatrix(true, true);
+            render.skyCubeCamera.matrix.copy(render.cubeCamera.matrixWorld);
+            render.skyCubeCamera.matrix.setPosition(0, 0, 0);
+            render.skyCubeCamera.updateMatrixWorld(true);
+            render.skyCubeCamera.update(this.renderer, this.skybox.scene);
+            render.cubeRenderTarget.clear(this.renderer, false, true, false);
+        }
+        render.cubeCamera.update(this.renderer, this.scene);
+    }
+    forceFrame = () => {
+        if (!this.queuedFrameId && this.autoFrameMode != "never") {
+            this.queuedFrameId = compatRequestAnimationFrame(() => this.render());
+        }
+    };
+    async takeScenePicture(width = this.canvas.width, height = this.canvas.height) {
+        let rendertarget = null;
+        if (width != this.canvas.width || height != this.canvas.height) {
+            let gl = this.renderer.getContext();
+            rendertarget = new THREE.WebGLRenderTarget(width, height, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+                colorSpace: (this.camMode != "vr360" ? this.renderer.outputColorSpace : THREE.LinearSRGBColorSpace),
+                samples: gl.getParameter(gl.SAMPLES)
+            });
+            // (rendertarget as any).isXRRenderTarget = true;
+        }
+        return this.guaranteeGlCalls(() => {
+            let oldtarget = this.renderer.getRenderTarget();
+            this.renderer.setRenderTarget(rendertarget);
+            this.resizeViewToRendererSize();
+            if (this.camMode != "vr360") {
+                let cam = this.getCurrent2dCamera();
+                this.renderScene(cam);
+            }
+            else {
+                let vrcam = new vr360camera_1.VR360Render(this.renderer, (width > 2000 ? 2048 : 1024), 0.1, 1000);
+                this.camera.add(vrcam.cubeCamera);
+                this.renderCube(vrcam);
+                this.renderer.clearColor();
+                vrcam.render(this.renderer);
+                vrcam.cubeCamera.removeFromParent();
+            }
+            let pixels = this.getFrameBufferPixels();
+            this.renderer.setRenderTarget(oldtarget);
+            this.resizeViewToRendererSize();
+            return pixels;
+        });
+    }
+    getFrameBufferPixels() {
+        let rendertarget = this.renderer.getRenderTarget();
+        let width = rendertarget?.width ?? this.canvas.width;
+        let height = rendertarget?.height ?? this.canvas.height;
+        let buf = new Uint8Array(width * height * 4); //node-gl doesn't accept clamped
+        if (rendertarget) {
+            this.renderer.readRenderTargetPixels(rendertarget, 0, 0, width, height, buf);
+            rendertarget.dispose();
+        }
+        else {
+            let gl = this.renderer.getContext();
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        }
+        let r = (0, imgutils_1.makeImageData)(buf, width, height);
+        (0, imgutils_1.flipImage)(r);
+        return r;
+    }
+    takeMapPicture(cam, framesizex = -1, framesizey = -1, linearcolor = false, highlight = null) {
+        if (framesizex != -1 && framesizey != -1) {
+            this.renderer.setSize(framesizex, framesizey);
+        }
+        return this.guaranteeGlCalls(() => {
+            let opaqueBackground = !highlight;
+            //change render settings
+            let oldcolorspace = this.renderer.outputColorSpace;
+            this.renderer.outputColorSpace = (linearcolor ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace);
+            this.renderer.setClearColor(new THREE.Color(0, 0, 0), (opaqueBackground ? 255 : 0));
+            this.scene.background = (opaqueBackground ? new THREE.Color(0, 0, 0) : null);
+            if (!highlight) {
+                this.renderScene(cam);
+            }
+            else {
+                this.renderer.clearDepth();
+                this.renderer.clearColor();
+                let old = cam.layers.mask;
+                cam.layers.set(1); //TODO put this layer id in a constant somewhere
+                this.renderer.render(this.scene, cam);
+                cam.layers.mask = old;
+            }
+            let img = this.getFrameBufferPixels();
+            //restore render settings
+            this.renderer.outputColorSpace = oldcolorspace;
+            this.renderer.setClearColor(new THREE.Color(0, 0, 0), 0);
+            this.scene.background = null;
+            return img;
+        });
+    }
+    setCameraPosition(pos) {
+        this.camera.position.copy(pos);
+    }
+    setCameraLimits(target) {
+        // compute the box that contains all the stuff
+        // from root and below
+        if (!target) {
+            const box = new THREE.Box3().setFromObject(this.modelnode);
+            const boxSize = box.getSize(new THREE.Vector3()).length();
+            target = box.getCenter(new THREE.Vector3());
+        }
+        // update the Trackball controls to handle the new size
+        // this.controls.maxDistance = Math.min(500, boxSize * 10 + 10);
+        this.standardControls.target.copy(target);
+        this.standardControls.update();
+        this.standardControls.screenSpacePanning = true;
+        // this.floormesh.position.setY(Math.min(0, box.min.y - 0.005));
+    }
+    mousedown = async (e) => {
+        let x1 = e.screenX;
+        let y1 = e.screenY;
+        let cnvx = e.clientX;
+        let cnvy = e.clientY;
+        let onup = (e) => {
+            let d = Math.abs(e.screenX - x1) + Math.abs(e.screenY - y1);
+            if (d < 10) {
+                this.click(cnvx, cnvy);
+            }
+            //*should* prevent rightclick menu's if dragging outside of canvas
+            e.preventDefault();
+        };
+        window.addEventListener("mouseup", onup, { once: true });
+    };
+    async click(cnvx, cnvy) {
+        let raycaster = new THREE.Raycaster();
+        let cnvrect = this.canvas.getBoundingClientRect();
+        let mousepos = new THREE.Vector2((cnvx - cnvrect.x) / cnvrect.width * 2 - 1, -(cnvy - cnvrect.y) / cnvrect.height * 2 + 1);
+        let currentcam = this.camMode == "standard" ? this.getStandardCamera() : this.camMode == "topdown" ? this.getTopdownCamera() : null;
+        if (!currentcam) {
+            return;
+        }
+        raycaster.setFromCamera(mousepos, currentcam);
+        let intersects = raycaster.intersectObjects(this.scene.children);
+        let firstloggable = true;
+        for (let isct of intersects) {
+            let obj = isct.object;
+            if (!obj.visible) {
+                continue;
+            }
+            let meshdata = obj.userData;
+            if (firstloggable) {
+                globalThis.model = isct.object;
+                firstloggable = false;
+                if (globalThis.logclicks) {
+                    if (isct.object instanceof three_1.Mesh && isct.object.geometry instanceof three_1.BufferGeometry) {
+                        let indices = [isct.face.a, isct.face.b, isct.face.c];
+                        console.log("Click intersect");
+                        for (let [id, attr] of Object.entries(isct.object.geometry.attributes)) {
+                            let vals = [];
+                            for (let index of indices) {
+                                let val = [];
+                                vals.push(val);
+                                if (attr.itemSize >= 1) {
+                                    val.push(attr.getX(index));
+                                }
+                                if (attr.itemSize >= 2) {
+                                    val.push(attr.getY(index));
+                                }
+                                if (attr.itemSize >= 3) {
+                                    val.push(attr.getZ(index));
+                                }
+                                if (attr.itemSize >= 4) {
+                                    val.push(attr.getW(index));
+                                }
+                            }
+                            console.log(`${id} = ${vals.map(q => `[${q.map(q => q.toFixed(2)).join(",")}]`)}`);
+                        }
+                    }
+                }
+            }
+            if (!(obj instanceof THREE.Mesh) || !meshdata.isclickable) {
+                continue;
+            }
+            //find out what we clicked
+            let match = undefined;
+            let endindex = obj.geometry.index?.count ?? obj.geometry.attributes.position.count;
+            let startindex = 0;
+            let clickindex = isct.faceIndex;
+            if (typeof clickindex == "undefined") {
+                throw new Error("???");
+            }
+            for (let i = 0; i < meshdata.subranges.length; i++) {
+                if (clickindex * 3 < meshdata.subranges[i]) {
+                    endindex = meshdata.subranges[i];
+                    break;
+                }
+                startindex = meshdata.subranges[i];
+                match = meshdata.subobjects[i];
+            }
+            if (!match) {
+                continue;
+            }
+            //find all the meshes and vertex ranges that are part of this obejct
+            let matches = [];
+            if (!meshdata.searchPeers) {
+                matches.push({ start: startindex, end: endindex, mesh: obj });
+            }
+            else {
+                let root = obj;
+                while (root.parent) {
+                    root = root.parent;
+                }
+                root.traverseVisible(obj => {
+                    let meshdata = obj.userData;
+                    if (obj instanceof THREE.Mesh && meshdata.isclickable && meshdata.searchPeers) {
+                        for (let i = 0; i < meshdata.subobjects.length; i++) {
+                            if (meshdata.subobjects[i] == match) {
+                                matches.push({
+                                    start: meshdata.subranges[i],
+                                    end: meshdata.subranges[i + 1] ?? obj.geometry.index.count,
+                                    mesh: obj
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+            this.emit("select", { obj, meshdata, match, vertexgroups: matches });
+            return;
+        }
+        this.emit("select", null);
+    }
+    makeUIRenderer() {
+        let scene = new THREE.Scene();
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        let hemilight = new THREE.HemisphereLight(0xffffff, 0x888844);
+        var dirLight = new THREE.DirectionalLight(0xffffff);
+        dirLight.position.set(75, 300, -75);
+        let modelnode = new THREE.Group();
+        modelnode.scale.set(1 / 512, 1 / 512, -1 / 512);
+        scene.add(dirLight);
+        scene.add(hemilight);
+        scene.add(modelnode);
+        let clock = new THREE.Clock();
+        let rendertarget = null;
+        let currentnode = null;
+        let currentcentery = 0;
+        let setmodel = (model, centery) => {
+            if (currentnode?.modelnode) {
+                modelnode.remove(currentnode.modelnode);
+                currentnode = null;
+            }
+            if (model?.modelnode) {
+                modelnode.add(model.modelnode);
+                currentnode = model;
+            }
+            currentcentery = centery;
+        };
+        let takePicture = (width, height, params) => {
+            let gl = this.renderer.getContext();
+            if (!rendertarget || width != rendertarget.width || height != rendertarget.height) {
+                rendertarget?.dispose();
+                rendertarget = new THREE.WebGLRenderTarget(width, height, {
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter,
+                    format: THREE.RGBAFormat,
+                    colorSpace: this.renderer.outputColorSpace,
+                    samples: gl.getParameter(gl.SAMPLES)
+                });
+            }
+            let delta = clock.getDelta();
+            currentnode?.updateAnimation?.(delta, clock.elapsedTime);
+            let oldtarget = this.renderer.getRenderTarget();
+            this.renderer.setRenderTarget(rendertarget);
+            let itemcam = new THREE.PerspectiveCamera();
+            (0, camerautils_1.updateItemCamera)(itemcam, width, height, currentcentery, params);
+            this.renderer.clearColor();
+            this.renderer.clearDepth();
+            this.renderer.render(scene, itemcam);
+            let img = this.getFrameBufferPixels();
+            this.renderer.setRenderTarget(oldtarget);
+            return img;
+        };
+        let dispose = () => rendertarget?.dispose();
+        return { takePicture, dispose, setmodel };
+    }
+    dispose() {
+        this.renderer.dispose();
+        disposeThreeTree(this.scene);
+    }
+}
+exports.ThreeJsRenderer = ThreeJsRenderer;
+function disposeThreeTree(node) {
+    if (!node) {
+        return;
+    }
+    const cleanMaterial = (material) => {
+        count++;
+        material.dispose();
+        // dispose textures
+        for (const key of Object.keys(material)) {
+            const value = material[key];
+            if (value && typeof value === 'object' && 'minFilter' in value) {
+                value.dispose();
+                count++;
+            }
+        }
+    };
+    let count = 0;
+    node.traverse((object) => {
+        if (!object.isMesh)
+            return;
+        count++;
+        object.geometry.dispose();
+        if (object.material.isMaterial) {
+            cleanMaterial(object.material);
+        }
+        else {
+            // an array of materials
+            for (const material of object.material) {
+                cleanMaterial(material);
+            }
+        }
+    });
+    console.log("disposed scene objects", count);
+}
+async function exportThreeJsGltf(node) {
+    let exporter = new GLTFExporter_1.GLTFExporter();
+    let anims = [];
+    let undolist = [];
+    let hiddenattributes = [
+        "RA_skinIndex_bone",
+        "RA_skinIndex_skin",
+        "RA_skinWeight_bone",
+        "RA_skinWeight_skin"
+    ];
+    //there doesn't seem to be any good way to hook the exporter, so just temporarily edit the scene
+    node.traverseVisible(node => {
+        if (node.animations) {
+            anims.push(...node.animations.filter(q => q.duration != 0));
+        }
+        //threejs currently bugs out with i8 normal attributes
+        //these attributes need to be padded to 4 bytes according to gltf spec but threejs doesn't
+        if (node instanceof three_1.Mesh && node.geometry instanceof three_1.BufferGeometry) {
+            let attributes = node.geometry.attributes;
+            let normal = node.geometry.attributes.normal;
+            if (normal && normal.array instanceof Int8Array) {
+                let v = new three_1.Vector3();
+                let cloned = new THREE.BufferAttribute(new Float32Array(normal.count * 3), 3);
+                for (let i = 0; i < normal.count; i++) {
+                    v.fromBufferAttribute(normal, i);
+                    v.normalize();
+                    cloned.setXYZ(i, v.x, v.y, v.z);
+                }
+                let oldnormal = attributes.normal;
+                undolist.push(() => attributes.normal = oldnormal);
+                node.geometry.attributes.normal = cloned;
+            }
+            //for some reason blender chokes on these
+            for (let attr of hiddenattributes) {
+                if (attributes[attr]) {
+                    let attrname = attr;
+                    let oldval = attributes[attr];
+                    delete attributes[attr];
+                    undolist.push(() => attributes[attrname] = oldval);
+                }
+            }
+        }
+    });
+    let res = await new Promise((resolve, reject) => {
+        exporter.parse(node, gltf => resolve(gltf), reject, {
+            binary: true,
+            animations: anims
+        });
+    });
+    undolist.forEach(q => q());
+    return res;
+}
+function exportThreeJsStl(node) {
+    let exporter = new STLExporter_1.STLExporter();
+    let res = exporter.parse(node, { binary: true });
+    return Promise.resolve(new Uint8Array(res.buffer, res.byteOffset, res.byteLength));
+}
+function highlightModelGroup(vertexgroups) {
+    //update the affected meshes
+    let undos = [];
+    for (let submatch of vertexgroups) {
+        let color = submatch.mesh.geometry.getAttribute("color");
+        if (!color) {
+            continue;
+        }
+        let usecolor = submatch.mesh.geometry.getAttribute("color_2");
+        let oldindices = [];
+        let oldcols = [];
+        let oldusecols = [];
+        //remember old atribute values
+        for (let i = submatch.start; i < submatch.end; i++) {
+            let index = submatch.mesh.geometry.index?.getX(i) ?? i;
+            oldindices.push(index);
+            oldcols.push([color.getX(index), color.getY(index), color.getZ(index)]);
+            if (usecolor) {
+                oldusecols.push([usecolor.getX(index), usecolor.getY(index), usecolor.getZ(index), usecolor.getW(index)]);
+            }
+        }
+        //update the value in a seperate loop since we'll be writing some multiple times
+        for (let i = submatch.start; i < submatch.end; i++) {
+            let index = submatch.mesh.geometry.index?.getX(i) ?? i;
+            oldindices.push(index);
+            color.setXYZ(index, 1, 0, 0);
+            if (usecolor) {
+                usecolor.setXYZW(index, 1, 1, 1, 1);
+            }
+        }
+        undos.push(() => {
+            for (let i = submatch.start; i < submatch.end; i++) {
+                let index = oldindices[i - submatch.start];
+                color.setXYZ(index, ...oldcols[i - submatch.start]);
+                color.needsUpdate = true;
+                if (usecolor) {
+                    usecolor.setXYZW(index, ...oldusecols[i - submatch.start]);
+                    usecolor.needsUpdate = true;
+                }
+            }
+        });
+        color.needsUpdate = true;
+        if (usecolor) {
+            usecolor.needsUpdate = true;
+        }
+    }
+    return undos;
+}
