@@ -145,6 +145,22 @@ import * as cmdts from "cmd-ts";
 import { renderAppearance, runServer } from "./api";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
 import { promises as fs } from "fs";
+import { ModelModifications } from "../utils";
+
+function parseMods(str: string): [number, number][] {
+	if (!str) return [];
+	try {
+		if (str.startsWith("[") || str.startsWith("{")) return JSON.parse(str);
+		return str.split(',').map(pair => {
+			const [from, to] = pair.split(':').map(Number);
+			return [from, to] as [number, number];
+		}).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+	} catch (e) {
+		console.error("Failed to parse mods:", str, e);
+		return [];
+	}
+}
+
 
 let cmd = cmdts.command({
 	name: "render",
@@ -155,7 +171,9 @@ let cmd = cmdts.command({
 		endpoint: cmdts.option({ long: "endpoint", short: "e", defaultValue: () => "" }),
 		auth: cmdts.option({ long: "auth", short: "p", defaultValue: () => "" }),
 		analyze: cmdts.flag({ long: "analyze" }),
-		wiki: cmdts.option({ long: "wiki", defaultValue: () => "" })
+		wiki: cmdts.option({ long: "wiki", defaultValue: () => "" }),
+		colors: cmdts.option({ long: "colors", short: "c", defaultValue: () => "" }),
+		materials: cmdts.option({ long: "materials", short: "mats", defaultValue: () => "" })
 	},
 	handler: async (args) => {
 		let src = await args.source();
@@ -172,11 +190,16 @@ let cmd = cmdts.command({
 			if (modelStr.startsWith('sound:') || modelStr.startsWith('music:')) ext = "ogg";
 			if (modelStr.startsWith('sprite:')) ext = "png";
 
+			let overrides: ModelModifications = {
+				replaceColors: parseMods(args.colors),
+				replaceMaterials: parseMods(args.materials)
+			};
+
 			if (modelStr.includes(':')) {
 				const [m, id] = modelStr.split(':');
-				ava = await renderAppearance(scene, m as any, id, args.head);
+				ava = await renderAppearance(scene, m as any, id, args.head, overrides);
 			} else {
-				ava = await renderAppearance(scene, 'appearance', modelStr, args.head);
+				ava = await renderAppearance(scene, 'appearance', modelStr, args.head, overrides);
 			}
 
 			if (ava.imgfile && ava.imgfile.length > 0) {

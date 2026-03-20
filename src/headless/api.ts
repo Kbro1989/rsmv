@@ -1,7 +1,7 @@
 
 import { CacheFileSource } from "../cache";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
-import { delay } from "../utils";
+import { ModelModifications, delay } from "../utils";
 import { Vector3, WebGLRendererParameters } from "three";
 import { appearanceUrl, avatarStringToBytes } from "../3d/avatar";
 import { pixelsToImageFile } from "../imgutils";
@@ -140,7 +140,7 @@ export async function getRenderer(width: number, height: number, extraopts?: Web
 	return render;
 }
 
-export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc" | "loc" | "spot" | "mat" | "map" | "sound" | "music" | "sprite", argument: string, headmodel = false) {
+export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc" | "loc" | "spot" | "mat" | "map" | "sound" | "music" | "sprite", argument: string, headmodel = false, overrides: ModelModifications = {}) {
 	let width = 500;
 	let height = 700;
 
@@ -217,6 +217,18 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 		return { modelfile: Buffer.from(gltfblob), imgfile: Buffer.alloc(0), metadata: { type: mode, id: argument } };
 	} else {
 		throw new Error("unknown mode " + mode);
+	}
+
+	// Apply overrides to model modifications
+	if (overrides.replaceColors || overrides.replaceMaterials) {
+		meshdata.models.forEach(m => {
+			if (overrides.replaceColors) {
+				m.mods.replaceColors = [...(m.mods.replaceColors || []), ...overrides.replaceColors];
+			}
+			if (overrides.replaceMaterials) {
+				m.mods.replaceMaterials = [...(m.mods.replaceMaterials || []), ...overrides.replaceMaterials];
+			}
+		});
 	}
 
 	// Extract Semantic Metadata for NPCs/Items/Objects
