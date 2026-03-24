@@ -1,4 +1,4 @@
-import { AstNode, BranchingStatement, ClientScriptFunction, CodeBlockNode, ComposedOp, FunctionBindNode, IfStatementNode, RawOpcodeNode, SwitchStatementNode, VarAssignNode, WhileLoopStatementNode, getSingleChild, SubcallNode, ComposedopType, isNamedOp, RewriteCursor } from "./ast";
+import { AstNode, BranchingStatement, ClientScriptFunction, CodeBlockNode, ComposedOp, FunctionBindNode, IfStatementNode, RawOpcodeNode, SwitchStatementNode, VarAssignNode, WhileLoopStatementNode, getSingleChild, SubcallNode, ComposedopType, isNamedOp, RewriteCursor } from "./ast_nodes";
 import { ClientscriptObfuscation } from "./callibrator";
 import { ClientScriptSubtypeSolver } from "./subtypedetector";
 import { ClientScriptOp, PrimitiveType, binaryOpSymbols, branchInstructionsOrJump, getOpName, int32MathOps, longJsonToBigInt, namedClientScriptOps, popDiscardOps, popLocalOps, subtypeToTs, subtypes } from "./definitions";
@@ -87,10 +87,238 @@ export class TsWriterContext {
         }
     }
     getCode = (node: AstNode) => {
+        ensureWriters();
         let writer = writermap.get(node.constructor);
         if (!writer) { throw new Error(`no writer defined for ${node.constructor.name} node`); }
         return writer(node, this);
     }
+}
+
+function ensureWriters() {
+    if (writermap.size != 0) { return; }
+    addWriter(ComposedOp, (node, ctx) => {
+        if ((["++x", "--x", "x++", "x--"] as ComposedopType[]).includes(node.type)) {
+            if (node.children.length != 0) { throw new Error("no children expected on composednode"); }
+            let varname = getOpcodeName(ctx.calli, (node.internalOps[0] as RawOpcodeNode).op);
+            if (ctx.int32casts) {
+                if (node.type == "++x") { return `(${varname} = ${varname} + 1 | 0)`; }
+                if (node.type == "--x") { return `(${varname} = ${varname} - 1 | 0)`; }
+                if (node.type == "x++") { return `(${varname} = ${varname} + 1 | 0, ${varname} - 1 | 0)`; }
+                if (node.type == "x--") { return `(${varname} = ${varname} - 1 | 0, ${varname} + 1 | 0)`; }
+            } else {
+                if (node.type == "++x") { return `++${varname}`; }
+                if (node.type == "--x") { return `--${varname}`; }
+                if (node.type == "x++") { return `${varname}++`; }
+                if (node.type == "x--") { return `${varname}--`; }
+            }
+        }
+        if (node.type == "stack") {
+            return writeCall(ctx, "stack", node.children);
+        }
+        throw new Error("unknown composed op type");
+    });
+    addWriter(VarAssignNode, (node, ctx) => {
+        let res = "";
+        let fulldiscard = node.varops.every(q => popDiscardOps.includes(q.op.opcode));
+        if (!fulldiscard) {
+            let hasglobal = false;
+            let hasundeclared = false;
+            let varnames: string[] = [];
+            let exacttypes: number[] = [];
+            let vardeclared: boolean[] = [];
+            for (let sub of node.varops) {
+                let name = getOpcodeName(ctx.calli, sub.op);
+
+                let exacttype = -1;
+                if (node.knownStackDiff?.exactin) {
+                    let all = node.knownStackDiff.exactin.all();
+                    if (all.length != 1) { throw new Error("unexpected"); }
+                    let type = ctx.typectx.knowntypes.get(all[0]);
+                    if (typeof type == "number") {
+                        exacttype = type;
+                    }
+                }
+                exacttypes.push(exacttype);
+                if (popLocalOps.includes(sub.op.opcode)) {
+                    let isdeclared = ctx.declareLocal(name);
+                    hasundeclared ||= !isdeclared;
+                    vardeclared.push(isdeclared);
+                } else {
+                    hasglobal = true;
+                }
+                varnames.push(name);
+            }
+            if (hasundeclared) {
+                if (hasglobal) {
+                    //we need a "var" expression, but can't add var to the entire destructor operation, add seperate var declarations
+                    for (let [index, name] of varnames.entries()) {
+                        if (vardeclared[index]) { continue; }
+                        res += `var ${name}${ctx.typescript ? ":" + subtypeToTs(exacttypes[index]) : ""};`;
+                        res += ctx.codeIndent();
+                    }
+                } else {
+                    res += "var ";
+                }
+            }
+            if (node.varops.length != 1) { res += "["; }
+            res += `${varnames.join(", ")}`;
+            if (node.varops.length != 1) { res += "]"; }
+            res += " = ";
+        }
+        res += valueList(ctx, node.children);
+        return res;
+    });
+    addWriter(CodeBlockNode, (node, ctx) => {
+        let code = "";
+        if (node.parent) {
+            code += `{\n`;
+            ctx.pushIndent(node.parent instanceof ClientScriptFunction);
+        }
+        // code += `${codeIndent(indent, node.originalindex)}//[${node.scriptid},${node.originalindex}]\n`;
+        for (let child of node.children) {
+            code += `${ctx.codeIndent(child.originalindex)}${ctx.getCode(child)};\n`;
+        }
+        if (node.parent) {
+            if (node.parent instanceof SwitchStatementNode && node.branchEndNode != null) {
+                code += `${ctx.codeIndent()}break;\n`;
+            }
+            if (node.deadcodeSuccessor) { 
+                code += ctx.getCode(node.deadcodeSuccessor);
+            }
+            ctx.popIndent();
+            code += `${ctx.codeIndent()}}`;
+        }
+        return code;
+    });
+    addWriter(BranchingStatement, (node, ctx) => {
+        return getOpcodeCallCode(ctx, node.op, node.children, node.originalindex);
+    });
+    addWriter(WhileLoopStatementNode, (node, ctx) => {
+        let res = `while (${ctx.getCode(node.statement)}) `;
+        res += ctx.getCode(node.body);
+        return res;
+    });
+    addWriter(SwitchStatementNode, (node, ctx) => {
+        let res = "";
+        res += `switch (${node.valueop ? ctx.getCode(node.valueop) : ""}) {\n`;
+        ctx.pushIndent(false);
+        for (let [i, branch] of node.branches.entries()) {
+            res += `${ctx.codeIndent(branch.block.originalindex)}case ${branch.value}:`;
+            if (i + 1 < node.branches.length && node.branches[i + 1].block == branch.block) {
+                res += `\n`;
+            } else {
+                res += " " + ctx.getCode(branch.block);
+                res += "\n";
+            }
+        }
+        if (node.defaultbranch) {
+            res += `${ctx.codeIndent()}default: `;
+            res += ctx.getCode(node.defaultbranch);
+            res += `\n`;
+        }
+        ctx.popIndent();
+        res += `${ctx.codeIndent()}}`;
+        return res;
+    });
+    addWriter(IfStatementNode, (node, ctx) => {
+        let res = `if (${ctx.getCode(node.statement)}) `;
+        res += ctx.getCode(node.truebranch);
+        if (node.falsebranch) {
+            res += ` else `;
+            //skip brackets for else if construct
+            let subif = getSingleChild(node.falsebranch, IfStatementNode);
+            if (subif) {
+                res += ctx.getCode(subif);
+            } else {
+                res += ctx.getCode(node.falsebranch);
+            }
+        }
+        return res;
+    });
+    addWriter(RawOpcodeNode, (node, ctx) => {
+        if (node.op.opcode == namedClientScriptOps.pushconst) {
+            let exacttype = -1;
+            if (node.knownStackDiff?.exactout) {
+                let all = node.knownStackDiff.exactout.all();
+                if (all.length != 1) { throw new Error("unexpected"); }
+                let type = ctx.typectx.knowntypes.get(all[0]);
+                if (typeof type == "number") {
+                    exacttype = type;
+                }
+            }
+            let gettypecast = () => {
+                if (!ctx.typescript) { return ""; }
+                if (exacttype == -1) { return ""; }
+                if (exacttype == subtypes.int || exacttype == subtypes.string || exacttype == subtypes.long) { return ""; }
+                if (exacttype == subtypes.unknown_int || exacttype == subtypes.unknown_string || exacttype == subtypes.unknown_long) { return ""; }
+                return ` as ${subtypeToTs(exacttype)}`;
+            }
+            if (typeof node.op.imm_obj == "string") {
+                return `"${escapeStringLiteral(node.op.imm_obj, "double")}"${gettypecast()}`;
+            } else if (Array.isArray(node.op.imm_obj)) {
+                return `${longJsonToBigInt(node.op.imm_obj)}n${gettypecast()}`;
+            } else if (typeof node.op.imm_obj == "number") {
+                if (exacttype == subtypes.component) {
+                    let intf = node.op.imm_obj >> 16;
+                    let sub = node.op.imm_obj & 0xffff;
+                    if (ctx.usecompoffset && ctx.compoffsets.has(intf)) {
+                        return `comprel(${intf},${sub - ctx.compoffsets.get(intf)!})`;
+                    } else {
+                        return `comp(${intf}, ${sub})`;
+                    }
+                }
+                if (exacttype == subtypes.coordgrid && node.op.imm_obj != -1) {
+                    let v = node.op.imm_obj;
+                    //plane,chunkx,chunkz,subx,subz
+                    return `pos(${(v >> 28) & 3},${(v >> 20) & 0xff},${(v >> 6) & 0xff},${(v >> 12) & 0x3f},${v & 0x3f})`;
+                }
+                if (exacttype == subtypes.boolean) {
+                    return (node.op.imm_obj == 1 ? "true" : "false");
+                }
+                return `${node.op.imm_obj}${gettypecast()}`;
+            } else {
+                throw new Error("unexpected");
+            }
+        }
+        if (node.op.opcode == namedClientScriptOps.pushlocalint
+            || node.op.opcode == namedClientScriptOps.pushlocallong
+            || node.op.opcode == namedClientScriptOps.pushlocalstring
+            || node.op.opcode == namedClientScriptOps.pushvar
+            || node.op.opcode == namedClientScriptOps.pushvarbit) {
+            return getOpcodeName(ctx.calli, node.op);
+        }
+        if (node.op.opcode == namedClientScriptOps.joinstring) {
+            let res = "`";
+            for (let child of node.children) {
+                if (child instanceof RawOpcodeNode && child.opinfo.id == namedClientScriptOps.pushconst && typeof child.op.imm_obj == "string") {
+                    res += escapeStringLiteral(child.op.imm_obj, "template");
+                } else {
+                    res += `\${${ctx.getCode(child)}}`;
+                }
+            }
+            res += "`";
+            return res;
+        }
+        return getOpcodeCallCode(ctx, node.op, node.children, node.originalindex);
+    });
+    addWriter(ClientScriptFunction, (node, ctx) => {
+        let scriptidmatch = node.scriptname.match(/^script(\d+)$/);
+        let meta = (scriptidmatch ? ctx.calli.scriptargs.get(+scriptidmatch[1]) : null);
+        let res = "";
+        res += `//${meta?.scriptname ?? "unknown name"}\n`;
+        res += `${ctx.codeIndent()}function ${node.scriptname}(${node.argtype.toTypeScriptVarlist(true, ctx.typescript, meta?.stack.exactin)})`;
+        if (ctx.typescript) { res += `: ${node.returntype.toTypeScriptReturnType(meta?.stack.exactout)} `; }
+        res += ctx.getCode(node.children[0]);
+        return res;
+    });
+    addWriter(FunctionBindNode, (node, ctx) => {
+        let scriptid = node.children[0]?.knownStackDiff?.constout ?? -1;
+        if (scriptid == -1 && node.children.length == 1) { return `callback()`; }
+        return `callback(script${scriptid}${node.children.length > 1 ? ", " : ""}${node.children.slice(1).map(ctx.getCode).join(", ")})`;
+    });
+    addWriter(SubcallNode, (node, ctx) => {
+        return writeCall(ctx, node.funcname, node.children.slice(0, -1));
+    });
 }
 
 function getOpcodeName(calli: ClientscriptObfuscation, op: ClientScriptOp) {
@@ -186,227 +414,4 @@ const writermap = new Map<AstNode["constructor"], (node: AstNode, ctx: TsWriterC
 function addWriter<T extends new (...args: any[]) => AstNode>(type: T, writer: (node: InstanceType<T>, ctx: TsWriterContext) => string) {
     writermap.set(type, writer as any);
 }
-
-addWriter(ComposedOp, (node, ctx) => {
-    if ((["++x", "--x", "x++", "x--"] as ComposedopType[]).includes(node.type)) {
-        if (node.children.length != 0) { throw new Error("no children expected on composednode"); }
-        let varname = getOpcodeName(ctx.calli, (node.internalOps[0] as RawOpcodeNode).op);
-        if (ctx.int32casts) {
-            if (node.type == "++x") { return `(${varname} = ${varname} + 1 | 0)`; }
-            if (node.type == "--x") { return `(${varname} = ${varname} - 1 | 0)`; }
-            if (node.type == "x++") { return `(${varname} = ${varname} + 1 | 0, ${varname} - 1 | 0)`; }
-            if (node.type == "x--") { return `(${varname} = ${varname} - 1 | 0, ${varname} + 1 | 0)`; }
-        } else {
-            if (node.type == "++x") { return `++${varname}`; }
-            if (node.type == "--x") { return `--${varname}`; }
-            if (node.type == "x++") { return `${varname}++`; }
-            if (node.type == "x--") { return `${varname}--`; }
-        }
-    }
-    if (node.type == "stack") {
-        return writeCall(ctx, "stack", node.children);
-    }
-    throw new Error("unknown composed op type");
-});
-addWriter(VarAssignNode, (node, ctx) => {
-    let res = "";
-    let fulldiscard = node.varops.every(q => popDiscardOps.includes(q.op.opcode));
-    if (!fulldiscard) {
-        let hasglobal = false;
-        let hasundeclared = false;
-        let varnames: string[] = [];
-        let exacttypes: number[] = [];
-        let vardeclared: boolean[] = [];
-        for (let sub of node.varops) {
-            let name = getOpcodeName(ctx.calli, sub.op);
-
-            let exacttype = -1;
-            if (node.knownStackDiff?.exactin) {
-                let all = node.knownStackDiff.exactin.all();
-                if (all.length != 1) { throw new Error("unexpected"); }
-                let type = ctx.typectx.knowntypes.get(all[0]);
-                if (typeof type == "number") {
-                    exacttype = type;
-                }
-            }
-            exacttypes.push(exacttype);
-            if (popLocalOps.includes(sub.op.opcode)) {
-                let isdeclared = ctx.declareLocal(name);
-                hasundeclared ||= !isdeclared;
-                vardeclared.push(isdeclared);
-            } else {
-                hasglobal = true;
-            }
-            varnames.push(name);
-        }
-        if (hasundeclared) {
-            if (hasglobal) {
-                //we need a "var" expression, but can't add var to the entire destructor operation, add seperate var declarations
-                for (let [index, name] of varnames.entries()) {
-                    if (vardeclared[index]) { continue; }
-                    res += `var ${name}${ctx.typescript ? ":" + subtypeToTs(exacttypes[index]) : ""};`;
-                    res += ctx.codeIndent();
-                }
-            } else {
-                res += "var ";
-            }
-        }
-        if (node.varops.length != 1) { res += "["; }
-        res += `${varnames.join(", ")}`;
-        if (node.varops.length != 1) { res += "]"; }
-        res += " = ";
-    }
-    res += valueList(ctx, node.children);
-    return res;
-});
-addWriter(CodeBlockNode, (node, ctx) => {
-    let code = "";
-    if (node.parent) {
-        code += `{\n`;
-        ctx.pushIndent(node.parent instanceof ClientScriptFunction);
-    }
-    // code += `${codeIndent(indent, node.originalindex)}//[${node.scriptid},${node.originalindex}]\n`;
-    for (let child of node.children) {
-        code += `${ctx.codeIndent(child.originalindex)}${ctx.getCode(child)};\n`;
-    }
-    if (node.parent) {
-        if (node.parent instanceof SwitchStatementNode && node.branchEndNode != null) {
-            code += `${ctx.codeIndent()}break;\n`;
-        }
-        if (node.deadcodeSuccessor) { 
-            code += ctx.getCode(node.deadcodeSuccessor);
-        }
-        ctx.popIndent();
-        code += `${ctx.codeIndent()}}`;
-    }
-    return code;
-});
-addWriter(BranchingStatement, (node, ctx) => {
-    return getOpcodeCallCode(ctx, node.op, node.children, node.originalindex);
-});
-addWriter(WhileLoopStatementNode, (node, ctx) => {
-    let res = `while (${ctx.getCode(node.statement)}) `;
-    res += ctx.getCode(node.body);
-    return res;
-});
-addWriter(SwitchStatementNode, (node, ctx) => {
-    let res = "";
-    res += `switch (${node.valueop ? ctx.getCode(node.valueop) : ""}) {\n`;
-    ctx.pushIndent(false);
-    for (let [i, branch] of node.branches.entries()) {
-        res += `${ctx.codeIndent(branch.block.originalindex)}case ${branch.value}:`;
-        if (i + 1 < node.branches.length && node.branches[i + 1].block == branch.block) {
-            res += `\n`;
-        } else {
-            res += " " + ctx.getCode(branch.block);
-            res += "\n";
-        }
-    }
-    if (node.defaultbranch) {
-        res += `${ctx.codeIndent()}default: `;
-        res += ctx.getCode(node.defaultbranch);
-        res += `\n`;
-    }
-    ctx.popIndent();
-    res += `${ctx.codeIndent()}}`;
-    return res;
-});
-addWriter(IfStatementNode, (node, ctx) => {
-    let res = `if (${ctx.getCode(node.statement)}) `;
-    res += ctx.getCode(node.truebranch);
-    if (node.falsebranch) {
-        res += ` else `;
-        //skip brackets for else if construct
-        let subif = getSingleChild(node.falsebranch, IfStatementNode);
-        if (subif) {
-            res += ctx.getCode(subif);
-        } else {
-            res += ctx.getCode(node.falsebranch);
-        }
-    }
-    return res;
-});
-addWriter(RawOpcodeNode, (node, ctx) => {
-    if (node.op.opcode == namedClientScriptOps.pushconst) {
-        let exacttype = -1;
-        if (node.knownStackDiff?.exactout) {
-            let all = node.knownStackDiff.exactout.all();
-            if (all.length != 1) { throw new Error("unexpected"); }
-            let type = ctx.typectx.knowntypes.get(all[0]);
-            if (typeof type == "number") {
-                exacttype = type;
-            }
-        }
-        let gettypecast = () => {
-            if (!ctx.typescript) { return ""; }
-            if (exacttype == -1) { return ""; }
-            if (exacttype == subtypes.int || exacttype == subtypes.string || exacttype == subtypes.long) { return ""; }
-            if (exacttype == subtypes.unknown_int || exacttype == subtypes.unknown_string || exacttype == subtypes.unknown_long) { return ""; }
-            return ` as ${subtypeToTs(exacttype)}`;
-        }
-        if (typeof node.op.imm_obj == "string") {
-            return `"${escapeStringLiteral(node.op.imm_obj, "double")}"${gettypecast()}`;
-        } else if (Array.isArray(node.op.imm_obj)) {
-            return `${longJsonToBigInt(node.op.imm_obj)}n${gettypecast()}`;
-        } else if (typeof node.op.imm_obj == "number") {
-            if (exacttype == subtypes.component) {
-                let intf = node.op.imm_obj >> 16;
-                let sub = node.op.imm_obj & 0xffff;
-                if (ctx.usecompoffset && ctx.compoffsets.has(intf)) {
-                    return `comprel(${intf},${sub - ctx.compoffsets.get(intf)!})`;
-                } else {
-                    return `comp(${intf}, ${sub})`;
-                }
-            }
-            if (exacttype == subtypes.coordgrid && node.op.imm_obj != -1) {
-                let v = node.op.imm_obj;
-                //plane,chunkx,chunkz,subx,subz
-                return `pos(${(v >> 28) & 3},${(v >> 20) & 0xff},${(v >> 6) & 0xff},${(v >> 12) & 0x3f},${v & 0x3f})`;
-            }
-            if (exacttype == subtypes.boolean) {
-                return (node.op.imm_obj == 1 ? "true" : "false");
-            }
-            return `${node.op.imm_obj}${gettypecast()}`;
-        } else {
-            throw new Error("unexpected");
-        }
-    }
-    if (node.op.opcode == namedClientScriptOps.pushlocalint
-        || node.op.opcode == namedClientScriptOps.pushlocallong
-        || node.op.opcode == namedClientScriptOps.pushlocalstring
-        || node.op.opcode == namedClientScriptOps.pushvar
-        || node.op.opcode == namedClientScriptOps.pushvarbit) {
-        return getOpcodeName(ctx.calli, node.op);
-    }
-    if (node.op.opcode == namedClientScriptOps.joinstring) {
-        let res = "`";
-        for (let child of node.children) {
-            if (child instanceof RawOpcodeNode && child.opinfo.id == namedClientScriptOps.pushconst && typeof child.op.imm_obj == "string") {
-                res += escapeStringLiteral(child.op.imm_obj, "template");
-            } else {
-                res += `\${${ctx.getCode(child)}}`;
-            }
-        }
-        res += "`";
-        return res;
-    }
-    return getOpcodeCallCode(ctx, node.op, node.children, node.originalindex);
-});
-addWriter(ClientScriptFunction, (node, ctx) => {
-    let scriptidmatch = node.scriptname.match(/^script(\d+)$/);
-    let meta = (scriptidmatch ? ctx.calli.scriptargs.get(+scriptidmatch[1]) : null);
-    let res = "";
-    res += `//${meta?.scriptname ?? "unknown name"}\n`;
-    res += `${ctx.codeIndent()}function ${node.scriptname}(${node.argtype.toTypeScriptVarlist(true, ctx.typescript, meta?.stack.exactin)})`;
-    if (ctx.typescript) { res += `: ${node.returntype.toTypeScriptReturnType(meta?.stack.exactout)} `; }
-    res += ctx.getCode(node.children[0]);
-    return res;
-});
-addWriter(FunctionBindNode, (node, ctx) => {
-    let scriptid = node.children[0]?.knownStackDiff?.constout ?? -1;
-    if (scriptid == -1 && node.children.length == 1) { return `callback()`; }
-    return `callback(script${scriptid}${node.children.length > 1 ? ", " : ""}${node.children.slice(1).map(ctx.getCode).join(", ")})`;
-});
-addWriter(SubcallNode, (node, ctx) => {
-    return writeCall(ctx, node.funcname, node.children.slice(0, -1));
-});
+

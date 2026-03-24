@@ -9,7 +9,7 @@ import { Openrs2CacheSource } from "../cache/openrs2loader";
 import * as fs from "fs/promises";
 import { crc32, crc32addInt } from "../libs/crc32util";
 import { params } from "../../generated/params";
-import { ClientScriptOp, ImmediateType, StackConstants, StackDiff, StackInOut, StackList, namedClientScriptOps, variableSources, typeToPrimitive, getOpName, knownClientScriptOpNames } from "./definitions";
+import { ClientScriptOp, ImmediateType, StackConstants, StackDiff, StackInOut, StackList, namedClientScriptOps, variableSources, typeToPrimitive, getOpName, knownClientScriptOpNames, getArgType, getReturnType } from "./definitions";
 import { dbtables } from "../../generated/dbtables";
 import { reverseHashes } from "../libs/rshashnames";
 import { CodeBlockNode, RawOpcodeNode, generateAst, parseClientScriptIm } from "./ast";
@@ -1062,40 +1062,6 @@ function callibrateOperants(calli: ClientscriptObfuscation, candidates: Map<numb
     calli.foundParameters = true;
 }
 
-export function getArgType(script: clientscriptdata | clientscript) {
-    let res = new StackDiff();
-    res.int = script.intargcount;
-    res.long = script.longargcount;
-    res.string = script.stringargcount;
-    return res;
-}
-
-export function getReturnType(calli: ClientscriptObfuscation, ops: ClientScriptOp[], endindex = ops.length) {
-    let res = new StackList();
-    //the jagex compiler appends a default return with null constants to the script, even if this would be dead code
-    //endindex-1=return, pushconsts begins at -2
-    for (let i = endindex - 2; i >= 0; i--) {
-        let op = ops[i];
-        let opinfo = calli.getNamedOp(op.opcode);
-        if (opinfo.id == namedClientScriptOps.pushconst) {
-            if (op.imm == 0) { res.int(); }
-            if (op.imm == 1) { res.long(); }
-            if (op.imm == 2) { res.string(); }
-        } else if (opinfo.id == namedClientScriptOps.pushint) {
-            res.int();
-        } else if (opinfo.id == namedClientScriptOps.pushlong) {
-            res.long();
-        } else if (opinfo.id == namedClientScriptOps.pushstring) {
-            res.string();
-        } else {
-            break;
-        }
-    }
-    res.values.reverse();
-    return res;
-}
-
-//TODO remove/hide
 globalThis.getop = (opid: string) => {
     let id = -1;
     //don't use match because it breaks console hints

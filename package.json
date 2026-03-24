@@ -1,6 +1,7 @@
 {
 	"name": "alt1cache",
 	"version": "0.1.0",
+	"type": "commonjs",
 	"description": "A viewer for NXT client models and materials",
 	"main": "dist/main.js",
 	"exports": {
@@ -66,14 +67,15 @@
 	"dependencies": {
 		"cmd-ts": "^0.7.0",
 		"comment-json": "^4.2.2",
+		"gl": "^8.1.6",
 		"lzma": "^2.3.2",
 		"node-fetch": "^2.6.5"
 	},
 	"peerDependencies": {
-		"canvas": ">=2.10.2",
+		"canvas": "^3.2.2",
 		"electron": "^26.3.0",
 		"lzma-native": "^8.0.1",
-		"sharp": ">=0.30.5",
+		"sharp": "^0.34.5",
 		"sqlite3": ">=5.0.8"
 	},
 	"peerDependenciesMeta": {

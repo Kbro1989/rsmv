@@ -94,6 +94,14 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			preserveDrawingBuffer: true,
 			...params
 		});
+
+		// FIX: Force Three.js to use uniform-based skinning instead of texture-based skinning
+		// headless-gl only supports WebGL 1.0, but Three.js attempts to use texelFetch if it thinks
+		// float vertex textures are supported, causing shader compilation errors.
+		// Detect headless environment
+		if (typeof document === "undefined") {
+			this.renderer.capabilities.floatVertexTextures = false;
+		}
 		const renderer = this.renderer;
 		canvas.addEventListener("webglcontextlost", () => this.contextLossCount++);
 		canvas.onmousedown = this.mousedown;
@@ -202,8 +210,14 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		return this.modelnode;
 	}
 
-	addSceneElement(el: ThreeJsSceneElementSource) {
+	public addSceneElement(el: ThreeJsSceneElementSource) {
 		this.sceneElements.add(el);
+
+		// float vertex textures are supported, causing shader compilation errors.
+		if (typeof document === "undefined") {
+			this.renderer.capabilities.floatVertexTextures = false;
+		}
+
 		this.sceneElementsChanged();
 	}
 

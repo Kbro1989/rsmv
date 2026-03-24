@@ -365,6 +365,7 @@ function ScenarioComponentControl(p: { ctx: UIContextReady | null, comp: Scenari
 	let revert = async () => {
 		if (p.comp.type != "custom" || !p.ctx) { return; }
 		let def = await modelInitToModel(p.ctx.sceneCache, p.comp.basecomp);
+		if (!def) { return; }
 		p.onChange({
 			type: "simple",
 			modelkey: p.comp.basecomp,
@@ -472,7 +473,7 @@ function modeldefJsonToModel(cache: any, json: string): SimpleModelInfo<null, st
 
 type SimpleModelInitTypes = "model" | "item" | "loc" | "npc" | "spotanim" | "player";
 type ModelInitTypes = SimpleModelInitTypes | "custom" | "map";
-async function modelInitToModel(cache: ThreejsSceneCache, init: string): Promise<SimpleModelInfo<any, any>> {
+async function modelInitToModel(cache: ThreejsSceneCache, init: string): Promise<SimpleModelInfo<any, any> | null> {
 	let [key] = init.split(":", 1) as [ModelInitTypes];
 	let id = init.slice(key.length + 1);
 	if (key == "model") { return modelToModel(cache, +id); }
@@ -537,6 +538,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 			});
 		} else {
 			let prim = await modelInitToModel(this.props.ctx.sceneCache, `${this.state.addModelType}:${id}`);
+			if (!prim) { return; }
 			let compid = this.idcounter++;
 			this.editComp(compid, {
 				type: "simple",
@@ -1268,7 +1270,7 @@ function ImageDataView(p: { img: HTMLImageElement | HTMLCanvasElement | HTMLVide
 	)
 }
 
-function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID>>) {
+function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID> | null>) {
 	let pendingId = React.useRef<ID | null>(null);
 	let [loadedModel, setLoadedModel] = React.useState<RSModel | null>(null);
 	let [visible, setVisible] = React.useState<SimpleModelInfo<T, ID> | null>(null);
@@ -1284,11 +1286,9 @@ function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: Th
 				setLoadedId(id);
 			}
 		} catch (err) {
+			console.warn("Failed to load model", id, err);
 			if (pendingId.current == id) {
-				localStorage.rsmv_lastsearch = JSON.stringify(id);
-				setVisible(null);
 				setLoadedId(id);
-				console.error(err);//TODO make ui
 			}
 		}
 	}, [ctx]);

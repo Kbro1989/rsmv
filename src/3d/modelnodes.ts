@@ -39,142 +39,177 @@ export function castModelInfo<T, ID>(info: SimpleModelInfo<T, ID>) {
 }
 
 export async function modelToModel(cache: ThreejsSceneCache, id: number) {
-	let modeldata = await cache.getModelData(id);
-	//getting the same file a 2nd time to get the full json
-	let info: any;
-	if (cache.modelType == "classic") {
-		let arch = await cache.engine.getArchiveById(0, classicGroups.models);
-		info = parse.classicmodels.read(arch[id].buffer, cache.engine.rawsource);
-	} else if (cache.modelType == "old") {
-		let major = (cache.engine.legacyData ? legacyMajors.oldmodels : cacheMajors.oldmodels);
-		info = parse.oldmodels.read(await cache.engine.getFileById(major, id), cache.engine.rawsource);
-	} else if (cache.modelType == "nxt") {
-		info = parse.models.read(await cache.engine.getFileById(cacheMajors.models, id), cache.engine.rawsource);
+	try {
+		let modeldata = await cache.getModelData(id);
+		//getting the same file a 2nd time to get the full json
+		let info: any;
+		if (cache.modelType == "classic") {
+			let arch = await cache.engine.getArchiveById(0, classicGroups.models);
+			info = parse.classicmodels.read(arch[id].buffer, cache.engine.rawsource);
+		} else if (cache.modelType == "old") {
+			let major = (cache.engine.legacyData ? legacyMajors.oldmodels : cacheMajors.oldmodels);
+			info = parse.oldmodels.read(await cache.engine.getFileById(major, id), cache.engine.rawsource);
+		} else if (cache.modelType == "nxt") {
+			info = parse.models.read(await cache.engine.getFileById(cacheMajors.models, id), cache.engine.rawsource);
+		}
+		return castModelInfo({
+			models: [{ modelid: id, mods: {} }],
+			anims: {},
+			info: { modeldata, info },
+			id,
+			name: `model:${id}`
+		});
+	} catch (e) {
+		console.warn("Failed to load model", id, e);
+		return null;
 	}
-	return castModelInfo({
-		models: [{ modelid: id, mods: {} }],
-		anims: {},
-		info: { modeldata, info },
-		id,
-		name: `model:${id}`
-	});
 }
 
-export async function playerDataToModel(cache: ThreejsSceneCache, modeldata: { player: string, head: boolean, data: Buffer }) {
-	let avainfo = await avatarToModel(cache.engine, modeldata.data, modeldata.head);
-	return castModelInfo({
-		...avainfo,
-		id: modeldata,
-		name: modeldata.player
-	});
+export async function playerDataToModel(cache: ThreejsSceneCache, modeldata: { player: string, head: boolean, data: Buffer }): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let avainfo = await avatarToModel(cache.engine, modeldata.data, modeldata.head);
+		return castModelInfo({
+			...avainfo,
+			id: modeldata,
+			name: modeldata.player
+		});
+	} catch (e) {
+		console.warn("Failed to load player data model", modeldata.player, e);
+		return null;
+	}
 }
 
-export async function playerToModel(cache: ThreejsSceneCache, name: string) {
-	let avadata = "";
-	if (name.length <= 20) {
-		let url = appearanceUrl(name);
-		let data = await fetch(url).then(q => q.text());
-		if (data.indexOf("404 - Page not found") != -1) { throw new Error("player avatar not found"); }
-		avadata = data;
-	} else {
-		avadata = name;
+export async function playerToModel(cache: ThreejsSceneCache, name: string): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let avadata = "";
+		if (name.length <= 20) {
+			let url = appearanceUrl(name);
+			let data = await fetch(url).then(q => q.text());
+			if (data.indexOf("404 - Page not found") != -1) { throw new Error("player avatar not found"); }
+			avadata = data;
+		} else {
+			avadata = name;
+		}
+		let avainfo = await avatarToModel(cache.engine, avatarStringToBytes(avadata), false);
+		return castModelInfo({
+			...avainfo,
+			id: name,
+			name: name
+		});
+	} catch (e) {
+		console.warn("Failed to load player model", name, e);
+		return null;
 	}
-	let avainfo = await avatarToModel(cache.engine, avatarStringToBytes(avadata), false);
-	return castModelInfo({
-		...avainfo,
-		id: name,
-		name: name
-	});
 }
 
 export async function npcBodyToModel(cache: ThreejsSceneCache, id: number) {
 	return npcToModel(cache, { id, head: false });
 }
 
-export async function npcToModel(cache: ThreejsSceneCache, id: { id: number, head: boolean }) {
-	let npc = parse.npc.read(await cache.engine.getGameFile("npcs", id.id), cache.engine.rawsource);
-	let anims: Record<string, number> = {};
-	let modelids = (id.head ? npc.headModels : npc.models) ?? [];
-	if (!id.head && npc.animation_group) {
-		let arch = await cache.engine.getArchiveById(cacheMajors.config, cacheConfigPages.animgroups);
-		let animgroup = parse.animgroupConfigs.read(arch[npc.animation_group].buffer, cache.engine.rawsource);
-		anims = serializeAnimset(animgroup);
-	}
-	let mods: ModelModifications = {};
-	if (npc.color_replacements) { mods.replaceColors = npc.color_replacements; }
-	if (npc.material_replacements) { mods.replaceMaterials = npc.material_replacements; }
-	let models = modelids.map(q => ({ modelid: q, mods }));
-	return castModelInfo({
-		info: npc,
-		models,
-		anims,
-		id,
-		name: npc.name ?? `npc:${id.id}`
-	});
-}
-
-export async function spotAnimToModel(cache: ThreejsSceneCache, id: number) {
-	let animdata = parse.spotAnims.read(await cache.engine.getGameFile("spotanims", id), cache.engine.rawsource);
-	let mods: ModelModifications = {};
-	if (animdata.replace_colors) { mods.replaceColors = animdata.replace_colors; }
-	if (animdata.replace_materials) { mods.replaceMaterials = animdata.replace_materials; }
-	let models = (animdata.model ? [{ modelid: animdata.model, mods }] : []);
-	let anims: Record<string, number> = {};
-	if (animdata.sequence) { anims.default = animdata.sequence; }
-	return castModelInfo({
-		models,
-		anims,
-		info: animdata,
-		id,
-		name: `spotanim:${id}`
-	});
-}
-
-export async function locToModel(cache: ThreejsSceneCache, id: number) {
-	let { morphedloc } = await resolveMorphedObject(cache.engine, id);
-	let mods: ModelModifications = {};
-	let anims: Record<string, number> = {};
-	let models: SimpleModelDef = [];
-	if (morphedloc) {
-		if (morphedloc.color_replacements) { mods.replaceColors = morphedloc.color_replacements; }
-		if (morphedloc.material_replacements) { mods.replaceMaterials = morphedloc.material_replacements; }
-		if (cache.engine.getBuildNr() > lastClassicBuildnr && cache.engine.getBuildNr() < 377) {
-			//old caches just use one prop to replace both somehow
-			mods.replaceMaterials = mods.replaceColors;
+export async function npcToModel(cache: ThreejsSceneCache, id: { id: number, head: boolean }): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let npc = parse.npc.read(await cache.engine.getGameFile("npcs", id.id), cache.engine.rawsource);
+		let anims: Record<string, number> = {};
+		let modelids = (id.head ? npc.headModels : npc.models) ?? [];
+		if (!id.head && npc.animation_group) {
+			let arch = await cache.engine.getArchiveById(cacheMajors.config, cacheConfigPages.animgroups);
+			let animgroup = parse.animgroupConfigs.read(arch[npc.animation_group].buffer, cache.engine.rawsource);
+			anims = serializeAnimset(animgroup);
 		}
-		models = [
-			...morphedloc.models?.flatMap(m => m.values).map(q => ({ modelid: q, mods })) ?? [],
-			...morphedloc.models_05?.models.flatMap(m => m.values).map(q => ({ modelid: q, mods })) ?? []
-		];
+		let mods: ModelModifications = {};
+		if (npc.color_replacements) { mods.replaceColors = npc.color_replacements; }
+		if (npc.material_replacements) { mods.replaceMaterials = npc.material_replacements; }
+		let models = modelids.map(q => ({ modelid: q, mods }));
+		return castModelInfo({
+			info: npc,
+			models,
+			anims,
+			id,
+			name: npc.name ?? `npc:${id.id}`
+		});
+	} catch (e) {
+		console.warn("Failed to load npc model", id.id, e);
+		return null;
 	}
-	if (morphedloc?.probably_animation) {
-		anims.default = morphedloc.probably_animation;
-	}
-	return castModelInfo({
-		models,
-		anims,
-		info: morphedloc,
-		id,
-		name: morphedloc.name ?? `loc:${id}`
-	});
 }
-export async function itemToModel(cache: ThreejsSceneCache, id: number) {
-	let item = parse.item.read(await cache.engine.getGameFile("items", id), cache.engine.rawsource);
-	if (!item.baseModel && item.noteTemplate) {
-		item = parse.item.read(await cache.engine.getGameFile("items", item.noteTemplate), cache.engine.rawsource);
-	}
-	let mods: ModelModifications = {};
-	if (item.color_replacements) { mods.replaceColors = item.color_replacements; }
-	if (item.material_replacements) { mods.replaceMaterials = item.material_replacements; }
-	let models = (item.baseModel ? [{ modelid: item.baseModel, mods }] : [])
 
-	return castModelInfo({
-		models,
-		anims: {},
-		info: item,
-		id,
-		name: item.name ?? `item:${id}`
-	});
+export async function spotAnimToModel(cache: ThreejsSceneCache, id: number): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let animdata = parse.spotAnims.read(await cache.engine.getGameFile("spotanims", id), cache.engine.rawsource);
+		let mods: ModelModifications = {};
+		if (animdata.replace_colors) { mods.replaceColors = animdata.replace_colors; }
+		if (animdata.replace_materials) { mods.replaceMaterials = animdata.replace_materials; }
+		let models = (animdata.model ? [{ modelid: animdata.model, mods }] : []);
+		let anims: Record<string, number> = {};
+		if (animdata.sequence) { anims.default = animdata.sequence; }
+		return castModelInfo({
+			models,
+			anims,
+			info: animdata,
+			id,
+			name: `spotanim:${id}`
+		});
+	} catch (e) {
+		console.warn("Failed to load spotanim model", id, e);
+		return null;
+	}
+}
+
+export async function locToModel(cache: ThreejsSceneCache, id: number): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let { morphedloc } = await resolveMorphedObject(cache.engine, id);
+		let mods: ModelModifications = {};
+		let anims: Record<string, number> = {};
+		let models: SimpleModelDef = [];
+		if (morphedloc) {
+			if (morphedloc.color_replacements) { mods.replaceColors = morphedloc.color_replacements; }
+			if (morphedloc.material_replacements) { mods.replaceMaterials = morphedloc.material_replacements; }
+			if (cache.engine.getBuildNr() > lastClassicBuildnr && cache.engine.getBuildNr() < 377) {
+				//old caches just use one prop to replace both somehow
+				mods.replaceMaterials = mods.replaceColors;
+			}
+			models = [
+				...morphedloc.models?.flatMap(m => m.values).map(q => ({ modelid: q, mods })) ?? [],
+				...morphedloc.models_05?.models.flatMap(m => m.values).map(q => ({ modelid: q, mods })) ?? []
+			];
+		}
+		if (morphedloc?.probably_animation) {
+			anims.default = morphedloc.probably_animation;
+		}
+		return castModelInfo({
+			models,
+			anims,
+			info: morphedloc,
+			id,
+			name: morphedloc.name ?? `loc:${id}`
+		});
+	} catch (e) {
+		console.warn("Failed to load loc model", id, e);
+		return null;
+	}
+}
+export async function itemToModel(cache: ThreejsSceneCache, id: number): Promise<SimpleModelInfo<any, any> | null> {
+	try {
+		let item = parse.item.read(await cache.engine.getGameFile("items", id), cache.engine.rawsource);
+		if (!item.baseModel && item.noteTemplate) {
+			item = parse.item.read(await cache.engine.getGameFile("items", item.noteTemplate), cache.engine.rawsource);
+		}
+		let mods: ModelModifications = {};
+		if (item.color_replacements) { mods.replaceColors = item.color_replacements; }
+		if (item.material_replacements) { mods.replaceMaterials = item.material_replacements; }
+		let models = (item.baseModel ? [{ modelid: item.baseModel, mods }] : [])
+
+		return castModelInfo({
+			models,
+			anims: {},
+			info: item,
+			id,
+			name: item.name ?? `item:${id}`
+		});
+	} catch (e) {
+		console.warn("Failed to load item model", id, e);
+		return null;
+	}
 }
 
 export async function materialToModel(sceneCache: ThreejsSceneCache, id: number) {
@@ -250,21 +285,33 @@ export class RSModel extends TypedEmitter<{ loaded: undefined, animchanged: numb
 		this.loaded?.matUvAnims.forEach(q => q.tex.offset.copy(q.v).multiplyScalar(epochtime));
 	}
 
-	constructor(cache: ThreejsSceneCache, models: SimpleModelDef, name = "") {
+	constructor(cache: ThreejsSceneCache, models: SimpleModelDef, name = "", options: { noSkin?: boolean } = {}) {
 		super();
 		this.cache = cache;
 		this.model = (async () => {
-			let meshdatas = await Promise.all(models.map(async modelinit => {
-				let meshdata = await cache.getModelData(modelinit.modelid);
-				let modified = {
-					...meshdata,
-					meshes: meshdata.meshes.map(q => modifyMesh(q, modelinit.mods))
-				};
-				return modified;
-			}));
+			let meshdatas = (await Promise.all(models.map(async modelinit => {
+				try {
+					let meshdata = await cache.getModelData(modelinit.modelid);
+					let modified = {
+						...meshdata,
+						meshes: meshdata.meshes.map(q => modifyMesh(q, modelinit.mods))
+					};
+					return modified;
+				} catch (e) {
+					console.warn("failed to load sub-model", modelinit.modelid, e);
+					return null;
+				}
+			}))).filter(q => q != null);
 			let modeldata = mergeModelDatas(meshdatas);
 			mergeBoneids(modeldata);
-			let mesh = await ob3ModelToThree(this.cache, modeldata);
+			let effectiveOptions = { 
+				noSkin: options.noSkin ?? (modeldata.bonecount > 250 || (modeldata.bonecount > 40 && typeof window === "undefined")),
+				...options 
+			};
+			if (effectiveOptions.noSkin && modeldata.bonecount > 40) {
+				console.warn(`[RSModel] HIGH BONE COUNT (${modeldata.bonecount}) detected in headless environment or ultra-complex rig. Auto-disabling skinning to prevent WebGL crash.`);
+			}
+			let mesh = await ob3ModelToThree(this.cache, modeldata, effectiveOptions);
 			mesh.name = name;
 
 			let nullbones: Object3D[] = [];

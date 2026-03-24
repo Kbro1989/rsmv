@@ -5,10 +5,14 @@ import * as opcode_reader from "./opcode_reader";
 import commentJson from "comment-json";
 import type { CacheFileSource } from "./cache";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Use a local identifier to avoid throwing SyntaxErrors under Node CJS compilation where __dirname is global
+// We use eval to hide import.meta from tsc's static analysis during CommonJS builds
+const __local_dirname = typeof __dirname !== 'undefined' 
+	? __dirname 
+	: path.dirname(fileURLToPath(eval('import.meta.url')));
 
 const readJsonc = (relPath: string) => {
-	const fullPath = path.join(__dirname, relPath);
+	const fullPath = path.join(__local_dirname, relPath);
 	return fs.readFileSync(fullPath, "utf-8");
 };
 

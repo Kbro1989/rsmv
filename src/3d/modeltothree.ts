@@ -704,8 +704,8 @@ export function applyMaterial(mesh: Mesh, parsedmat: ParsedMaterial, minimapVari
 				throw new Error("material has vertex alpha, but mesh doesn't have vertex colors");
 			}
 
-			let [oldbuf, oldoffset, oldstride] = getAttributeBackingStore(oldcol);
-			let [newbuf, newoffset, newstride] = getAttributeBackingStore(newcol);
+			let [oldbuf, oldoffset, oldstride] = getAttributeBackingStore(oldcol) as [Uint8Array, number, number];
+			let [newbuf, newoffset, newstride] = getAttributeBackingStore(newcol) as [Uint8Array, number, number];
 			let hasoldcol = !!oldcol;
 
 			for (let i = 0; i < vertcount; i++) {
@@ -808,6 +808,9 @@ export function mergeBoneids(model: ModelData) {
 }
 
 export function mergeModelDatas(models: ModelData[]) {
+	if (models.length == 0) {
+		return { bonecount: 0, skincount: 0, maxy: 0, miny: 0, meshes: [] };
+	}
 	let r: ModelData = {
 		bonecount: Math.max(...models.map(q => q.bonecount)),
 		skincount: Math.max(...models.map(q => q.skincount)),
@@ -819,10 +822,10 @@ export function mergeModelDatas(models: ModelData[]) {
 	return r;
 }
 
-export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData) {
+export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData, options: { noSkin?: boolean } = {}) {
 	let rootnode = new Object3D();
 	let nullskeleton: Skeleton = null!;
-	if (model.bonecount != 0 || model.skincount != 0) {
+	if (!options.noSkin && (model.bonecount != 0 || model.skincount != 0)) {
 		let nullbones: Object3D[] = [];
 		let maxbones = Math.max(model.bonecount, model.skincount);
 		let rootbone = new Bone();
@@ -845,7 +848,7 @@ export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData
 		if (attrs.boneweights) { geo.setAttribute("RA_skinWeight_bone", attrs.boneweights); }
 		geo.index = meshdata.indices;
 		let mesh: THREE.Mesh | THREE.SkinnedMesh;
-		if (attrs.skinids || attrs.boneids) {
+		if (!options.noSkin && (attrs.skinids || attrs.boneids)) {
 			mesh = new THREE.SkinnedMesh(geo);
 			let oldbones = !!geo.attributes.RA_skinIndex_bone;
 			if (!geo.attributes.skinIndex) {

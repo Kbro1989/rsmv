@@ -130,7 +130,7 @@ export class ParsedTexture {
 						resolve(img);
 					}
 					img.onerror = reject;
-					let blob = new Blob([this.imagefiles[subimg]], { type: "image/png" });
+					let blob = new Blob([this.imagefiles[subimg] as any], { type: "image/png" });
 					img.src = URL.createObjectURL(blob);
 				});
 			} else {

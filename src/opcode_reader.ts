@@ -54,9 +54,13 @@ export type ChunkParser = {
 	read(state: DecodeState): any,
 	write(state: EncodeState, v: unknown): void,
 	getTypescriptType(indent: string): string,
-	getJsonSchema(): jsonschema.JSONSchema6Definition,
+	getJsonSchema(): any,
 	readConst?(state: SharedEncoderState): any
 }
+
+var parserFunctions: any;
+var parserPrimitives: any;
+var hardcodes: any;
 
 type ChunkParentCallback = (prop: string, childresolve: ResolvedReference) => ResolvedReference;
 
@@ -129,7 +133,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 					debugdata.opcodes.push({ op: (parser ? parser.key as string : `_0x${opt.toString(16)}_`), index: state.scan - 1, stacksize: state.stack.length });
 				}
 				if (!parser) { throw new Error("unknown chunk 0x" + opt.toString(16).toUpperCase()); }
-				r[parser.key] = parser.parser.read(state);
+				(r as any)[parser.key] = parser.parser.read(state);
 			}
 			state.stack.pop();
 			state.hiddenstack.pop();
@@ -179,7 +183,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -297,12 +301,12 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
 			for (let key of keys) {
 				if (debugdata) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
-				let v = props[key].read(state);
+				let v = (props as any)[key].read(state);
 				if (v !== undefined) {
 					if (key[0] == "$") {
-						hidden[key] = v;
+						(hidden as any)[key] = v;
 					} else {
-						r[key] = v;
+						(r as any)[key] = v;
 					}
 				}
 			}
@@ -316,8 +320,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			state.stack.push(value);
 			state.hiddenstack.push(hiddenvalue);
 			for (let key of keys) {
-				let propvalue = value[key as string];
-				let prop = props[key];
+				let propvalue = (value as any)[key as string];
+				let prop = (props as any)[key];
 
 				if (key.startsWith("$")) {
 					if (prop.readConst != undefined) {
@@ -330,7 +334,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 							propvalue = ref.resolve(value, propvalue);
 						}
 					}
-					hiddenvalue[key] = propvalue;
+					(hiddenvalue as any)[key] = propvalue;
 				}
 				prop.write(state, propvalue);
 			}
@@ -342,7 +346,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			let newindent = indent + "\t";
 			for (let key of keys) {
 				if (key[0] == "$") { continue; }
-				r += newindent + key + ": " + props[key].getTypescriptType(newindent) + ",\n";
+				r += newindent + key + ": " + (props as any)[key].getTypescriptType(newindent) + ",\n";
 			}
 			r += indent + "}";
 			return r;
@@ -364,7 +368,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -381,8 +385,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 	for (let propdef of args) {
 		if (!Array.isArray(propdef) || propdef.length != 2) { throw new Error("each struct args should be a [name,type] pair"); }
 		if (typeof propdef[0] != "string") { throw new Error("prop name should be string"); }
-		if (props[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
-		props[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
+		if ((props as any)[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
+		(props as any)[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
 	}
 	let keys = Object.keys(props);
 	return r;
@@ -484,22 +488,22 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 					let obj: object;
 					if (chunkindex == 0) {
 						obj = {};
-						r.push(obj);
+						(r as any).push(obj);
 						hidden = {};
 						hiddenprops.push(hidden);
 					} else {
-						obj = r[i];
+						obj = (r as any)[i];
 						hidden = hiddenprops[i];
 					}
 					//TODO check if we can save speed by manually overwriting stack[length-1] instead of pop->push
 					state.stack.push(obj);
 					state.hiddenstack.push(hidden);
 					for (let key in proptype) {
-						let value = proptype[key].read(state);
+						let value = (proptype as any)[key].read(state);
 						if (key.startsWith("$")) {
-							hidden[key] = value;
+							(hidden as any)[key] = value;
 						} else {
-							obj[key] = value;
+							(obj as any)[key] = value;
 						}
 					}
 					state.stack.pop();
@@ -522,8 +526,8 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 					state.hiddenstack.push(hiddenvalue);
 					if (typeof entry != "object" || !entry) { throw new Error("object expected"); }
 					for (let key in proptype) {
-						let prop = proptype[key];
-						let propvalue = entry[key];
+						let prop = (proptype as any)[key];
+						let propvalue = (entry as any)[key];
 						if (key.startsWith("$")) {
 							if (prop.readConst != undefined) {
 								propvalue = prop.readConst(state);
@@ -535,7 +539,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 									propvalue = ref.resolve(entry, propvalue);
 								}
 							}
-							hiddenvalue[key] = propvalue;
+							(hiddenvalue as any)[key] = propvalue;
 						}
 						prop.write(state, propvalue);
 					}
@@ -583,7 +587,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -1112,7 +1116,7 @@ function conditionParser(parent: ChunkParentCallback, optionstrings: string[], w
 }
 
 
-const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) => ChunkParser> = {
+hardcodes = {
 	playeritem: function () {
 		return {
 			read(state) {
@@ -1593,7 +1597,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	}
 }
 
-const parserPrimitives: Record<string, ChunkParser> = {
+parserPrimitives = {
 	...Object.fromEntries(Object.entries(numberTypes).map<[string, ChunkParser]>(([k, e]) => [k, {
 		read: e.read,
 		write: (s, v) => {
@@ -1628,7 +1632,7 @@ const parserPrimitives: Record<string, ChunkParser> = {
 	paddedstring: stringParser([0]),
 }
 
-const parserFunctions = {
+parserFunctions = {
 	ref: referenceValueParser,
 	accum: intAccumolatorParser,
 	opt: optParser,

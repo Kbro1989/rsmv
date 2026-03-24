@@ -4,8 +4,8 @@ globalThis.__non_webpack_require__ = (id: string) => {
     catch (e) { return import(id); }
 };
 
-import { EngineCache } from "./src/3d/modeltothree";
-import { GameCacheLoader } from "./src/cache/sqlite";
+import { EngineCache } from "./3d/modeltothree";
+import { GameCacheLoader } from "./cache/sqlite";
 import * as path from "path";
 
 async function dump() {

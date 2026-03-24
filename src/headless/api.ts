@@ -277,8 +277,20 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	await model.model;
 	console.log("model loaded. setting camera...");
 	await delay(1);
-	render.setCameraPosition(new Vector3(0, 0.85, 2.75));
-	render.setCameraLimits(new Vector3(0, 0.85, 0));
+	
+	// Dynamic camera framing based on bounding box
+	const box = new (await import("three")).Box3().setFromObject(render.getModelNode());
+	const center = box.getCenter(new (await import("three")).Vector3());
+	const size = box.getSize(new (await import("three")).Vector3());
+	const maxDim = Math.max(size.x, size.y, size.z);
+	const fov = 45; // PerspectiveCamera fov is 45 in ThreeJsRenderer
+	const aspect = width / height;
+	// Calculate distance to fit the object
+	let distance = maxDim / (2 * Math.tan(Math.PI * fov / 360));
+	distance *= 1.2; // Add 20% margin
+
+	render.setCameraPosition(new (await import("three")).Vector3(center.x, center.y + size.y * 0.1, center.z + distance));
+	render.setCameraLimits(center);
 
 	console.log("exporting gltf...");
 	let gltfblob = await exportThreeJsGltf(render.getModelNode());

@@ -184,23 +184,49 @@ let cmd = cmdts.command({
 			let engine = await EngineCache.create(src);
 			let scene = await ThreejsSceneCache.create(engine);
 
-			let ava: any;
 			const modelStr = args.model;
-			let ext = "glb";
-			if (modelStr.startsWith('sound:') || modelStr.startsWith('music:')) ext = "ogg";
-			if (modelStr.startsWith('sprite:')) ext = "png";
-
 			let overrides: ModelModifications = {
 				replaceColors: parseMods(args.colors),
 				replaceMaterials: parseMods(args.materials)
 			};
 
+			let ava: any;
 			if (modelStr.includes(':')) {
 				const [m, id] = modelStr.split(':');
 				ava = await renderAppearance(scene, m as any, id, args.head, overrides);
 			} else {
 				ava = await renderAppearance(scene, 'appearance', modelStr, args.head, overrides);
 			}
+			
+			// Detect actual output format
+			let ext = "glb";
+			if (modelStr.startsWith('sound:') || modelStr.startsWith('music:')) {
+				const buf = Buffer.from(ava.modelfile);
+				const magic = buf.toString('utf8', 0, 4);
+				if (magic === 'OggS') {
+					ext = "ogg";
+				} else if (magic === 'RIFF') {
+					ext = "wav";
+				} else if (magic === 'JAGA') {
+					// This is Archive 40 PCM data. 
+					// It needs a WAV header to not be "static noise".
+					ext = "wav";
+					try {
+						const { wrapPcmInWav } = await import("./wav_utils.js");
+						const { parse } = await import("../opdecoder.js");
+						const audio = parse.audio.read(buf, engine.rawsource);
+						// Combine all chunks into one PCM buffer
+						const pcm = Buffer.concat(audio.chunks.map(c => c.data).filter(Boolean) as Buffer[]);
+						ava.modelfile = wrapPcmInWav(pcm, audio.samplefreq || 44100);
+						console.log(`Audible Forensic Fix: Wrapped ${pcm.length} bytes of PCM in WAV at ${audio.samplefreq}Hz`);
+					} catch (e) {
+						console.warn("Failed to wrap PCM in WAV:", e);
+					}
+				} else {
+					ext = "bin";
+				}
+			}
+			if (modelStr.startsWith('sprite:')) ext = "png";
 
 			if (ava.imgfile && ava.imgfile.length > 0) {
 				await fs.writeFile("model.png", ava.imgfile);
