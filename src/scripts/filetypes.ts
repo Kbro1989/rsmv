@@ -671,6 +671,7 @@ export const cacheFileJsonModes = constrainedMap<JsonBasedFile>()({
 	environments: { parser: parse.environments, lookup: singleMinorIndex(cacheMajors.config, cacheConfigPages.environments) },
 	animgroupconfigs: { parser: parse.animgroupConfigs, lookup: singleMinorIndex(cacheMajors.config, cacheConfigPages.animgroups) },
 	maplabels: { parser: parse.maplabels, lookup: singleMinorIndex(cacheMajors.config, cacheConfigPages.maplabels) },
+	varbits: { parser: parse.varbits, lookup: singleMinorIndex(cacheMajors.config, cacheConfigPages.varbits) },
 	mapzones: { parser: parse.mapZones, lookup: singleMinorIndex(cacheMajors.worldmap, 0) },
 	cutscenes: { parser: parse.cutscenes, lookup: noArchiveIndex(cacheMajors.cutscenes) },
 

@@ -42,7 +42,7 @@ export async function scrapePlayerAvatars(output: ScriptOutput, outdir: ScriptFS
 	}
 }
 
-async function* fetchPlayerAvatars(skip: number, max: number) {
+async function* fetchPlayerAvatars(): Generator<any, void, any> (skip: number, max: number) {
 	let count = 0;
 	const pagesize = 25;
 	let startpage = Math.floor(skip / pagesize);

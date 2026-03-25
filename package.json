@@ -99,5 +99,11 @@
 			"//reason": "Improves cache loading performance dramatically when loading large files.",
 			"optional": true
 		}
+	},
+	"exclude": [
+		"tmp_rsmv_inspect/**/*"
+	],
+	"compilerOptions": {
+		"skipLibCheck": true
 	}
 }

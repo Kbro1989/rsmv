@@ -657,7 +657,7 @@ function findOpcodeImmidiates(calli: ClientscriptObfuscation) {
     let switchcompleted = false;
     let tribytecompleted = false;
 
-    function* tryMakeOp(script: clientscriptdata, offset: number, parent: ScriptState | null, opsleft: number) {
+    function* tryMakeOp(): Generator<any, void, any> (script: clientscriptdata, offset: number, parent: ScriptState | null, opsleft: number) {
         if (opsleft == -1) { return; }
         if (script.opcodedata.length < offset + 2) { return; }
         let opid = script.opcodedata.readUint16BE(offset);

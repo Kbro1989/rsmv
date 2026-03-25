@@ -150,6 +150,10 @@ function allParsers() {
 		identitykit: FileParser.fromJson<import("../generated/identitykit").identitykit>(readJsonc("./opcodes/identitykit.jsonc")),
 		structs: FileParser.fromJson<import("../generated/structs").structs>(readJsonc("./opcodes/structs.jsonc")),
 		params: FileParser.fromJson<import("../generated/params").params>(readJsonc("./opcodes/params.jsonc")),
+		varbits: new FileParser<{ varid: number, bits: [number, number] }>({
+			"0x01": { "name": "varid", "read": "utribyte" },
+			"0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] }
+		}),
 		particles_0: FileParser.fromJson<import("../generated/particles_0").particles_0>(readJsonc("./opcodes/particles_0.jsonc")),
 		particles_1: FileParser.fromJson<import("../generated/particles_1").particles_1>(readJsonc("./opcodes/particles_1.jsonc")),
 		audio: FileParser.fromJson<import("../generated/audio").audio>(readJsonc("./opcodes/audio.jsonc")),

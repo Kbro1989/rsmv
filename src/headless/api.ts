@@ -140,7 +140,7 @@ export async function getRenderer(width: number, height: number, extraopts?: Web
 	return render;
 }
 
-export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc" | "loc" | "spot" | "mat" | "map" | "sound" | "music" | "sprite", argument: string, headmodel = false, overrides: ModelModifications = {}) {
+export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" | "appearance" | "item" | "npc" | "loc" | "spot" | "mat" | "map" | "sound" | "music" | "sprite", argument: string, headmodel = false, overrides: ModelModifications = {}, overrideAnimId?: number) {
 	let width = 500;
 	let height = 700;
 
@@ -268,7 +268,10 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	} catch (e) { console.warn("metadata extraction failed:", e); }
 	// let player = await itemToModel(scene, 0);
 	let model = new RSModel(scene, meshdata.models, meshdata.name);
-	if (meshdata.anims && !isNaN(meshdata.anims.default)) {
+	if (overrideAnimId !== undefined && !isNaN(overrideAnimId)) {
+        model.setAnimation(overrideAnimId);
+        console.log(`[KINEMATIC-BIND] Forcing model animation to sequence ${overrideAnimId}`);
+    } else if (meshdata.anims && !isNaN(meshdata.anims.default)) {
 		model.setAnimation(meshdata.anims.default);
 	}
 	render.addSceneElement(model);

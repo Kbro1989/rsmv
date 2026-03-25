@@ -172,6 +172,7 @@ let cmd = cmdts.command({
 		auth: cmdts.option({ long: "auth", short: "p", defaultValue: () => "" }),
 		analyze: cmdts.flag({ long: "analyze" }),
 		wiki: cmdts.option({ long: "wiki", defaultValue: () => "" }),
+		anim: cmdts.option({ long: "anim", defaultValue: () => "" }),
 		colors: cmdts.option({ long: "colors", short: "c", defaultValue: () => "" }),
 		materials: cmdts.option({ long: "materials", short: "mats", defaultValue: () => "" })
 	},
@@ -189,13 +190,15 @@ let cmd = cmdts.command({
 				replaceColors: parseMods(args.colors),
 				replaceMaterials: parseMods(args.materials)
 			};
+            
+            const animId = args.anim ? parseInt(args.anim) : undefined;
 
 			let ava: any;
 			if (modelStr.includes(':')) {
 				const [m, id] = modelStr.split(':');
-				ava = await renderAppearance(scene, m as any, id, args.head, overrides);
+				ava = await renderAppearance(scene, m as any, id, args.head, overrides, animId);
 			} else {
-				ava = await renderAppearance(scene, 'appearance', modelStr, args.head, overrides);
+				ava = await renderAppearance(scene, 'appearance', modelStr, args.head, overrides, animId);
 			}
 			
 			// Detect actual output format

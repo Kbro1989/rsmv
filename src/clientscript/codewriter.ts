@@ -414,4 +414,4 @@ const writermap = new Map<AstNode["constructor"], (node: AstNode, ctx: TsWriterC
 function addWriter<T extends new (...args: any[]) => AstNode>(type: T, writer: (node: InstanceType<T>, ctx: TsWriterContext) => string) {
     writermap.set(type, writer as any);
 }
-
+
