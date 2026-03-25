@@ -3,6 +3,8 @@
 // run `npm run filetypes` to rebuild
 
 export type models = {
+	vertices: any;
+	faces: any;
 	format: number,
 	version: number,
 	always_0f: number,
@@ -11,7 +13,7 @@ export type models = {
 	unkCount1: number,
 	unkCount2: number,
 	unkCount3: number,
-	unkCount4: (number|0),
+	unkCount4: (number | 0),
 	meshes: {
 		unkint: number,
 		materialArgument: number,
@@ -26,11 +28,11 @@ export type models = {
 		alphaBuffer: Uint8Array | null,
 		faceboneidBuffer: Uint16Array | null,
 		indexBuffers: Uint16Array[],
-		vertexCount: (number|0),
+		vertexCount: (number | 0),
 		positionBuffer: Int16Array | null,
-		normalBuffer: (Int8Array|Int16Array) | null,
-		tagentBuffer: (Int16Array|null) | null,
-		uvBuffer: (Uint16Array|Float32Array) | null,
+		normalBuffer: (Int8Array | Int16Array) | null,
+		tagentBuffer: (Int16Array | null) | null,
+		uvBuffer: (Uint16Array | Float32Array) | null,
 		boneidBuffer: Uint16Array | null,
 		skin: {
 			skinWeightCount: number,
@@ -70,7 +72,7 @@ export type models = {
 			unkint: number,
 			materialArgument: number,
 			unkbyte2: number,
-			buf: (Uint16Array|Uint32Array),
+			buf: (Uint16Array | Uint32Array),
 		}[],
 	} | null,
 	unk1Buffer: Uint8Array[],

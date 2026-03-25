@@ -2,13 +2,13 @@ import * as cache from "./index.js";
 import { compressSqlite, decompress } from "./compression.js";
 import { cacheMajors } from "../constants.js";
 import { CacheIndex } from "./index.js";
-import sqlite from "sqlite3";
+import Database from 'better-sqlite3';
 import * as path from "path";
 import * as fs from "fs";
 
 
 type CacheTable = {
-	db: sqlite.Database | null,
+	db: any | null,
 	indices: Promise<cache.CacheIndexFile>,
 	readFile: (minor: number) => Promise<{ DATA: Buffer, CRC: number }>,
 	readIndexFile: () => Promise<{ DATA: Buffer, CRC: number }>,
@@ -44,13 +44,15 @@ export class GameCacheLoader extends cache.CacheFileSource {
 		for (let file of files) {
 			let m = file.match(/js5-(\d+)\.jcache$/);
 			if (m) {
-				majors[m[1]] = {
+				majors[m[1] as any] = {
 					major: cacheMajors.index,
 					minor: +m[1],
 					crc: 0,
 					size: 0,
 					subindexcount: 1,
 					subindices: [0],
+					subnames: null as any,
+					name: 0 as any,
 					version: 0,
 					uncompressed_crc: 0,
 					uncompressed_size: 0
@@ -71,7 +73,7 @@ export class GameCacheLoader extends cache.CacheFileSource {
 			let updateIndexFile: CacheTable["updateIndexFile"];
 
 			if (major == cacheMajors.index) {
-				indices = this.generateRootIndex();
+				indices = this.generateRootIndex() as any;
 				readFile = (minor) => this.openTable(minor).readIndexFile();
 				readIndexFile = () => { throw new Error("root index file not accesible for sqlite cache"); }
 				updateFile = (minor, data) => {
@@ -83,26 +85,16 @@ export class GameCacheLoader extends cache.CacheFileSource {
 				let dbfile = path.resolve(this.cachedir, `js5-${major}.jcache`);
 				//need separate throw here since sqlite just crashes instead of throwing
 				if (!fs.existsSync(dbfile)) { throw new Error(`cache index ${major} doesn't exist`); }
-				db = new sqlite.Database(dbfile, this.writable ? sqlite.OPEN_READWRITE : sqlite.OPEN_READONLY);
-				let ready = new Promise<void>(done => db!.once("open", done));
+				
+				db = new Database(dbfile, { readonly: !this.writable });
+				
 				let dbget = async (query: string, args: any[]) => {
-					await ready;
-					return new Promise<any>((resolve, reject) => {
-						db!.get(query, args, (err, row) => {
-							if (err) { reject(err); }
-							else { resolve(row); }
-						})
-					})
+					return db.prepare(query).get(args);
 				}
 				let dbrun = async (query: string, args: any[]) => {
-					await ready;
-					return new Promise<any>((resolve, reject) => {
-						db!.run(query, args, (err, res) => {
-							if (err) { reject(err); }
-							else { resolve(res); }
-						})
-					})
+					return db.prepare(query).run(args);
 				}
+				
 				readFile = (minor) => dbget(`SELECT DATA,CRC FROM cache WHERE KEY=?`, [minor]);
 				readIndexFile = () => dbget(`SELECT DATA FROM cache_index`, []);
 				updateFile = (minor, data) => dbrun(`UPDATE cache SET DATA=? WHERE KEY=?`, [data, minor]);

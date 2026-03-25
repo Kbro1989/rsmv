@@ -101,7 +101,7 @@
 		}
 	},
 	"exclude": [
-		"tmp_rsmv_inspect/**/*"
+		"rsmv/**/*"
 	],
 	"compilerOptions": {
 		"skipLibCheck": true

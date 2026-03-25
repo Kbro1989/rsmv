@@ -55,6 +55,14 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 }
 
 class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile | null }> {
+	setState(arg0: { openedFile: UIOpenedFile | null; }) {
+		throw new Error("Method not implemented.");
+	}
+	state: any;
+	forceUpdate() {
+		throw new Error("Method not implemented.");
+	}
+	props: any;
 	constructor(p) {
 		super(p);
 		this.state = {
@@ -151,7 +159,7 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 							<CacheSelector onOpen={this.openCache} />
 							<div style={{ flex: "1" }} />
 							<div style={{ textAlign: "center" }}>
-								Go to <a href="https://runeapps.org/modelviewer_about">RuneApps</a> for more info. Source code hosted at <a href="https://github.com/Kbro1989/POG2/blob/main/tmp_rsmv_inspect" target="_blank">https://github.com/Kbro1989/POG2.git/tmp_rsmv_inspect</a>
+								Go to <a href="https://runeapps.org/modelviewer_about">RuneApps</a> for more info. Source code hosted at <a href="https://github.com/Kbro1989/POG2/blob/main/rsmv" target="_blank">https://github.com/Kbro1989/POG2.git/rsmv</a>
 							</div>
 						</React.Fragment>
 					)}

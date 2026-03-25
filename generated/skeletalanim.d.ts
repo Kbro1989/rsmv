@@ -3,6 +3,7 @@
 // run `npm run filetypes` to rebuild
 
 export type skeletalanim = {
+	bones: any;
 	header: number,
 	framebase: number,
 	endtime: number,
