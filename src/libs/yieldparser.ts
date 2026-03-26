@@ -144,16 +144,16 @@ export function parse<Result = void>(
     }
 }
 
-export function* mustEnd(): Generator<any, void, any> () {
+export function* mustEnd() {
     yield /^$/;
 }
 
-export function* isEnd(): Generator<any, void, any> () {
+export function* isEnd() {
     const { index }: { index: number } = yield /$/;
     return index === 0;
 }
 
-export function* hasMore(): Generator<any, void, any> () {
+export function* hasMore() {
     const { index }: { index: number } = yield /$/;
     return index > 0;
     // return !(yield isEnd);

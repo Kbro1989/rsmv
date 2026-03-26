@@ -381,7 +381,7 @@ export class EngineCache extends CachingFileSource {
 	}
 }
 
-export async function* iterateConfigFiles(): Generator<any, void, any> (cache: EngineCache, major: number) {
+export async function* iterateConfigFiles(cache: EngineCache, major: number) {
 	if (cache.legacyData) {
 		let files: Buffer[] | null = null;
 		if (major == cacheMajors.items) { files = cache.legacyData.items; }

@@ -10,7 +10,7 @@ import { prepareClientScript } from ".";
 import { astToImJson, intrinsics } from "./jsonwriter";
 import { ClientScriptInterpreter } from "./interpreter";
 
-function* whitespace(): Generator<any, void, any> () {
+function* whitespace() {
     while (true) {
         let match = yield [/^\/\/.*\n/, /^\/\*[\s\S]*?\*\//, /^\s+/, ""];
         if (match === "") { break; }
@@ -186,7 +186,7 @@ function scriptContext(ctx: ParseContext) {
         return deob.getNamedOp(id);
     }
 
-    function* argumentDeclaration(): Generator<any, void, any> () {
+    function* argumentDeclaration() {
         let args: { name: string, type: string }[] = [];
         while (true) {
             let name = yield [varname, ""];
@@ -205,7 +205,7 @@ function scriptContext(ctx: ParseContext) {
         return args;
     }
 
-    function* typeDeclaration(): Generator<any, void, any> () {
+    function* typeDeclaration() {
         let first = yield [/^\w+/, "["];
         if (first == "void") { return []; }
         if (first != "[") { return [first[0]] }
@@ -221,7 +221,7 @@ function scriptContext(ctx: ParseContext) {
         return typelist;
     }
 
-    function* stringInterpolation(): Generator<any, void, any> () {
+    function* stringInterpolation() {
         yield "`";
         let parts: AstNode[] = [];
         let str = "";
@@ -269,7 +269,7 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* literalcast(): Generator<any, void, any> () {
+    function* literalcast() {
         if (yield has("as")) {
             yield whitespace;
             return yield varname;
@@ -277,7 +277,7 @@ function scriptContext(ctx: ParseContext) {
         return "";
     }
 
-    function* stringliteral(): Generator<any, void, any> () {
+    function* stringliteral() {
         yield '"';
         let str = "";
         while (!(yield has('"'))) {
@@ -298,14 +298,14 @@ function scriptContext(ctx: ParseContext) {
         return makeStringConst(str, subt || "string");
     }
 
-    function* intliteral(): Generator<any, void, any> () {
+    function* intliteral() {
         let [digits] = yield (/^(-?\d+|0x[\da-fA-F]+)\b/);
         yield whitespace;
         let subt = yield literalcast;
         return makeIntConst(parseInt(digits) | 0, subt || "int");
     }
 
-    function* longliteral(): Generator<any, void, any> () {
+    function* longliteral() {
         let [match, int] = yield (/^(-?\d+)n\b/);
         let bigint = BigInt(int) & 0xffff_ffff_ffff_ffffn;
         yield whitespace;
@@ -313,13 +313,13 @@ function scriptContext(ctx: ParseContext) {
         return makeLongConst(bigint, subt || "long");
     }
 
-    function* varname(): Generator<any, void, any> () {
+    function* varname() {
         const [name]: [string] = yield (/^[a-zA-Z$][\w$]*/);
         if (reserverd.includes(name)) { yield unmatchable; }
         return name;
     }
 
-    function* valueList(): Generator<any, void, any> () {
+    function* valueList() {
         let args: any[] = [];
         while (true) {
             args.push(yield valueStatement);
@@ -330,7 +330,7 @@ function scriptContext(ctx: ParseContext) {
         return args;
     }
 
-    function* call(): Generator<any, void, any> () {
+    function* call() {
         let funcname: string = yield varname;
         let metaid = 0;
         yield whitespace;
@@ -440,7 +440,7 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* returnStatement(): Generator<any, void, any> () {
+    function* returnStatement() {
         yield "return";
         yield whitespace;
 
@@ -450,7 +450,7 @@ function scriptContext(ctx: ParseContext) {
         return res;
     }
 
-    function* assignStatement(): Generator<any, void, any> () {
+    function* assignStatement() {
         let hasvarkeyword = yield [/^var\b/, ""]
         yield whitespace;
         let varnames: string[] = [];
@@ -544,7 +544,7 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* switchCaseEntry(): Generator<any, void, any> () {
+    function* switchCaseEntry() {
         let value = 0;
         let type = yield ["case", "default"];
         yield whitespace;
@@ -556,7 +556,7 @@ function scriptContext(ctx: ParseContext) {
         return { type, value };
     }
 
-    function* switchStatement(): Generator<any, void, any> () {
+    function* switchStatement() {
         yield "switch";
         yield whitespace;
         yield "(";
@@ -595,13 +595,13 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* controlStatement(): Generator<any, void, any> () {
+    function* controlStatement() {
         let type = yield ["break", "continue"];
         yield whitespace;
         return new ControlStatementNode(-1, type);
     }
 
-    function* ifStatement(): Generator<any, void, any> () {
+    function* ifStatement() {
         yield "if";
         yield whitespace;
         yield "(";
@@ -625,7 +625,7 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* readVariable(): Generator<any, void, any> () {
+    function* readVariable() {
         let preop = yield ["++", "--", ""];
         if (preop) { yield whitespace; }
         let name = yield varname;
@@ -664,7 +664,7 @@ function scriptContext(ctx: ParseContext) {
         }
     }
 
-    function* bracketedValue(): Generator<any, void, any> () {
+    function* bracketedValue() {
         yield "(";
         yield whitespace;
         let res = yield valueStatement;
@@ -673,7 +673,7 @@ function scriptContext(ctx: ParseContext) {
         return res;
     }
 
-    function* whileStatement(): Generator<any, void, any> () {
+    function* whileStatement() {
         yield "while";
         yield whitespace;
         yield "(";
@@ -686,7 +686,7 @@ function scriptContext(ctx: ParseContext) {
         return new WhileLoopStatementNode(-1, condition, code);
     }
 
-    function* valueStatement(): Generator<any, void, any> () {
+    function* valueStatement() {
         let left = yield [bracketedValue, call, readVariable, stringInterpolation, literal];
         yield whitespace;
         //TODO doesn't currently account for operator precedence
@@ -706,7 +706,7 @@ function scriptContext(ctx: ParseContext) {
         return node;
     }
 
-    function* valueTuple(): Generator<any, void, any> () {
+    function* valueTuple() {
         let first = yield [valueStatement, "[", ""];
         if (first instanceof AstNode) {
             return [first];
@@ -721,15 +721,15 @@ function scriptContext(ctx: ParseContext) {
         }
     }
 
-    function* literal(): Generator<any, void, any> () {
+    function* literal() {
         return yield [intliteral, stringliteral, longliteral];
     }
 
-    function* statement(): Generator<any, void, any> () {
+    function* statement() {
         return yield [functionStatement, ifStatement, whileStatement, switchStatement, returnStatement, controlStatement, assignStatement, valueStatement];
     }
 
-    function* statementlist(): Generator<any, void, any> () {
+    function* statementlist() {
         let statements: any[] = [];
         yield whitespace;
         while (true) {
@@ -754,7 +754,7 @@ function scriptContext(ctx: ParseContext) {
         return statements;
     }
 
-    function* codeBlock(): Generator<any, void, any> () {
+    function* codeBlock() {
         yield "{";
         let statements = yield statementlist;
         let closed = yield ["}", ""];
@@ -762,7 +762,7 @@ function scriptContext(ctx: ParseContext) {
         return new CodeBlockNode(-1, -1, -1, statements);
     }
 
-    function* functionStatement(): Generator<any, void, any> () {
+    function* functionStatement() {
         yield whitespace;
         yield "function";
         yield whitespace;
