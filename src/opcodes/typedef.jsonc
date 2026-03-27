@@ -124,6 +124,6 @@
 	"item_modelid":     ["match","buildnr",{">=670":"varuint",">=0":"ushort"}],
 	"animid":           ["match","buildnr",{">=670":"varnullint",">=0":"ushort"}],
 
-	"uivalues":         ["array","ubyte",["match","ubyte",{"0":"int","1":"string"}]],
+	"uivalues":         ["array","ubyte",["match","ubyte",{"0":"int","1":"string","2":"int"}]],
 	"uivaluesint":		["array","ubyte","int"]
 }
