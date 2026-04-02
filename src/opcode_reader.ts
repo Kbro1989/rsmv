@@ -1,6 +1,6 @@
-import { lastLegacyBuildnr } from "./constants";
+import { lastLegacyBuildnr } from "./constants.js";
 import type * as jsonschema from "json-schema";
-import type { ClientscriptObfuscation } from "./clientscript/callibrator";
+import type { ClientscriptObfuscation } from "./clientscript/callibrator.js";
 
 export type TypeDef = { [name: string]: unknown };
 
@@ -476,6 +476,16 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 	let r: ChunkParser = {
 		read(state) {
 			let len = lengthtype.read(state);
+			// Jagex rev 221+ version sentinel: 0xFFFF means versioned header
+			// Format: [0xFFFF][version_ubyte][actual_ushort_length]
+			if (len === 0xFFFF) {
+				let version = state.buffer.readUInt8(state.scan);
+				state.scan += 1;
+				len = lengthtype.read(state);
+				if (debugdata) {
+					debugdata.opcodes.push({ op: `chunkedarray_version_${version}`, index: state.scan, stacksize: state.stack.length });
+				}
+			}
 			let r: object[] = [];
 			let hiddenprops: object[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
@@ -1424,65 +1434,74 @@ function getClientVersion(args: Record<string, unknown>) {
 	return args.clientVersion;
 }
 
+function checkBounds(s: DecodeState, bytes: number) {
+	if (s.scan + bytes > s.endoffset) {
+		console.warn(`[GhostLimb] Buffer underrun at ${s.scan}/${s.endoffset} (reading ${bytes} bytes)`);
+		throw new RangeError(`Buffer underrun at ${s.scan}/${s.endoffset}`);
+	}
+}
+
 const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s: EncodeState, v: number) => void, min: number, max: number }> = {
 	ubyte: {
-		read(s) { let r = s.buffer.readUInt8(s.scan); s.scan += 1; return r; },
+		read(s) { checkBounds(s, 1); let r = s.buffer.readUInt8(s.scan); s.scan += 1; return r; },
 		write(s, v) { s.buffer.writeUInt8(v, s.scan); s.scan += 1; },
 		min: 0, max: 255
 	},
 	byte: {
-		read(s) { let r = s.buffer.readInt8(s.scan); s.scan += 1; return r; },
+		read(s) { checkBounds(s, 1); let r = s.buffer.readInt8(s.scan); s.scan += 1; return r; },
 		write(s, v) { s.buffer.writeInt8(v, s.scan); s.scan += 1; },
 		min: -128, max: 127
 	},
 	ushort: {
-		read(s) { let r = s.buffer.readUInt16BE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readUInt16BE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeUInt16BE(v, s.scan); s.scan += 2; },
 		min: 0, max: 2 ** 16 - 1
 	},
 	short: {
-		read(s) { let r = s.buffer.readInt16BE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readInt16BE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeInt16BE(v, s.scan); s.scan += 2; },
 		min: -(2 ** 15), max: 2 ** 15 - 1
 	},
 	uint: {
-		read(s) { let r = s.buffer.readUInt32BE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readUInt32BE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeUInt32BE(v, s.scan); s.scan += 4; },
 		min: 0, max: 2 ** 32 - 1
 	},
 	int: {
-		read(s) { let r = s.buffer.readInt32BE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readInt32BE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeInt32BE(v, s.scan); s.scan += 4; },
 		min: -(2 ** 31), max: 2 ** 31 - 1
 	},
 
 	uint_le: {
-		read(s) { let r = s.buffer.readUInt32LE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readUInt32LE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeUint32LE(v, s.scan); s.scan += 4; },
 		min: 0, max: 2 ** 32 - 1
 	},
 	ushort_le: {
-		read(s) { let r = s.buffer.readUInt16LE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readUInt16LE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeUint16LE(v, s.scan); s.scan += 2; },
 		min: 0, max: 2 ** 16 - 1
 	},
 	utribyte: {
-		read(s) { let r = s.buffer.readUIntBE(s.scan, 3); s.scan += 3; return r; },
+		read(s) { checkBounds(s, 3); let r = s.buffer.readUIntBE(s.scan, 3); s.scan += 3; return r; },
 		write(s, v) { s.buffer.writeUintBE(v, s.scan, 3); s.scan += 3; },
 		min: 0, max: 2 ** 24 - 1
 	},
 	float: {
-		read(s) { let r = s.buffer.readFloatBE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readFloatBE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeFloatBE(v, s.scan); s.scan += 4; },
 		min: Number.MIN_VALUE, max: Number.MAX_VALUE
 	},
 
 	varushort: {
 		read(s) {
+			checkBounds(s, 1);
 			let firstByte = s.buffer.readUInt8(s.scan++);
 			if ((firstByte & 0x80) == 0) {
 				return firstByte;
 			}
+			checkBounds(s, 1);
 			let secondByte = s.buffer.readUInt8(s.scan++);
 			return ((firstByte & 0x7f) << 8) | secondByte;
 		},
@@ -1499,11 +1518,13 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varshort: {
 		read(s) {
+			checkBounds(s, 1);
 			let firstByte = s.buffer.readUInt8(s.scan++);
 			if ((firstByte & 0x80) == 0) {
 				//sign extend from 7nth bit (>> fills using 32th bit)
 				return (firstByte << (32 - 7)) >> (32 - 7);
 			}
+			checkBounds(s, 1);
 			let secondByte = s.buffer.readUInt8(s.scan++);
 			return ((((firstByte & 0x7f) << 8) | secondByte) << (32 - 15)) >> (32 - 15);
 		},
@@ -1520,11 +1541,13 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varuint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if ((firstWord & 0x8000) == 0) {
 				return firstWord;
 			} else {
+				checkBounds(s, 2);
 				let secondWord = s.buffer.readUInt16BE(s.scan);
 				s.scan += 2;
 				return ((firstWord & 0x7fff) << 16) | secondWord;
@@ -1544,6 +1567,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varnullint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if (firstWord == 0x7fff) {
@@ -1551,6 +1575,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 			} else if ((firstWord & 0x8000) == 0) {
 				return firstWord;
 			} else {
+				checkBounds(s, 2);
 				let secondWord = s.buffer.readUInt16BE(s.scan);
 				s.scan += 2;
 				return ((firstWord & 0x7fff) << 16) | secondWord;
@@ -1573,12 +1598,14 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if ((firstWord & 0x8000) == 0) {
 				//sign extend from 7nth bit (>> fills using 32th bit)
 				return (firstWord << (32 - 15)) >> (32 - 15);
 			}
+			checkBounds(s, 2);
 			let secondWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			return ((((firstWord & 0x7fff) << 16) | secondWord) << (32 - 31)) >> (32 - 31);

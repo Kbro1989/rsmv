@@ -98,11 +98,11 @@ export function getModelCenter(model: ModelData) {
 	return center;
 }
 
-function parsePosData(arr: Int16Array) {
+export function parsePosData(arr: Int16Array) {
 	return new THREE.BufferAttribute(new Float32Array(arr), 3);
 }
 
-function addBoneIdBuffer(attributes: ModelMeshData["attributes"], boneidBuffer: Uint16Array) {
+export function addBoneIdBuffer(attributes: ModelMeshData["attributes"], boneidBuffer: Uint16Array) {
 	let quadboneids = new Uint8Array(boneidBuffer.length * 4);
 	let quadboneweights = new Uint8Array(boneidBuffer.length * 4);
 	const maxshort = (1 << 16) - 1;
@@ -116,7 +116,7 @@ function addBoneIdBuffer(attributes: ModelMeshData["attributes"], boneidBuffer: 
 	attributes.boneweights = new THREE.BufferAttribute(quadboneweights, 4, true);
 }
 
-function addUvBuffer(attributes: ModelMeshData["attributes"], vertexCount: number, uvBuffer: Uint16Array | Float32Array) {
+export function addUvBuffer(attributes: ModelMeshData["attributes"], vertexCount: number, uvBuffer: Uint16Array | Float32Array) {
 	if (uvBuffer instanceof Uint16Array) {
 		//unpack from float 16
 		let uvBufferCopy = new Float32Array(vertexCount * 2);
@@ -129,7 +129,7 @@ function addUvBuffer(attributes: ModelMeshData["attributes"], vertexCount: numbe
 	}
 }
 
-function addNormalsBuffer(attributes: ModelMeshData["attributes"], normalBuffer: Int8Array | Int16Array) {
+export function addNormalsBuffer(attributes: ModelMeshData["attributes"], normalBuffer: Int8Array | Int16Array) {
 	let normalsrepacked = new Int8Array(normalBuffer.length);
 	//TODO threejs can probly do this for us
 	for (let i = 0; i < normalBuffer.length; i += 3) {
@@ -306,6 +306,132 @@ export function parseOb3Model(modelfile: Buffer, source: CacheFileSource) {
 				needsNormalBlending: false,
 				attributes: attributes
 			})
+		}
+	}
+
+	return makeModelData(meshes);
+}
+
+/**
+ * Parses a "Thick" Model Substrate that has already been parsed into a JSON object 
+ * with materialized TypedArrays.
+ */
+export function parseThickModelData(parsed: any): ModelData {
+	let meshes: ModelMeshData[] = [];
+
+	if (parsed.meshes) {
+		for (let mesh of parsed.meshes) {
+			if (mesh.isHidden) { continue; }
+			let indexBuffers = mesh.indexBuffers;
+			let indexlods = indexBuffers.map(q => new THREE.BufferAttribute(q, 1));
+			let indexbuf = indexBuffers[0];
+
+			let attributes: ModelMeshData["attributes"] = {
+				pos: parsePosData(mesh.positionBuffer!)
+			}
+
+			if (mesh.skin) {
+				let skinIdBuffer = new Uint16Array(mesh.vertexCount * 4);
+				let skinWeightBuffer = new Uint8Array(mesh.vertexCount * 4);
+				let weightin = mesh.skin.skinWeightBuffer;
+				let idin = mesh.skin.skinBoneBuffer;
+				let idindex = 0;
+				let weightindex = 0;
+				for (let i = 0; i < mesh.vertexCount; i++) {
+					let remainder = 255;
+					for (let j = 0; j < 4; j++) {
+						let weight = weightin[weightindex++];
+						let boneid = idin[idindex++];
+						let actualweight = (weight != 0 ? weight : remainder);
+						remainder -= weight;
+						skinIdBuffer[i * 4 + j] = (boneid == 65535 ? 0 : boneid);
+						skinWeightBuffer[i * 4 + j] = actualweight;
+						if (weight == 0) { break; }
+					}
+				}
+				attributes.skinids = new THREE.BufferAttribute(skinIdBuffer, 4);
+				attributes.skinweights = new THREE.BufferAttribute(skinWeightBuffer, 4, true);
+			}
+
+			if (mesh.colourBuffer) {
+				let vertexcolor = new Uint8Array(mesh.vertexCount * 4);
+				let alphaBuffer = mesh.alphaBuffer;
+				for (let i = 0; i < mesh.faceCount; i++) {
+					let [r, g, b] = HSL2RGB(packedHSL2HSL(mesh.colourBuffer[i]));
+					for (let j = 0; j < 3; j++) {
+						let index = indexbuf[i * 3 + j] * 4;
+						vertexcolor[index + 0] = r;
+						vertexcolor[index + 1] = g;
+						vertexcolor[index + 2] = b;
+						vertexcolor[index + 3] = (alphaBuffer ? alphaBuffer[i] : 255);
+					}
+				}
+				attributes.color = new THREE.BufferAttribute(vertexcolor, 4, true);
+			}
+
+			if (mesh.boneidBuffer) { addBoneIdBuffer(attributes, mesh.boneidBuffer); }
+			if (mesh.uvBuffer) { addUvBuffer(attributes, mesh.vertexCount, mesh.uvBuffer); }
+			if (mesh.normalBuffer) { addNormalsBuffer(attributes, mesh.normalBuffer); }
+
+			meshes.push({
+				indices: indexlods[0],
+				vertexstart: 0,
+				vertexend: attributes.pos.count,
+				indexLODs: indexlods,
+				materialId: mesh.materialArgument - 1,
+				hasVertexAlpha: !!mesh.alphaBuffer,
+				needsNormalBlending: false,
+				attributes: attributes
+			});
+		}
+	} else if (parsed.meshdata) {
+		let mesh = parsed.meshdata;
+		let attributes: ModelMeshData["attributes"] = {
+			pos: parsePosData(mesh.positionBuffer!)
+		}
+
+		if (mesh.vertexColours) {
+			let vertexcolor = new Uint8Array(mesh.vertexCount * 4);
+			let alphaBuffer = mesh.vertexAlpha;
+			for (let i = 0; i < mesh.vertexColours.length; i++) {
+				let [r, g, b] = HSL2RGB(packedHSL2HSL(mesh.vertexColours[i]));
+				let alpha = (alphaBuffer ? alphaBuffer[i] : 255);
+				let index = i * 4;
+				vertexcolor[index + 0] = r;
+				vertexcolor[index + 1] = g;
+				vertexcolor[index + 2] = b;
+				vertexcolor[index + 3] = alpha;
+			}
+			attributes.color = new THREE.BufferAttribute(vertexcolor, 4, true);
+		}
+
+		if (mesh.boneidBuffer) { addBoneIdBuffer(attributes, mesh.boneidBuffer); }
+		if (mesh.uvBuffer) { addUvBuffer(attributes, mesh.vertexCount, mesh.uvBuffer); }
+		if (mesh.normalBuffer) { addNormalsBuffer(attributes, mesh.normalBuffer); }
+
+		if (mesh.renders) {
+			for (let render of mesh.renders) {
+				if (render.isHidden) { continue; }
+				let buf = render.buf;
+				let minindex = buf[0];
+				let maxindex = buf[0];
+				for (let i = 0; i < buf.length; i++) {
+					let v = buf[i];
+					if (v < minindex) { minindex = v; }
+					if (v > maxindex) { maxindex = v; }
+				}
+				let index = new THREE.BufferAttribute(buf, 1);
+				meshes.push({
+					indices: index,
+					vertexstart: minindex,
+					vertexend: maxindex + 1,
+					indexLODs: [index],
+					materialId: render.materialArgument - 1,
+					hasVertexAlpha: !!render.hasVertexAlpha,
+					needsNormalBlending: false,
+					attributes: attributes
+				});
+			}
 		}
 	}
 

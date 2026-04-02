@@ -22,7 +22,8 @@ import { findImageBounds, pixelsToImageFile, sliceImage } from "../imgutils";
 
 export type SimpleModelDef = {
 	modelid: number,
-	mods: ModelModifications
+	mods: ModelModifications,
+	injectedModelData?: ModelData
 }[];
 
 export type SimpleModelInfo<T = object, ID = string> = {
@@ -291,7 +292,7 @@ export class RSModel extends TypedEmitter<{ loaded: undefined, animchanged: numb
 		this.model = (async () => {
 			let meshdatas = (await Promise.all(models.map(async modelinit => {
 				try {
-					let meshdata = await cache.getModelData(modelinit.modelid);
+					let meshdata = modelinit.injectedModelData || await cache.getModelData(modelinit.modelid);
 					let modified = {
 						...meshdata,
 						meshes: meshdata.meshes.map(q => modifyMesh(q, modelinit.mods))
@@ -304,13 +305,22 @@ export class RSModel extends TypedEmitter<{ loaded: undefined, animchanged: numb
 			}))).filter(q => q != null);
 			let modeldata = mergeModelDatas(meshdatas);
 			mergeBoneids(modeldata);
-			let effectiveOptions = { 
-				noSkin: options.noSkin ?? (modeldata.bonecount > 250 || (modeldata.bonecount > 40 && typeof window === "undefined")),
-				...options 
-			};
-			if (effectiveOptions.noSkin && modeldata.bonecount > 40) {
-				console.warn(`[RSModel] HIGH BONE COUNT (${modeldata.bonecount}) detected in headless environment or ultra-complex rig. Auto-disabling skinning to prevent WebGL crash.`);
+			let effectiveNoSkin: boolean;
+			if (options.noSkin !== undefined) {
+				// Explicit caller intent — respect it absolutely
+				effectiveNoSkin = options.noSkin;
+			} else if (typeof window === "undefined" && modeldata.bonecount > 40) {
+				// Headless environment (CLI/Node) — no GPU, disable skinning
+				effectiveNoSkin = true;
+				console.warn(`[RSModel] Headless: disabling skinning for ${name} (${modeldata.bonecount} bones)`);
+			} else {
+				// In-browser: NEVER auto-disable skinning — every NPC twitch matters
+				effectiveNoSkin = false;
 			}
+			let effectiveOptions = { 
+				...options,
+				noSkin: effectiveNoSkin
+			};
 			let mesh = await ob3ModelToThree(this.cache, modeldata, effectiveOptions);
 			mesh.name = name;
 
@@ -465,9 +475,10 @@ export class RSMapChunk extends TypedEmitter<{ loaded: RSMapChunkData, changed: 
 		this.chunkz = chunkz;
 		this.chunkdata = (async () => {
 			this.loaded = await renderMapSquare(cache, preparsed, chunkx, chunkz, opts);
-			this.rootnode.add(this.loaded.chunkroot);
+
+			this.rootnode.add(this.loaded!.chunkroot);
 			this.onModelLoaded();
-			return this.loaded;
+			return this.loaded!;
 		})();
 	}
 

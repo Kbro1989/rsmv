@@ -346,6 +346,8 @@ export class UIContext extends TypedEmitter<{ openfile: UIOpenedFile | null, sta
 	sceneCache: ThreejsSceneCache | null = null;
 	renderer: ThreeJsRenderer | null = null;
 	openedfile: UIOpenedFile | null = null;
+	grounding: import("../map/grounding_logic").SovereignGrounding | null = null;
+	mapCenter: { x: number, z: number } | null = null;
 	rootElement: HTMLElement;
 	useServiceWorker: boolean;
 
@@ -359,6 +361,16 @@ export class UIContext extends TypedEmitter<{ openfile: UIOpenedFile | null, sta
 			//across tab reloads
 			navigator.serviceWorker?.register(new URL('../assets/contextholder.js', import.meta.url).href, { scope: './', });
 		}
+	}
+
+	setGrounding(grounding: import("../map/grounding_logic").SovereignGrounding | null) {
+		this.grounding = grounding;
+		this.emit("statechange", undefined);
+	}
+
+	setMapCenter(center: { x: number, z: number } | null) {
+		this.mapCenter = center;
+		this.emit("statechange", undefined);
 	}
 
 	setCacheSource(source: CacheFileSource | null) {

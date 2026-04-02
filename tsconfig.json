@@ -10,7 +10,8 @@
 		"sourceMap": false,
 		"alwaysStrict": true,
 		"jsx": "react",
-		"allowJs": false,
+		"allowJs": true,
+		"checkJs": false,
 		"strictNullChecks": true,
 		"baseUrl": "./src",
 		"outDir": "./dist",
@@ -23,9 +24,13 @@
 		"strictPropertyInitialization": true,
 		"skipLibCheck": true
 	},
+	"include": [
+		"src/**/*"
+	],
 	"exclude": [
 		"node_modules",
-		"./generated"
+		"dist",
+		"generated"
 	],
 	"compileOnSave": false
-}
+}

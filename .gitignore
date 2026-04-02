@@ -8,6 +8,21 @@ node_modules/
 .*
 *.sqlite3
 
+#################
+## Sovereign / rsmv_inspector
+#################
+
+# SQLite databases (all extensions)
+*.sqlite
+
+# Build output directories (decoded RS3 cache content only)
+dist_temp/
+
+# Debug probe output files
+dbg_out*.txt
+out*.txt
+sovereign_entity_*.txt
+
 
 #################
 ## Eclipse

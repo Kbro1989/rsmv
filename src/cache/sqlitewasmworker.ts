@@ -60,7 +60,7 @@ function openTable(major: number) {
 			throw new Error(`need file ${file}`);
 		}
 
-		let dbprom = (require("sql.js/dist/sql-wasm-workerfs.js") as InitSqlJsStatic)().then(sqlite => {
+		let dbprom = (require("../libs/sqljsfork/dist/sql-wasm-workerfs.js") as InitSqlJsStatic)().then(sqlite => {
 			return new sqlite.Database(dbfiles[file] as any);
 		});
 

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { delay, TypedEmitter } from '../utils';
 import { dumpTexture, flipImage, makeImageData } from '../imgutils';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
@@ -51,9 +52,9 @@ export type ThreeJsSceneElement = {
 	}
 }
 
-type CameraControlMode = "free" | "world";
+type CameraControlMode = "free" | "world" | "editor";
 type AutoFrameMode = "forced" | "continuous" | "never";
-export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown";
+export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown" | "editor";
 
 export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private renderer: THREE.WebGLRenderer;
@@ -76,10 +77,11 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private standardLights: Group;
 
 	private camMode: RenderCameraMode = "standard";
-	private camera: THREE.PerspectiveCamera;
+	public camera: THREE.PerspectiveCamera;
 	private topdowncam: THREE.OrthographicCamera;
 	private standardControls: OrbitControls;
 	private orthoControls: OrbitControls;
+	public transformControls: TransformControls;
 	private itemcam = new THREE.PerspectiveCamera();
 
 	constructor(canvas: HTMLCanvasElement, params?: THREE.WebGLRendererParameters) {
@@ -113,6 +115,28 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.standardControls.target.set(0, 5, 0);
 		this.standardControls.update();
 		this.standardControls.addEventListener("change", this.forceFrame);
+ 
+		this.transformControls = new TransformControls(this.camera, canvas);
+		this.transformControls.addEventListener("change", this.forceFrame);
+		this.transformControls.addEventListener("dragging-changed", (event) => {
+			this.standardControls.enabled = !event.value;
+			
+			// If drag ended, broadcast the mutation
+			if (!event.value && this.transformControls.object) {
+				const obj = this.transformControls.object;
+				const mutation = {
+					type: 'ENTITY_MUTATED',
+					entityId: (obj as any).entityId || obj.name,
+					position: { x: obj.position.x / 512, y: obj.position.y / 512, z: obj.position.z / 512 },
+					rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+					scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
+				};
+				import("./SovereignBridge").then(m => {
+					m.SovereignBridge.getInstance().sendAction(JSON.stringify(mutation));
+				});
+				console.log(`[POG2 EDITOR] Mutation Broadcast: ${mutation.entityId}`);
+			}
+		});
 
 		this.topdowncam = new SkewOrthographicCamera(10, 0, 0);
 		this.topdowncam.position.copy(this.camera.position);
@@ -127,9 +151,10 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.scene = scene;
 		scene.add(this.camera);
 		scene.add(this.topdowncam);
+		scene.add(this.transformControls);
 
-		//three typings are outdated
-		(renderer as any).useLegacyLights = false;
+		// three lighting migration (r155+)
+		// (renderer as any).useLegacyLights = false; // DEPRECATED
 		renderer.outputColorSpace = THREE.SRGBColorSpace as any;
 
 		const planeSize = 11;
@@ -697,7 +722,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 					minFilter: THREE.LinearFilter,
 					magFilter: THREE.LinearFilter,
 					format: THREE.RGBAFormat,
-					colorSpace: this.renderer.outputColorSpace,
+					colorSpace: this.renderer.outputColorSpace as any,
 					samples: gl.getParameter(gl.SAMPLES)
 				});
 			}
@@ -785,6 +810,23 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 		//these attributes need to be padded to 4 bytes according to gltf spec but threejs doesn't
 		if (node instanceof Mesh && node.geometry instanceof BufferGeometry) {
 			let attributes = node.geometry.attributes;
+			
+			// Always strip non-standard RS3 attributes that Blender/Standard GLTF chokes on
+			let rs3Attributes = [
+				"color_0", "color_1", "color_2", "color_3",
+				"texcoord_0", "texcoord_1", "texcoord_2", "texcoord_3",
+				"RA_skinIndex_bone", "RA_skinIndex_skin", "RA_skinWeight_bone", "RA_skinWeight_skin"
+			];
+
+			for (let attr of rs3Attributes) {
+				if (attributes[attr]) {
+					let attrname = attr;
+					let oldval = attributes[attr];
+					delete attributes[attr];
+					undolist.push(() => attributes[attrname] = oldval);
+				}
+			}
+
 			let normal = node.geometry.attributes.normal as THREE.BufferAttribute;
 			if (normal && normal.array instanceof Int8Array) {
 				let v = new Vector3();
@@ -797,15 +839,6 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 				let oldnormal = attributes.normal;
 				undolist.push(() => attributes.normal = oldnormal);
 				node.geometry.attributes.normal = cloned;
-			}
-			//for some reason blender chokes on these
-			for (let attr of hiddenattributes) {
-				if (attributes[attr]) {
-					let attrname = attr;
-					let oldval = attributes[attr];
-					delete attributes[attr];
-					undolist.push(() => attributes[attrname] = oldval);
-				}
 			}
 		}
 	});

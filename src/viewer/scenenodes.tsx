@@ -38,6 +38,8 @@ import { UiCameraParams, updateItemCamera } from "./camerautils";
 import { boundMethod } from "autobind-decorator";
 import * as cmdts from "cmd-ts";
 import { EngineCache, ThreejsSceneCache, constModelsIds } from "../3d/modeltothree";
+import { GroundingHUD, VarbitMonitor } from "./grounding_ui";
+import { SovereignGrounding } from "../map/grounding_logic";
 
 
 type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map" | "avatar" | "spotanim" | "scenario" | "scripts";
@@ -492,8 +494,6 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 	mapoffset: { x: number, z: number } | null = null;
 	mapgrid = new CombinedTileGrid([]);
 	hadctx = false;
-	state: any;
-	props: any;
 
 	constructor(p: LookupModeProps) {
 		super(p);
@@ -757,7 +757,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		if (this.state.addModelType == "npc") {
 			selectEntity(this.props.ctx, "npcs", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
 		} else if (this.state.addModelType == "item") {
-			selectEntity(this.props.ctx, "items", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
+			selectEntity(this.props.ctx, "items", id => this.addComp("" + id), [{ path: ["equipSlotId"], search: "" }, { path: ["name"], search: "" }])
 		} else if (this.state.addModelType == "loc") {
 			selectEntity(this.props.ctx, "objects", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
 		}
@@ -831,9 +831,6 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 				</div>
 			</React.Fragment>
 		)
-	}
-	setState(arg0: { addActionTarget: number; }) {
-		throw new Error('Method not implemented.');
 	}
 }
 
@@ -911,7 +908,7 @@ function ScenePlayer(p: LookupModeProps) {
 
 	const colorDropdown = (id: keyof avataroverrides, v: number, opts: Record<number, number>) => {
 		return (
-			<LabeledInput label={id} children={undefined}>
+			<LabeledInput label={id}>
 				<select value={v} onChange={e => changeColor(id, +e.currentTarget.value)} style={{ backgroundColor: hsl2hex(opts[v]) }}>
 					{Object.entries(opts).map(([i, v]) => <option key={i} value={i} style={{ backgroundColor: hsl2hex(v) }}>{i}</option>)}
 				</select>
@@ -930,7 +927,7 @@ function ScenePlayer(p: LookupModeProps) {
 				</React.Fragment>
 			)}
 			{data && (
-				<LabeledInput label="Animation" children={undefined}>
+				<LabeledInput label="Animation">
 					<select onChange={e => { model?.setAnimation(+e.currentTarget.value); forceUpdate() }} value={model?.targetAnimId ?? -1}>
 						{Object.entries(data.anims).map(([k, v]) => <option key={k} value={v}>{k}</option>)}
 					</select>
@@ -1201,6 +1198,7 @@ function ExportSceneMenu(p: { ctx: UIContextReady, renderopts: ThreeJsSceneEleme
 		</div>
 	)
 }
+
 
 export function RendererControls(p: { ctx: UIContext }) {
 	const elconfig = React.useRef<ThreeJsSceneElement>({ options: {} });
@@ -1567,7 +1565,7 @@ function SceneNpc(p: LookupModeProps) {
 			)}
 			{model && data && (<label><input type="checkbox" checked={initid.head} onChange={e => setId({ id: initid.id, head: e.currentTarget.checked })} />Head</label>)}
 			{model && data && (
-				<LabeledInput label="Animation" children={undefined}>
+				<LabeledInput label="Animation">
 					<select onChange={e => { model.setAnimation(+e.currentTarget.value); forceUpdate() }} value={model.targetAnimId}>
 						{Object.entries(data.anims).map(([k, v]) => <option key={k} value={v}>{k}</option>)}
 					</select>
@@ -1620,9 +1618,7 @@ type SceneMapState = {
 };
 export class SceneMapModel extends React.Component<LookupModeProps, SceneMapState> {
 	selectCleanup: (() => void)[] = [];
-	state: any;
-	props: any;
-	constructor(p) {
+	constructor(p: LookupModeProps) {
 		super(p);
 		this.state = {
 			chunkgroups: [],
@@ -1637,11 +1633,8 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 	@boundMethod
 	clear() {
 		this.selectCleanup.forEach(q => q());
-		this.state.chunkgroups.forEach(q => q.models.forEach(q => q.cleanup()));
-		this.setState({ chunkgroups: [], toggles: Object.create(null) });
-	}
-	setState(arg0: { chunkgroups: never[]; toggles: any; }) {
-		throw new Error('Method not implemented.');
+		this.state.chunkgroups.forEach(q => (q.models as Map<ThreejsSceneCache, RSMapChunk>).forEach(q => q.cleanup()));
+		this.setState({ chunkgroups: [], toggles: Object.create(null) } as any);
 	}
 
 	@boundMethod
@@ -1714,9 +1707,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 		group.diffs.push(diffgroup);
 		this.forceUpdate();
 	}
-	forceUpdate() {
-		throw new Error('Method not implemented.');
-	}
+
 
 	@boundMethod
 	async meshSelected(e: ThreeJsRendererEvents["select"]) {
@@ -1820,6 +1811,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 			let group = prevstate.chunkgroups.find(q => q.chunkx == chunkx && q.chunkz == chunkz);
 			let newstate: Partial<SceneMapState> = {};
 			newstate.center = center;
+			this.props.ctx.setMapCenter(center);
 			if (!group) {
 				group = { chunkx, chunkz, models: new Map(), diffs: [] };
 				newstate.chunkgroups = [...prevstate.chunkgroups, group];
@@ -2024,6 +2016,12 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 							)
 						}))}
 						<JsonDisplay obj={this.state.selectionData} />
+						{this.props.ctx && (
+							<>
+								<GroundingHUD ctx={this.props.ctx as any} mapCenter={this.state.center} />
+								<VarbitMonitor ctx={this.props.ctx as any} />
+							</>
+						)}
 					</div>
 				)}
 			</React.Fragment>
@@ -2104,9 +2102,6 @@ export class Map2dView extends React.Component<{ addArea?: (x: number, z: number
 			</div>
 		);
 	}
-	forceUpdate() {
-		throw new Error('Method not implemented.');
-	}
 }
 
 function PreviewFilesScript(p: UiScriptProps) {
@@ -2165,13 +2160,13 @@ function ExtractFilesScript(p: UiScriptProps) {
 	return (
 		<React.Fragment>
 			<p>Extract files from the cache.<br />The ranges field uses logical file id's for JSON based files, {"<major>.<minor>"} notation for bin mode, or {"<x>.<z>"} for map based files.</p>
-			<LabeledInput label="Mode" children={undefined}>
+			<LabeledInput label="Mode">
 				<select value={mode} onChange={e => setMode(e.currentTarget.value as any)}>
 					{/* {Object.keys(cacheFileDecodeModes).map(k => <option key={k} value={k}>{k}</option>)} */}
 					<ModeDropDownOptions />
 				</select>
 			</LabeledInput>
-			<LabeledInput label="File ranges" children={undefined}>
+			<LabeledInput label="File ranges">
 				<InputCommitted type="text" onChange={e => setFilestext(e.currentTarget.value)} value={filestext} />
 			</LabeledInput>
 			<div>{modemeta?.description ?? ""}</div>
@@ -2201,16 +2196,16 @@ function ExtractHistoricScript(p: UiScriptProps) {
 	return (
 		<React.Fragment>
 			<p>Tracks a single file's update history using openrs2 caches. Each known cache will be compared and all changes are shown. {"<major>.<minor>"} notation for bin mode, or {"<x>.<z>"} for map based files.</p>
-			<LabeledInput label="Mode" children={undefined}>
+			<LabeledInput label="Mode">
 				<select value={mode} onChange={e => setMode(e.currentTarget.value as any)}>
 					{/* {Object.keys(cacheFileDecodeModes).map(k => <option key={k} value={k}>{k}</option>)} */}
 					<ModeDropDownOptions />
 				</select>
 			</LabeledInput>
-			<LabeledInput label="File ranges" children={undefined}>
+			<LabeledInput label="File ranges">
 				<InputCommitted type="text" onChange={e => setFilestext(e.currentTarget.value)} value={filestext} />
 			</LabeledInput>
-			<LabeledInput label="Build numbers (empty for all)" children={undefined}>
+			<LabeledInput label="Build numbers (empty for all)">
 				<input type="text" value={buildnrs} onChange={e => setbuildnrs(e.currentTarget.value)} />
 			</LabeledInput>
 			<input type="button" className="sub-btn" value="Run" onClick={run} />
@@ -2235,13 +2230,13 @@ function MapRemoteRenderScript(p: UiScriptProps) {
 	return (
 		<React.Fragment>
 			<p>Update a map database, requires compatible server endpoint.</p>
-			<LabeledInput label="Endpoint" children={undefined}>
+			<LabeledInput label="Endpoint">
 				<InputCommitted type="text" onChange={e => setEndpoint(e.currentTarget.value)} value={endpoint} />
 			</LabeledInput>
-			<LabeledInput label="Auth" children={undefined}>
+			<LabeledInput label="Auth">
 				<InputCommitted type="text" onChange={e => setAuth(e.currentTarget.value)} value={auth} />
 			</LabeledInput>
-			<LabeledInput label="mapid" children={undefined}>
+			<LabeledInput label="mapid">
 				<InputCommitted type="number" onChange={e => setMapId(+e.currentTarget.value)} value={mapid} />
 			</LabeledInput>
 			<input type="button" className="sub-btn" value="Run" onClick={run} />
@@ -2357,7 +2352,7 @@ function CacheDiffScript(p: UiScriptProps) {
 				</div>
 			)}
 			{cache2 && <input type="button" className="sub-btn" value={`Close ${cache2.getCacheMeta().name}`} onClick={e => setCache2(null)} />}
-			<LabeledInput label="file range" children={undefined}>
+			<LabeledInput label="file range">
 				<input type="text" onChange={e => setFilerange(e.currentTarget.value)} value={filerange} />
 			</LabeledInput>
 			<input type="button" className="sub-btn" value="Run" onClick={run} />
@@ -2405,12 +2400,12 @@ function TestFilesScript(p: UiScriptProps) {
 	return (
 		<React.Fragment>
 			<p>Run this script to test if the current cache parser is compatible with the loaded cache. Generates readable errors if not.</p>
-			<LabeledInput label="Mode" children={undefined}>
+			<LabeledInput label="Mode">
 				<select value={mode} onChange={e => setMode(e.currentTarget.value)}>
 					{Object.keys(cacheFileJsonModes).map(k => <option key={k} value={k}>{k}</option>)}
 				</select>
 			</LabeledInput>
-			<LabeledInput label="file range" children={undefined}>
+			<LabeledInput label="file range">
 				<input type="text" onChange={e => setRange(e.currentTarget.value)} value={range} />
 			</LabeledInput>
 			<div><label><input type="checkbox" checked={ordersize} onChange={e => setOrdersize(e.currentTarget.checked)} />Order by size (puts everything in mem)</label></div>

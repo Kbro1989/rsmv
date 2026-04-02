@@ -110,12 +110,12 @@ export class MapRenderFsBacked extends MapRender {
 //if not it will generate the file and save it together with some metadata (hash+build nr)
 export class MapRenderDatabaseBacked extends MapRender {
 	endpoint: string;
-	workerid: string;
+	declare workerid: string;
 	uploadmapid: number;
 	auth: string;
 	overwrite: boolean;
 	ignorebefore: Date;
-	rendermetaLayer: LayerConfig | undefined;
+	declare rendermetaLayer: LayerConfig | undefined;
 
 	private postThrottler = new FetchThrottler(20);
 	private fileThrottler = new FetchThrottler(20);
