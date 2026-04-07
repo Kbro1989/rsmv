@@ -38,13 +38,26 @@ export type StackDiffEquation = {
 let varInfoParser = new FileParser<{ type: number }>({
     "0x03": { "name": "type", "read": "ubyte" },
     "0x04": { "name": "0x04", "read": "ubyte" },
+    "0x05": { "name": "0x05", "read": true },
+    "0x06": { "name": "0x06", "read": "ubyte" },
     "0x07": { "name": "0x07", "read": true },
+    "0x08": { "name": "0x08", "read": true },
+    "0x09": { "name": "0x09", "read": true },
+    "0x0a": { "name": "0x0a", "read": true },
+    "0x0b": { "name": "0x0b", "read": true },
+    "0x10": { "name": "0x10", "read": true },
+    "0x11": { "name": "0x11", "read": true },
     "0x6e": { "name": "0x6e", "read": "ushort" },
 });
 
 var varbitInfoParser = new FileParser<{ varid: number, bits: [number, number] }>({
     "0x01": { "name": "varid", "read": "utribyte" },//[8bit domain][16bit id] read as tribyte since thats also how we read pushvar/popvar imm
-    "0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] }
+    "0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] },
+    "0x03": { "name": "unk03", "read": "ubyte" },
+    "0x04": { "name": "unk04", "read": "ubyte" },
+    "0x08": { "name": "unk08", "read": true },
+    "0x10": { "name": "unk10", "read": true },
+    "0x11": { "name": "unk11", "read": true }
 });
 
 export class OpcodeInfo {
@@ -380,7 +393,12 @@ export class ClientscriptObfuscation {
         }
         let res = new ClientscriptObfuscation(source);
         globalThis.deob = res;//TODO remove
-        await res.preloadData();
+        try {
+            await res.preloadData();
+        } catch (e) {
+            console.warn(`⚠️ Warning: Failed to preload CS2 metadata: ${e instanceof Error ? e.message : e}`);
+            console.warn(`🔍 Proceeding with raw ID mode for decompilation.`);
+        }
         await res.loadCandidates();
         return res;
     }

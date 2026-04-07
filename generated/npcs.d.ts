@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\npcs.jsonc'
+// This source data is located at '../src/opcodes/npcs.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type npcs = {
@@ -7,6 +7,7 @@ export type npcs = {
 	name?: string | null
 	examine?: string | null
 	unknown_08?: number | null
+	unknown_09?: number | null
 	unknown_0B?: number | null
 	boundSize?: number | null
 	unk_0D?: number | null
@@ -38,7 +39,7 @@ export type npcs = {
 	modelContract?: number | null
 	head_icon_data?: number | null
 	unknown_67?: number | null
-	morphs_1?: {
+	varbitId?: {
 		unk1: number,
 		unk2: number[],
 		unk3: (number|number),
@@ -58,7 +59,7 @@ export type npcs = {
 		number,
 		number,
 	] | null
-	morphs_2?: {
+	varpId?: {
 		unk1: number,
 		unk2: number,
 		unk3: number[],
@@ -205,4 +206,6 @@ export type npcs = {
 		stringvalue: string | null,
 	}[] | null
 	unknown_FD?: number | null
+	morphs_1?: { unk1: number, unk2: number[], unk3: number } | null
+	morphs_2?: { unk1: number, unk2: number, unk3: number[], unk4: number } | null
 };

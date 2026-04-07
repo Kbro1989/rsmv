@@ -1,0 +1,21 @@
+{
+  "animation_group": 1426,
+  "combat": 0,
+  "boundSize": 1,
+  "actions_0": "Talk to",
+  "actions_2": "Buy veteran capes",
+  "color_replacements": [
+    [5133, 6798],
+    [6443, 1561],
+    [5404, 1561],
+    [6563, 1555],
+    [5524, 1555]
+  ],
+  "material_replacements": [[605, 609], [607, 603]],
+  "name": "Hans",
+  "models": [40329, 28785, 28796, 40370, 28767, 28810],
+  "headModels": [39575],
+  "movementCapabilities": 2,
+  "action_cursors_0": 44,
+  "$schema": ".schema-npcs.json"
+}

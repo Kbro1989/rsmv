@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
 import { RSCompositeAvatar } from "./RSCompositeAvatar";
 import { SovereignBridge } from "./SovereignBridge";
+import { GameCacheLoader } from "../cache/sqlite";
+import { stringToMapArea } from "../utils";
 
 export class RSAvatarController {
     public raycaster = new THREE.Raycaster();
@@ -83,9 +85,11 @@ export class RSEngine {
     public avatarController: RSAvatarController | null = null;
     public collisionGroup = new THREE.Group();
     public spatialManager: import("./RSSpatialManager").RSSpatialManager | null = null;
+    public objectRenderer: import("./SovereignObjectRenderer").SovereignObjectRenderer | null = null;
     public grounding: import("../map/grounding_logic").SovereignGrounding | null = null;
-    private avatarTileX = 3712;
-    private avatarTileZ = 3328;
+    public modelnode = new THREE.Group();
+    private avatarTileX = 544;
+    private avatarTileZ = 1632;
     private lastChunkX = -1;
     private lastChunkZ = -1;
     public editorMode = false;
@@ -93,8 +97,8 @@ export class RSEngine {
     // Entities
     public avatar = {
         entityId: 15516,
-        position: { x: 3712, y: 0, z: 3328 }, // Havenhythe Anchor
-        targetPosition: { x: 3712, y: 0, z: 3328 },
+        position: { x: 544, y: 0, z: 1632 }, 
+        targetPosition: { x: 544, y: 0, z: 1632 },
         animation: { current: -1, next: -1, tick: 0 },
         path: [] as {x: number, z: number}[],
         state: 'idle', // idle, walking
@@ -163,13 +167,18 @@ export class RSEngine {
         }
         this.renderer.setPixelRatio(window.devicePixelRatio);
         
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
-        // Base starting position
-        this.camera.position.set(3712, 10, 3328);
-        this.camera.lookAt(3712, 0, 3328);
-        
         this.scene = new THREE.Scene();
+        
+        // Unified World Root (Z-inverted)
+        this.modelnode.scale.set(1 / 512, 1 / 512, -1 / 512);
+        this.scene.add(this.modelnode);
         this.scene.add(this.collisionGroup);
+        
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        // Base starting position (Blooming Burrow)
+        this.camera.position.set(544 * 512, 1000, 1632 * -512);
+        this.camera.lookAt(544 * 512, 0, 1632 * -512);
+        
         this.scene.background = new THREE.Color(0x000000);
 
         // Add some basic light to see things
@@ -201,7 +210,7 @@ export class RSEngine {
                 this.accumulator -= this.TICK_RATE;
             }
 
-            // 600ms World Pulse (Autonomous Thinking)
+            // 600ms World Pulse (Autonomous Thinking + Spatial Grounding)
             if (this.worldTickAccumulator >= this.WORLD_TICK) {
                 this.ThinkingTick();
                 this.worldTickAccumulator -= this.WORLD_TICK;
@@ -226,15 +235,13 @@ export class RSEngine {
                 } else {
                     const step = Math.min(dist, speed * dt);
                     this.avatar.position.x += (dx / dist) * step;
-                    this.avatar.position.z += (dz / dist) * step;
-                    
-                    // Basic orientation
-                    this.avatar.model.rootNode.rotation.y = Math.atan2(dx, dz);
+                    // Basic orientation (Z-inverted)
+                    this.avatar.model.rootNode.rotation.y = Math.atan2(dx, -dz);
                 }
                 
-                // Snap to terrain Height (Naive Raycast Down)
+                // Snap to terrain Height (World-Unit Raycast against scaled modelnode)
                 if (this.scene) {
-                    const rc = new THREE.Raycaster(new THREE.Vector3(this.avatar.position.x * 512, 10000, this.avatar.position.z * 512), new THREE.Vector3(0, -1, 0));
+                    const rc = new THREE.Raycaster(new THREE.Vector3(this.avatar.position.x, 10000, this.avatar.position.z * -1), new THREE.Vector3(0, -1, 0));
                     const hits = rc.intersectObjects(this.scene.children, true);
                     let groundY = 0;
                     for (let h of hits) {
@@ -243,12 +250,12 @@ export class RSEngine {
                             break;
                         }
                     }
-                    this.avatar.model.rootNode.position.set(this.avatar.position.x * 512, groundY, this.avatar.position.z * 512);
+                    this.avatar.model.rootNode.position.set(this.avatar.position.x * 512, groundY * 512, this.avatar.position.z * 512);
                 }
 
-                // Camera follow
+                // Camera follow (Z-inverted)
                 if (this.camera) {
-                    this.camera.position.set(this.avatar.model.rootNode.position.x + 1000, this.avatar.model.rootNode.position.y + 1000, this.avatar.model.rootNode.position.z - 1000);
+                    this.camera.position.set(this.avatar.model.rootNode.position.x + 1000, this.avatar.model.rootNode.position.y + 1000, this.avatar.model.rootNode.position.z + 1000);
                     this.camera.lookAt(this.avatar.model.rootNode.position);
                 }
             } else if (this.editorMode && this.camera) {
@@ -261,27 +268,50 @@ export class RSEngine {
         };
         }
 
-    private ThinkingTick() {
-        console.log(`[SOVEREIGN PULSE] 600ms Heartbeat: NPC Decision Loop Triggered.`);
-        // Bridge to SovereignIntelligence / CognitiveEngine here
-        if (this.scene && this.spatialManager) {
-            this.spatialManager.stream(this.avatarTileX, this.avatarTileZ, this.scene);
+    private async ThinkingTick() {
+        // Clinical Pulse: Scan 3x3 grid around avatar for zero-latency grounding (1,1,1,1 expansion)
+        if (this.modelnode && this.spatialManager) {
+            const centerX = Math.floor(this.avatarTileX / 64);
+            const centerZ = Math.floor(this.avatarTileZ / 64);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dz = -1; dz <= 1; dz++) {
+                    const tx = (centerX + dx) * 64;
+                    const tz = (centerZ + dz) * 64;
+                    // Stream all 4 planes (multi-plane manifestation)
+                    for (let p = 0; p < 4; p++) {
+                        this.spatialManager.stream(tx, tz, this.modelnode, p);
+                    }
+                }
+            }
         }
     }
 
     public async setCache(cache: ThreejsSceneCache) {
         this.cache = cache;
         const { RSSpatialManager } = await import("./RSSpatialManager");
+        const { SovereignObjectRenderer } = await import("./SovereignObjectRenderer");
+        
         this.spatialManager = new RSSpatialManager(this.cache);
+        this.objectRenderer = new SovereignObjectRenderer(this.cache, this.modelnode);
         await this.spatialManager.initialize();
+        
+        // Establish Neural Link to Cache Substrate for Brute-Force Extraction
+        try {
+            const loader = new GameCacheLoader(); // Defaults to ProgramData path
+            this.spatialManager.setCacheLoader(loader);
+            console.log(`[CNS] Sovereign Spatial Substrate (SQLITE) Linked.`);
+        } catch (e) {
+            console.warn(`[CNS] Failed to link Cache Substrate. Brute-force scanning disabled.`, e);
+        }
         
         await this.setupAvatar();
 
         this.setupPOG2API();
 
         // Trigger first stream immediately
-        if (this.scene) {
-            await this.spatialManager.stream(this.avatarTileX, this.avatarTileZ, this.scene);
+        if (this.modelnode) {
+            await this.spatialManager.stream(this.avatarTileX, this.avatarTileZ, this.modelnode);
         }
     }
 
@@ -313,8 +343,34 @@ export class RSEngine {
                 }
                 console.log(`[POG2 API] Interacting with NPC: ${name}`);
             },
-            scan: () => {
-                console.log(`[POG2 API] Scanning Pedagogy Grounding... loaded ${Object.keys(this.grounding?.pedagogy?.npcs || {}).length} NPCs and ${Object.keys(this.grounding?.pedagogy?.objects || {}).length} Objects into Runtime Context.`);
+            scan: (mx?: number | string, mz?: number, xsize = 1, zsize?: number) => {
+                if (typeof mx === "string") {
+                    const area = stringToMapArea(mx);
+                    if (area) {
+                        for (let dx = 0; dx < area.xsize; dx++) {
+                            for (let dz = 0; dz < area.zsize; dz++) {
+                                this.spatialManager?.stream((area.x + dx) * 64, (area.z + dz) * 64, this.modelnode);
+                            }
+                        }
+                        console.log(`[POG2 API] Coordinate Range Pulse: ${mx}`);
+                        return;
+                    }
+                }
+
+                const sz = zsize ?? xsize;
+                if (typeof mx === "number" && mz !== undefined) {
+                    console.log(`[POG2 API] Regional Grounding Pulse: [${mx}, ${mz}] with range [${xsize}x${sz}]`);
+                    for (let dx = 0; dx < xsize; dx++) {
+                        for (let dz = 0; dz < sz; dz++) {
+                            // Convert Mapsquare indices back to tile units for the spatial manager
+                            const tx = (mx + dx) * 64;
+                            const tz = (mz + dz) * 64;
+                            this.spatialManager?.stream(tx, tz, this.modelnode);
+                        }
+                    }
+                } else {
+                    console.log(`[POG2 API] Scanning Pedagogy Grounding... loaded ${Object.keys(this.grounding?.pedagogy?.npcs || {}).length} NPCs and ${Object.keys(this.grounding?.pedagogy?.objects || {}).length} Objects into Runtime Context.`);
+                }
             }
         };
         console.log("[CNS] window.POG2 bridge instantiated.");
@@ -388,7 +444,7 @@ export class RSEngine {
         avatar.rootNode.position.set(this.avatar.position.x * 512, this.avatar.position.y * 512, this.avatar.position.z * 512);
         
         // Add to sovereign scene
-        this.scene.add(avatar.rootNode);
+        this.modelnode.add(avatar.rootNode);
         this.avatar.model = avatar;
 
         if (this.camera) {

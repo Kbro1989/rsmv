@@ -17,9 +17,13 @@ export class RSSpatialManager {
     console.log('[RSSpatialManager] Grounding stream initialized');
   }
 
+  public setCacheLoader(loader: any) {
+    this.grounding.setCacheSubstrate(loader);
+  }
+
   // Called from RSEngine tick — cheap after first pass (loadedChunks guards re-entry)
-  async stream(avatarTileX: number, avatarTileZ: number, scene: THREE.Scene): Promise<void> {
-    const manifests = this.grounding.getStreamingManifests(avatarTileX, avatarTileZ, 208);
+  async stream(avatarTileX: number, avatarTileZ: number, scene: THREE.Object3D, plane: number = 0): Promise<void> {
+    const manifests = this.grounding.getStreamingManifests(avatarTileX, avatarTileZ, 208, plane);
 
     for (const manifest of manifests) {
       if (this.loadedChunks.has(manifest.chunkKey)) continue;

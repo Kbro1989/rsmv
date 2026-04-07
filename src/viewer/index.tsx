@@ -29,26 +29,9 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 	// 0. Initialize real-time bridge to POG2 backend
 	SovereignBridge.getInstance();
 	
-	// 1. Mount React as chrome/ui layer (lower z-index, pointer-events: none)
-	const uiContainer = document.createElement('div');
-	uiContainer.id = 'pog2-ui';
-	uiContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1000;';
-	rootelement.appendChild(uiContainer);
-	let root = ReactDOM.createRoot(uiContainer);
+	// 1. Mount React as the single root authority
+	let root = ReactDOM.createRoot(rootelement);
 	root.render(<App ctx={ctx} />);
-
-	// 2. Mount RSEngine as sovereign canvas (full screen, z-index: 0)
-	const canvas = document.createElement('canvas');
-	canvas.id = 'pog2-world';
-	canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;';
-	rootelement.appendChild(canvas);
-
-	// 3. Initialize sovereign loop
-	SovereignEngine.initialize(canvas, {
-		initialPosition: { x: 3712, y: 3328, z: 0 }, // Havenhythe
-		avatarEntityId: 1556,
-		cacheSource: 'D:\\sovereign\\cache_pedagogy'
-	});
 
 	globalThis.cli = async (args: string) => {
 		let cliconsole = new CLIScriptOutput();
@@ -78,6 +61,8 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 }
 
 class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile | null }> {
+	canvasRef = React.createRef<HTMLCanvasElement>();
+
 	constructor(p: { ctx: UIContext }) {
 		super(p);
 		this.state = {
@@ -140,7 +125,17 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 	}
 
 	initCnv = (cnv: HTMLCanvasElement | null) => {
+		// Guard: only set a new renderer if the canvas element actually changed
+		// Otherwise setRenderer emits statechange → forceUpdate → re-render → initCnv → infinite loop
+		const currentCanvas = this.props.ctx.renderer?.getCanvas?.() ?? null;
+		if (cnv === currentCanvas) return;
+		if (!cnv && !this.props.ctx.renderer) return;
 		this.props.ctx.setRenderer(cnv ? new ThreeJsRenderer(cnv) : null);
+	}
+
+	handleCanvasRef = (el: HTMLCanvasElement | null) => {
+		(this.canvasRef as any).current = el;
+		this.initCnv(el);
 	}
 
 	closeCache = () => {
@@ -164,6 +159,15 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		this.props.ctx.on("openfile", this.openFile);
 		this.props.ctx.on("statechange", this.stateChanged);
 		window.addEventListener("resize", this.resized);
+
+		// Initialize Sovereign Engine on the React-owned canvas
+		if (this.canvasRef.current) {
+			SovereignEngine.initialize(this.canvasRef.current, {
+				initialPosition: { x: 3712, y: 3328, z: 0 }, // Havenhythe
+				avatarEntityId: 1556,
+				cacheSource: 'D:\\sovereign\\cache_pedagogy'
+			});
+		}
 	}
 
 	componentWillUnmount() {
@@ -183,13 +187,49 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 
 		let cachemeta = this.props.ctx.source?.getCacheMeta();
 		return (
-			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })} style={{ pointerEvents: 'none', background: 'transparent' }}>
-				{/* 2026 Sovereign HUD Overlay */}
-				<SovereignHUD />
+			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })} 
+				style={{ 
+					display: 'flex', 
+					width: '100vw', 
+					height: '100vh', 
+					overflow: 'hidden',
+					background: '#000'
+				}}>
 				
-				<canvas className="mv-canvas" ref={this.initCnv} style={{ display: this.state.openedFile ? "none" : "", pointerEvents: 'auto' }}></canvas>
-				{this.state.openedFile && <div style={{ pointerEvents: 'auto' }}><FileViewer file={this.state.openedFile} onSelectFile={this.props.ctx.openFile} /></div>}
-				<div className="mv-sidebar" style={{ pointerEvents: 'auto' }}>
+				{/* 3D World Section (Left/Top) */}
+				<div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+					{/* 2026 Sovereign HUD Overlay (Transparent siblings) */}
+					<SovereignHUD />
+					
+					<canvas 
+						id="pog2-world"
+						className="mv-canvas" 
+						ref={this.handleCanvasRef} 
+						style={{ 
+							display: this.state.openedFile ? "none" : "block", 
+							width: '100%', 
+							height: '100%',
+							pointerEvents: 'auto' 
+						}}
+					/>
+					
+					{this.state.openedFile && (
+						<div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: '#222', zIndex: 10, pointerEvents: 'auto' }}>
+							<FileViewer file={this.state.openedFile} onSelectFile={this.props.ctx.openFile} />
+						</div>
+					)}
+				</div>
+
+				{/* Sidebar Section (Right/Bottom) */}
+				<div 
+					className="mv-sidebar" 
+					style={{ 
+						width: vertical ? '100%' : '320px', 
+						height: vertical ? '40%' : '100%',
+						pointerEvents: 'auto', 
+						borderLeft: '1px solid #445',
+						zIndex: 20
+					}}>
 					{!this.props.ctx.source && (
 						<React.Fragment>
 							<CacheSelector onOpen={this.openCache} />

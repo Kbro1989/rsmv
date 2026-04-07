@@ -1,9 +1,8 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\skeletalanim.jsonc'
+// This source data is located at '../src/opcodes/skeletalanim.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type skeletalanim = {
-	bones: any;
 	header: number,
 	framebase: number,
 	endtime: number,

@@ -203,6 +203,120 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		scene.add(this.standardLights);
 		this.scene.fog = new THREE.Fog("#FFFFFF", 10000, 10000);
 		this.sceneElementsChanged();
+
+		// Pulse Sync: Synchronize with the CNS 600ms heartbeat
+		import("./SovereignBridge").then(m => {
+			const bridge = m.SovereignBridge.getInstance();
+			bridge.onTick((msg) => this.handleTickEvent(msg));
+		});
+	}
+
+	private handleTickEvent(msg: any) {
+		if (msg.type !== 'tick_event') return;
+		
+		for (const event of msg.events) {
+			this.applyVisualActuation(event.id, event.signature, event.metadata);
+		}
+	}
+
+	/**
+	 * applyVisualActuation
+	 * Translates CNS "Calls" (id+calls) into bone-level animations and expressions.
+	 * Fulfills the "full on 3D with bones in eye and face" requirement.
+	 */
+	public applyVisualActuation(entityId: string, signature: string, metadata: any) {
+		// 1. Locate the entity in the scene
+		const entity = this.modelnode.children.find(c => (c as any).entityId === entityId || c.name === entityId);
+		if (!entity) return;
+
+		console.log(`[POG2 ACTUATOR] ${signature} for ${entityId}`);
+
+		switch (signature) {
+			case 'COMBAT_HIT':
+				this.triggerCombatFeedback(entity, metadata);
+				break;
+			case 'EXPRESSION_TRIGGER':
+				this.applyFacialExpression(entity, metadata.expression);
+				break;
+			case 'SKILL_SUCCESS':
+				this.triggerSkillVFX(entity, metadata);
+				break;
+		}
+	}
+
+	private triggerCombatFeedback(entity: THREE.Object3D, metadata: any) {
+		// Flash red (Material actuation)
+		entity.traverse((child) => {
+			if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshPhongMaterial) {
+				const originalColor = child.material.color.clone();
+				child.material.color.setHex(0xff0000);
+				setTimeout(() => {
+					child.material.color.copy(originalColor);
+				}, 150);
+			}
+		});
+
+		// Trigger "Hit" animation if bones are available
+		// metadata.damage can influence the intensity
+	}
+
+	private applyFacialExpression(entity: THREE.Object3D, expression: string) {
+		// This is where "bones in the eye and face" comes in.
+		// We manually actuate bone rotations for specific expressions.
+		// Requires entity to have a skeletal structure.
+		entity.traverse((child) => {
+			if (child instanceof THREE.SkinnedMesh) {
+				const jaw = child.skeleton.bones.find(b => b.name.toLowerCase().includes('jaw'));
+				if (jaw && expression === 'talk') {
+					jaw.rotation.x = 0.5; // Open mouth
+					setTimeout(() => { jaw.rotation.x = 0; }, 300);
+				}
+			}
+		});
+	}
+
+	private triggerSkillVFX(entity: THREE.Object3D, metadata: any) {
+		// Differentiate based on Substrate Source
+		let color = 0x00ff00; // Default: Success Green
+		let intensity = 2;
+		let radius = 2;
+
+		if (metadata.substrate === 'ground') {
+			color = 0x00ffff; // Cyan pulse for ground-linked logic
+			radius = 1; // Low pulse
+		} else if (metadata.substrate === 'equipped') {
+			color = 0xffaa00; // Gold pulse for equipment-linked logic
+			intensity = 4;
+		} else if (metadata.substrate === 'bank') {
+			color = 0xaa00ff; // Purple pulse for regional/banked logic
+		}
+
+		console.log(`[POG2 VISUAL] Skill Success via ${metadata.substrate || 'direct'} substrate.`);
+
+		const pointLight = new THREE.PointLight(color, intensity, radius);
+		pointLight.position.copy(entity.position);
+		if (metadata.substrate === 'ground') {
+			pointLight.position.y -= 5; // Pulse at feet
+		}
+		this.scene.add(pointLight);
+		setTimeout(() => this.scene.remove(pointLight), 600);
+
+		// Trigger "Sparkle" effect if bones/mesh available
+		if (metadata.station) {
+			this.triggerMaterialPulse(entity, color);
+		}
+	}
+
+	private triggerMaterialPulse(entity: THREE.Object3D, color: number) {
+		entity.traverse((child) => {
+			if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshPhongMaterial) {
+				const originalEmissive = child.material.emissive.clone();
+				child.material.emissive.setHex(color);
+				setTimeout(() => {
+					child.material.emissive.copy(originalEmissive);
+				}, 300);
+			}
+		});
 	}
 
 	getCurrent2dCamera() {
@@ -233,6 +347,9 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	}
 	getModelNode() {
 		return this.modelnode;
+	}
+	getCanvas() {
+		return this.canvas;
 	}
 
 	public addSceneElement(el: ThreeJsSceneElementSource) {

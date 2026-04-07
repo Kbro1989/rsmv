@@ -21,7 +21,7 @@ export class RSMeshLoader {
     this.sceneCache = sceneCache;
   }
 
-  async loadManifest(manifest: ChunkMeshManifest, scene: THREE.Scene): Promise<void> {
+  async loadManifest(manifest: ChunkMeshManifest, scene: THREE.Object3D): Promise<void> {
     console.log(`[RSMeshLoader] Materializing ${manifest.entities.length} entities for ${manifest.zoneName}`);
 
     const promises = manifest.entities.map(e => this.spawnEntity(e, scene));
@@ -33,14 +33,17 @@ export class RSMeshLoader {
     }
   }
 
-  private async spawnEntity(entity: SynthesisEntity, scene: THREE.Scene): Promise<void> {
+  private async spawnEntity(entity: SynthesisEntity, scene: THREE.Object3D): Promise<void> {
     const eZ = entity.z ?? entity.y ?? 0;
-    const key = `${entity.type}_${entity.id}_${entity.x}_${eZ}`;
+    const ePlane = entity.plane ?? 0;
+    const key = `${entity.type}_${entity.id}_${entity.x}_${eZ}_${ePlane}`;
     if (this.spawnedEntities.has(key)) return; // already spawned
 
     const rootNode = new THREE.Group();
-    // Position in world space — RS tile coords multiplied by 512 (default renderer scaling)
-    rootNode.position.set(entity.x * 512, 0, eZ * 512);
+    // modelnode scale is (1/512, 1/512, -1/512)
+    // We multiply by 512 so the final world position is [entity.x, height, -eZ]
+    const PLANE_HEIGHT = 2048; // Sovereign Plane Separation (4 levels of height)
+    rootNode.position.set(entity.x * 512, ePlane * PLANE_HEIGHT, eZ * 512);
 
     let rsModel: RSModel | null = null;
 
@@ -130,7 +133,7 @@ export class RSMeshLoader {
   }
 
   /** Tear down all spawned entities (for chunk unloading) */
-  unloadAll(scene: THREE.Scene): void {
+  unloadAll(scene: THREE.Object3D): void {
     for (const { rootNode, rsModel } of this.spawnedEntities.values()) {
       scene.remove(rootNode);
       // Cleanup animation mixers etc if possible

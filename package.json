@@ -12,7 +12,7 @@
   },
   "scripts": {
     "start": "electron ./dist/main.js",
-    "filetypes": "node dist/buildfiletypes.js",
+    "filetypes": "tsx src/scripts/buildfiletypes.ts",
     "buildnative": "electron-rebuild -f & node node_modules/sharp/install/dll-copy",
     "build": "webpack",
     "watch": "webpack --watch",
@@ -70,7 +70,10 @@
     "comment-json": "^4.2.2",
     "gl": "^8.1.6",
     "lzma": "^2.3.2",
-    "node-fetch": "^2.6.5"
+    "node-fetch": "^2.6.5",
+    "pako": "^2.1.0",
+    "tsx": "^4.20.6",
+    "autobind-decorator": "^2.4.0"
   },
   "peerDependencies": {
     "canvas": "^3.2.2",

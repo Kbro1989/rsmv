@@ -6,6 +6,7 @@ export class SovereignBridge {
     private static instance: SovereignBridge;
     private ws: WebSocket | null = null;
     private listeners: ((msg: any) => void)[] = [];
+    private tickListeners: ((msg: any) => void)[] = [];
     private logListeners: ((log: any) => void)[] = [];
     private engine: any = null;
     private state: any = {
@@ -40,6 +41,8 @@ export class SovereignBridge {
                 if (msg.type === 'state_sync') {
                     this.state = msg.state;
                     this.notifyListeners(msg);
+                } else if (msg.type === 'tick_event') {
+                    this.notifyTickListeners(msg);
                 } else if (msg.type === 'SYSTEM_LOG') {
                     this.notifyLogListeners(msg.payload);
                 } else if (msg.type === 'log') {
@@ -64,12 +67,20 @@ export class SovereignBridge {
         this.listeners.push(callback);
     }
 
+    public onTick(callback: (msg: any) => void) {
+        this.tickListeners.push(callback);
+    }
+
     public onSystemLog(callback: (log: any) => void) {
         this.logListeners.push(callback);
     }
 
     private notifyListeners(msg: any) {
         this.listeners.forEach(l => l(msg));
+    }
+
+    private notifyTickListeners(msg: any) {
+        this.tickListeners.forEach(l => l(msg));
     }
 
     private notifyLogListeners(log: any) {
@@ -140,8 +151,22 @@ export class SovereignBridge {
                 break;
 
             default:
-                // Relay unknown commands to the backend orchestrator
-                this.sendAction(JSON.stringify({ type: 'CONSOLE_COMMAND', payload: cmd }));
+                // Authoritative Admin Command Relay (Phase 29)
+                if (command.startsWith('::')) {
+                    const rawCmd = command.substring(2);
+                    this.log('CMD', 'Admin', `Relaying Authoritative Trigger: ${rawCmd}`);
+                    this.sendAction(JSON.stringify({ 
+                        type: 'ADMIN_COMMAND', 
+                        payload: {
+                            command: rawCmd,
+                            args: args,
+                            timestamp: Date.now()
+                        } 
+                    }));
+                } else {
+                    // Relay unknown commands to the backend orchestrator
+                    this.sendAction(JSON.stringify({ type: 'CONSOLE_COMMAND', payload: cmd }));
+                }
                 break;
         }
     }

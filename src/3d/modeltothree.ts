@@ -548,6 +548,7 @@ export class ThreejsSceneCache {
 	engine: EngineCache;
 	textureType: TextureModes = "dds";
 	modelType: ModelModes = "nxt";
+	public modelnode: THREE.Group | null = null;
 
 	static textureIndices: Record<TextureTypes, Record<Exclude<TextureModes, "none">, number>> = {
 		diffuse: {

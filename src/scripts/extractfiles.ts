@@ -37,8 +37,15 @@ export async function extractCacheFiles(output: ScriptOutput, outdir: ScriptFS, 
 				})();
 			}
 		}
+		let i = 0;
 		for (let fileid of allfiles) {
 			if (output.state != "running") { break; }
+			
+			// Phase 9: Micro-yielding to prevent event-loop starvation (Substrate Resilience)
+			if (++i % 100 === 0) {
+				await new Promise(resolve => setImmediate(resolve));
+			}
+
 			let arch: SubFile[];
 			if (lastarchive && lastarchive.index == fileid.index) {
 				arch = lastarchive.subfiles;

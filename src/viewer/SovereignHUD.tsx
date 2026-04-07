@@ -26,7 +26,7 @@ const SKILL_NAMES: Record<number, string> = {
 
 export function SovereignHUD() {
     const [state, setState] = React.useState<any>(null);
-    const [activeTab, setActiveTab] = React.useState<"inventory" | "skills" | "quests" | "bank" | "metadata" | "editor" | "console">("inventory");
+    const [activeTab, setActiveTab] = React.useState<"inventory" | "skills" | "quests" | "bank" | "metadata" | "synthesis" | "editor" | "console">("inventory");
     const [logs, setLogs] = React.useState<any[]>([]);
     const [cmdInput, setCmdInput] = React.useState("");
     const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -145,54 +145,68 @@ export function SovereignHUD() {
         </div>
     );
 
-    const renderEditor = () => (
+    const renderMetadata = () => (
         <div style={{ padding: "12px", color: "#e0e0f0" }}>
-            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "12px", color: "#00eeff", fontWeight: "bold" }}>CACHE EDITOR (LIMB #34)</div>
-            
-            <div style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "8px" }}>TRANSFORM MODE</div>
-                <div style={{ display: "flex", gap: "4px" }}>
-                    {["translate", "rotate", "scale"].map(mode => (
-                        <button key={mode} 
-                            onClick={() => {
-                                const render = (globalThis as any).render;
-                                if (render?.transformControls) {
-                                    render.transformControls.setMode(mode);
-                                    console.log(`[POG2 EDITOR] Transform Mode: ${mode.toUpperCase()}`);
-                                }
-                            }}
-                            style={{ flex: 1, padding: "6px", background: "rgba(30, 30, 50, 0.5)", border: "1px solid #445", borderRadius: "4px", color: "#fff", fontSize: "10px", cursor: "pointer", textTransform: "uppercase" }}>{mode}</button>
+            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "8px", color: "#88f" }}>NECROMANCY LOGIC</div>
+            <div style={{ background: "rgba(50, 0, 50, 0.3)", padding: "10px", borderRadius: "8px", border: "1px solid #505" }}>
+                <div style={{ fontSize: "10px", marginBottom: "4px" }}>RESIDUAL SOULS</div>
+                <div style={{ display: "flex", gap: "2px" }}>
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} style={{ flex: 1, height: "6px", background: i < combat.souls ? "#00eeff" : "#223", borderRadius: "2px", boxShadow: i < combat.souls ? "0 0 5px #00eeff" : "none" }} />
+                    ))}
+                </div>
+                <div style={{ fontSize: "10px", marginTop: "10px", marginBottom: "4px" }}>NECROSIS STACKS</div>
+                <div style={{ display: "flex", gap: "2px" }}>
+                    {[...Array(12)].map((_, i) => (
+                        <div key={i} style={{ flex: 1, height: "6px", background: i < combat.necrosis ? "#ff00ff" : "#223", borderRadius: "2px", boxShadow: i < combat.necrosis ? "0 0 5px #ff00ff" : "none" }} />
                     ))}
                 </div>
             </div>
 
-            <div style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "8px" }}>HISTORY CONTROL</div>
-                <div style={{ display: "flex", gap: "4px" }}>
-                    <button 
-                        onClick={() => SovereignBridge.getInstance().sendAction(JSON.stringify({ type: 'EDITOR_UNDO' }))}
-                        style={{ flex: 1, padding: "8px", background: "rgba(50, 20, 20, 0.4)", border: "1px solid #533", borderRadius: "4px", color: "#f88", fontSize: "11px", cursor: "pointer" }}>UNDO</button>
-                    <button 
-                        onClick={() => SovereignBridge.getInstance().sendAction(JSON.stringify({ type: 'EDITOR_REDO' }))}
-                        style={{ flex: 1, padding: "8px", background: "rgba(20, 50, 20, 0.4)", border: "1px solid #353", borderRadius: "4px", color: "#8f8", fontSize: "11px", cursor: "pointer" }}>REDO</button>
-                </div>
+            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginTop: "16px", marginBottom: "8px", color: "#ff0" }}>CHARACTER BIOMETRICS</div>
+            <div style={{ fontSize: "11px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>ADRENALINE:</span> <span>{combat.adrenaline}%</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}><span>TOTAL XP:</span> <span style={{ color: "#fff" }}>1,460,251,989</span></div>
+            </div>
+        </div>
+    );
+
+    const renderSynthesis = () => (
+        <div style={{ padding: "12px", color: "#e0e0f0" }}>
+            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "12px", color: "#00eeff", fontWeight: "bold" }}>GROUNDING STATUS (3X3)</div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "8px" }}>
+                {[-1,0,1].map(z => [-1,0,1].map(x => {
+                    const cx = Math.floor(avatar.x / 64) + x;
+                    const cz = Math.floor(avatar.y / 64) + z;
+                    const active = x === 0 && z === 0;
+                    return (
+                        <div key={`${x}_${z}`} style={{ 
+                            aspectRatio: "1/1", 
+                            background: active ? "rgba(0,238,255,0.2)" : "rgba(30,30,50,0.5)", 
+                            border: `1px solid ${active ? "#00eeff" : "#445"}`, 
+                            borderRadius: "4px",
+                            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "8px"
+                        }}>
+                            <div>{cx},{cz}</div>
+                            <div style={{ color: active ? "#0f0" : "#667" }}>{active ? "STREAMING" : "BUFFERED"}</div>
+                        </div>
+                    );
+                }))}
             </div>
 
-            <div style={{ padding: "10px", background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", border: "1px solid #334" }}>
-                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "4px" }}>PERSISTENCE LAYER</div>
-                <div style={{ fontSize: "11px", color: "#4f4" }}>● mod_layer active</div>
-                <div style={{ fontSize: "9px", color: "#667", marginTop: "4px" }}>path: d:\sovereign\cache_pedagogy\modified\</div>
+            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "8px", color: "#ff0" }}>GODHEAD LOGIC: VARBITS</div>
+            <div style={{ background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "8px", border: "1px solid #445", height: "150px", overflowY: "auto", fontFamily: "'Courier New', monospace", fontSize: "10px" }}>
+                {logs.filter(l => l.message.includes("Varbit") || l.message.includes("Godhead")).map((log, i) => (
+                    <div key={i} style={{ color: "#00eeff", marginBottom: "2px" }}>
+                        ⚡ {log.message}
+                    </div>
+                ))}
             </div>
 
-            <div style={{ marginTop: "24px", borderTop: "1px solid #334", paddingTop: "12px" }}>
-                <div style={{ fontSize: "12px", color: "#f0f000", fontWeight: "bold", marginBottom: "8px" }}>EDITOR KEY MAP</div>
-                <div style={{ fontSize: "10px", color: "#aaa", lineHeight: "1.6" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>E</span> <span>Toggle Editor Mode</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>WASD</span> <span>Noclip Camera</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Shift</span> <span>Sprint multiplier (3x)</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>G</span> <span>Toggle Gizmo</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Esc</span> <span>Deselect / Exit</span></div>
-                </div>
+            <div style={{ marginTop: "12px", padding: "8px", background: "rgba(20,50,20,0.2)", borderRadius: "4px", border: "1px solid #242" }}>
+                <div style={{ fontSize: "10px", color: "#4f4" }}>ALL-PLANE MANIFESTATION ACTIVE</div>
+                <div style={{ fontSize: "8px", color: "#686" }}>Vertical Grounding: Planes 0-3 synced.</div>
             </div>
         </div>
     );
@@ -232,42 +246,33 @@ export function SovereignHUD() {
                     marginBottom: "8px"
                 }}
             />
-
-            <div style={{ padding: "8px", background: "rgba(0,0,0,0.3)", borderRadius: "4px", border: "1px solid #334" }}>
-                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "6px", fontWeight: "bold" }}>COLLISION LEGEND (PRIFDDINAS)</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", fontSize: "9px" }}>
-                    <div style={{ color: "#00ffff" }}>● TT: Interactable</div>
-                    <div style={{ color: "#ffff00" }}>● O: Object/NPC</div>
-                    <div style={{ color: "#00ff88" }}>● TX: Passable Corner</div>
-                    <div style={{ color: "#ffa500" }}>● XT: Project-over</div>
-                    <div style={{ color: "#ff0000" }}>● X: Both Blocked</div>
-                </div>
-            </div>
         </div>
     );
- 
-    const renderMetadata = () => (
+
+    const renderEditor = () => (
         <div style={{ padding: "12px", color: "#e0e0f0" }}>
-            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "8px", color: "#88f" }}>NECROMANCY LOGIC</div>
-            <div style={{ background: "rgba(50, 0, 50, 0.3)", padding: "10px", borderRadius: "8px", border: "1px solid #505" }}>
-                <div style={{ fontSize: "10px", marginBottom: "4px" }}>RESIDUAL SOULS</div>
-                <div style={{ display: "flex", gap: "2px" }}>
-                    {[...Array(3)].map((_, i) => (
-                        <div key={i} style={{ flex: 1, height: "6px", background: i < combat.souls ? "#00eeff" : "#223", borderRadius: "2px", boxShadow: i < combat.souls ? "0 0 5px #00eeff" : "none" }} />
-                    ))}
-                </div>
-                <div style={{ fontSize: "10px", marginTop: "10px", marginBottom: "4px" }}>NECROSIS STACKS</div>
-                <div style={{ display: "flex", gap: "2px" }}>
-                    {[...Array(12)].map((_, i) => (
-                        <div key={i} style={{ flex: 1, height: "6px", background: i < combat.necrosis ? "#ff00ff" : "#223", borderRadius: "2px", boxShadow: i < combat.necrosis ? "0 0 5px #ff00ff" : "none" }} />
+            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginBottom: "12px", color: "#00eeff", fontWeight: "bold" }}>CACHE EDITOR (LIMB #34)</div>
+            
+            <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "8px" }}>TRANSFORM MODE</div>
+                <div style={{ display: "flex", gap: "4px" }}>
+                    {["translate", "rotate", "scale"].map(mode => (
+                        <button key={mode} 
+                            onClick={() => {
+                                const render = (globalThis as any).render;
+                                if (render?.transformControls) {
+                                    render.transformControls.setMode(mode);
+                                }
+                            }}
+                            style={{ flex: 1, padding: "6px", background: "rgba(30, 30, 50, 0.5)", border: "1px solid #445", borderRadius: "4px", color: "#fff", fontSize: "10px", cursor: "pointer", textTransform: "uppercase" }}>{mode}</button>
                     ))}
                 </div>
             </div>
 
-            <div style={{ fontSize: "12px", borderBottom: "1px solid #445", paddingBottom: "4px", marginTop: "16px", marginBottom: "8px", color: "#ff0" }}>CHARACTER BIOMETRICS</div>
-            <div style={{ fontSize: "11px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><span>ADRENALINE:</span> <span>{combat.adrenaline}%</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}><span>TOTAL XP:</span> <span style={{ color: "#fff" }}>1,460,251,989</span></div>
+            <div style={{ padding: "10px", background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", border: "1px solid #334" }}>
+                <div style={{ fontSize: "10px", color: "#88a", marginBottom: "4px" }}>PERSISTENCE LAYER</div>
+                <div style={{ fontSize: "11px", color: "#4f4" }}>● mod_layer active</div>
+                <div style={{ fontSize: "9px", color: "#667", marginTop: "4px" }}>path: d:\sovereign\cache_pedagogy\modified\</div>
             </div>
         </div>
     );
@@ -296,7 +301,7 @@ export function SovereignHUD() {
             <div style={{ padding: "16px", background: "rgba(255, 255, 255, 0.03)", borderBottom: "1px solid rgba(255, 255, 255, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div>
                     <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff", letterSpacing: "0.5px" }}>{avatar.username || "SOVEREIGN"}</div>
-                    <div style={{ fontSize: "10px", color: "#667" }}>REGION: ASGARDIA • {Math.floor(avatar.x)}, {Math.floor(avatar.y)}</div>
+                    <div style={{ fontSize: "10px", color: "#667" }}>REGION: {Math.floor(avatar.x / 64)}, {Math.floor(avatar.y / 64)} • {Math.floor(avatar.x)}, {Math.floor(avatar.y)}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "14px", color: "#f0f000", fontWeight: 700 }}>● {wallet[22159]?.toLocaleString() || 0}</div>
@@ -306,7 +311,7 @@ export function SovereignHUD() {
 
             {/* Navigation */}
             <div style={{ display: "flex", background: "rgba(0, 0, 0, 0.2)", borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                {(["inventory", "skills", "quests", "metadata", "bank", "editor", "console"] as const).map(tab => (
+                {(["inventory", "skills", "quests", "metadata", "synthesis", "bank", "editor", "console"] as const).map(tab => (
                     <div key={tab} 
                         onClick={() => setActiveTab(tab)}
                         style={{
@@ -321,7 +326,7 @@ export function SovereignHUD() {
                             borderBottom: activeTab === tab ? "2px solid #00eeff" : "none",
                             transition: "all 0.2s ease"
                         }}>
-                        {tab === "metadata" ? "MT" : tab === "editor" ? "EDT" : tab === "console" ? "CON" : tab.slice(0, 3).toUpperCase()}
+                        {tab === "metadata" ? "MT" : tab === "synthesis" ? "SYN" : tab === "editor" ? "EDT" : tab === "console" ? "CON" : tab.slice(0, 3).toUpperCase()}
                     </div>
                 ))}
             </div>
@@ -332,6 +337,7 @@ export function SovereignHUD() {
                 {activeTab === "skills" && renderSkills()}
                 {activeTab === "quests" && renderQuests()}
                 {activeTab === "metadata" && renderMetadata()}
+                {activeTab === "synthesis" && renderSynthesis()}
                 {activeTab === "bank" && renderBank()}
                 {activeTab === "editor" && renderEditor()}
                 {activeTab === "console" && renderConsole()}
@@ -339,7 +345,7 @@ export function SovereignHUD() {
 
             {/* Diagnostic Footer */}
             <div style={{ padding: "10px 16px", fontSize: "9px", background: "rgba(0,0,0,0.2)", color: "#445", borderTop: "1px solid rgba(255, 255, 255, 0.05)", display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#22aa44" }}>• NEURO-Nominal</span>
+                <span style={{ color: "#22aa44" }}>• GODHEAD-Grounding</span>
                 <span>TICK {state.tick}</span>
             </div>
         </div>

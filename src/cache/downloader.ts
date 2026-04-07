@@ -289,27 +289,28 @@ export class CacheDownloader extends DirectCacheFileSource {
 			let socket = this.socket ?? await this.getSocket();
 			try {
 				var file = await socket.writeRequest(major, minor);
-			} catch (e) {
+			} catch (e: any) {
+				const errorMsg = e instanceof Error ? e.message : String(e);
 				if (this.socket === socket) {
 					this.socket = null;
 					this.socketPromise = null;
 				}
-				if (attempt >= 5) {
-					await delay(500);
-				}
+				
+				// Phase 8: Exponential Backoff for substrate resilience
+				const sleepTime = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 200, 10000);
+				console.warn(`Substrate download failed (Attempt ${attempt}, Major ${major}, Minor ${minor}): ${errorMsg}. Backing off ${Math.round(sleepTime)}ms...`);
+				await delay(sleepTime);
 				continue;
 			}
 			if (typeof crc == "number" && (major != 255 || minor != 255)) {
 				let filecrc = crc32(file);
 				if (filecrc != crc) {
 					console.log(`crc fail expected ${crc}, got ${filecrc}`);
-					if (attempt >= 5) {
-						await delay(500);
-					}
+					const sleepTime = 500 * (attempt + 1);
+					await delay(sleepTime);
 					continue;
 				}
 			}
-			// console.log("downloaded", major, minor, crc);
 			return decompress(file);
 		}
 		throw new Error("Failed to download matching crc after 10 attemps");
