@@ -80,7 +80,15 @@ function resolveAlias(typename: string, parent: ChunkParentCallback, typedef: Ty
 }
 
 export function buildParser(parent: ChunkParentCallback | null, chunkdef: unknown, typedef: TypeDef): ChunkParser {
-	parent ??= () => { throw new Error("reference failed to resolve"); };
+	parent ??= (name, child) => {
+		if (name == "$opcode" || name == "buildnr") {
+			return {
+				stackdepth: child.stackdepth + 1,
+				resolve(v, old) { return old; }
+			};
+		}
+		throw new Error(`reference '${name}' failed to resolve at the top level`);
+	};
 	switch (typeof chunkdef) {
 		case "boolean":
 		case "number":
@@ -1240,7 +1248,7 @@ hardcodes = {
 					throw new Error("write not supported");
 				}
 			}
-			if (name == "$opcode") { return res; }
+			if (name == "$opcode" || name == "buildnr") { return res; }
 			return buildReference(name, parent, res);
 		}
 

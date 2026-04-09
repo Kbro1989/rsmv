@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { SovereignGroundingStream } from './SovereignGroundingStream';
 import { RSMeshLoader } from './RSMeshLoader';
 import { ThreejsSceneCache } from '../3d/modeltothree';
+import { SovereignWorldLoader, CollisionTile } from './SovereignWorldLoader';
 
 export class RSSpatialManager {
   private grounding = new SovereignGroundingStream();
   public loader: RSMeshLoader;
   private loadedChunks = new Set<string>();
+  private collisionCache = new Map<string, CollisionTile>();
+  private loadedCollisionRegions = new Set<string>();
 
   constructor(sceneCache: ThreejsSceneCache) {
     this.loader = new RSMeshLoader(sceneCache);
@@ -23,6 +26,21 @@ export class RSSpatialManager {
 
   // Called from RSEngine tick — cheap after first pass (loadedChunks guards re-entry)
   async stream(avatarTileX: number, avatarTileZ: number, scene: THREE.Object3D, plane: number = 0): Promise<void> {
+    // Hydrate collision cache for this region
+    const rx = Math.floor(avatarTileX / 64);
+    const rz = Math.floor(avatarTileZ / 64);
+    const regionKey = `${rx}_${rz}`;
+    if (!this.loadedCollisionRegions.has(regionKey)) {
+      this.loadedCollisionRegions.add(regionKey);
+      const truth = await SovereignWorldLoader.getInstance().loadRegionTruth(rx, rz);
+      if (truth) {
+        for (const [key, tile] of Object.entries(truth.collisionMatrix)) {
+          this.collisionCache.set(key, tile);
+        }
+        console.log(`[RSSpatialManager] Collision cache hydrated for region [${rx}, ${rz}]: ${Object.keys(truth.collisionMatrix).length} tiles`);
+      }
+    }
+
     const manifests = this.grounding.getStreamingManifests(avatarTileX, avatarTileZ, 208, plane);
 
     for (const manifest of manifests) {
@@ -43,18 +61,27 @@ export class RSSpatialManager {
   }
 
   /**
-   * Sovereign Collision Engine: Respects T/O/X Zoned Navigation.
-   * "Yesterday's Truth" for the 600ms World Pulse.
+   * Sovereign Collision Engine: Real walkability check from collision_matrix.
    */
   public isWalkable(tileX: number, tileZ: number): boolean {
     const floorX = Math.floor(tileX);
     const floorZ = Math.floor(tileZ);
+    const key = `${floorX}_${floorZ}`;
+    const tile = this.collisionCache.get(key);
+    if (!tile) return true; // Unknown tiles default to passable (unmapped void)
+    return tile.walkable;
+  }
 
-    // Placeholder: Check the grounded manifests for T/O/X zoning logic
-    // Currently, if tile matched a synthesis entity's center exactly, it might be an O (Obstacle)
-    // T (Target) = Actionable | O (Obstacle) = Blocked | X (Boundary) = Total Block
-    
-    // Defaulting to true for the baseline until the T/O/X grid is formally loaded from the pedagogy JSONs
-    return true; 
+  /**
+   * Returns the full collision cache for overlay rendering.
+   */
+  public getCollisionMatrix(): Map<string, CollisionTile> {
+    return this.collisionCache;
+  }
+
+  /** Returns the full list of indexed chunk keys (useful for debug overlays) */
+  getIndexedChunkKeys(): string[] {
+    return Array.from(this.loadedChunks);
   }
 }
+

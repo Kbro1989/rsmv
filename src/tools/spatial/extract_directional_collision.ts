@@ -19,44 +19,51 @@ async function extractDirectionalCollision(regionId: number) {
     // 1. Resolve coordinates from region ID
     const x = (regionId >> 8) & 0xFF;
     const y = regionId & 0xFF;
-    const mapIndex = 5; // Maps index
-    
-    // 2. Locate map files (js5-5)
-    // In RS3, Map squares are sub-files in Index 5.
-    // GameCacheLoader exposes getCacheIndex() to find named subfiles.
+    // 2. Locate map files (Index 5)
+    // Archive ID is the regionId. Subfiles: 3 = terrain, 0 = locations
+    const mapIndex = 5;
     const index = await loader.getCacheIndex(mapIndex);
-    const terrainEntry = index.find((e: any) => e && e.name === `m${x}_${y}`);
-    const locationEntry = index.find((e: any) => e && e.name === `l${x}_${y}`);
+    const archive = index[regionId];
 
-    if (!terrainEntry || !locationEntry) {
-        console.error(`Could not find map files for region ${regionId} (m${x}_${y} / l${x}_${y})`);
+    if (!archive) {
+        console.error(`Could not find map archive for region ${regionId}`);
         return;
     }
 
-    const terrainData = await loader.getFile(terrainEntry.major, terrainEntry.minor, terrainEntry.crc);
-    const locationData = await loader.getFile(locationEntry.major, locationEntry.minor, locationEntry.crc);
+    const files = await loader.getFileArchive(archive);
+    const terrainData = files[3]?.buffer; // Subfile 3: Terrain
+    const locationData = files[0]?.buffer; // Subfile 0: Locations
+
+    if (!terrainData || !locationData) {
+        console.error(`Missing required subfiles in archive ${regionId}`);
+        return;
+    }
     
-    const terrain = parse.mapsquareTiles.read(terrainData, loader);
-    const locations = parse.mapsquareLocations.read(locationData, loader);
+    const terrain = parse.mapsquareTiles.read(Buffer.from(terrainData), loader);
+    const locations = parse.mapsquareLocations.read(Buffer.from(locationData), loader);
 
     // 3. Synthesis Matrix
     const matrix: any = {};
 
     // Process Terrain first (Level 0)
-    for (let i = 0; i < terrain.tiles.length; i++) {
-        const tile = terrain.tiles[i];
-        const tx = i % 64;
-        const ty = Math.floor(i / 64) % 64;
-        const plane = Math.floor(i / 4096);
+    for (let i = 0; i < terrain.level0.length; i++) {
+        const tile = terrain.level0[i];
+        // NXT Stride is 66 (1 tile padding on each side)
+        const tx = (i % 66) - 1;
+        const ty = (Math.floor(i / 66) % 66) - 1;
+        const plane = Math.floor(i / 4356);
         
+        // Skip padding tiles (only process 0-63)
+        if (tx < 0 || tx >= 64 || ty < 0 || ty >= 64) continue;
+
         const key = `${plane}_${tx}_${ty}`;
         matrix[key] = {
             north: true, south: true, east: true, west: true,
             npc_only: []
         };
 
-        // Bit 0x1: Blocked (tile.settings may be null for undecorated tiles)
-        if (tile.settings != null && (tile.settings & 0x1)) {
+        // NXT Bit 0x2: Blocking
+        if (tile.flags != null && (tile.flags & 0x02)) {
             matrix[key] = { north: false, south: false, east: false, west: false, npc_only: [] };
         }
     }

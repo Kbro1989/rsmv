@@ -9,6 +9,7 @@ export class SovereignBridge {
     private tickListeners: ((msg: any) => void)[] = [];
     private logListeners: ((log: any) => void)[] = [];
     private engine: any = null;
+    private retryCount = 0;
     private state: any = {
         tick: 0,
         avatar: { x: 3200, y: 3200, plane: 0, username: 'POG2_Sovereign', isBusy: false },
@@ -32,6 +33,7 @@ export class SovereignBridge {
         this.ws = new WebSocket('ws://localhost:8788');
 
         this.ws.onopen = () => {
+            this.retryCount = 0;
             console.log('%c[BRIDGE] Connected to Sovereign Switchboard', 'color: #00ff00; font-weight: bold;');
         };
 
@@ -54,8 +56,12 @@ export class SovereignBridge {
         };
 
         this.ws.onclose = () => {
-            console.warn('[BRIDGE] Socket closed. Retrying in 5s...');
-            setTimeout(() => this.connect(), 5000);
+            this.retryCount++;
+            const delay = Math.min(5000 * Math.pow(2, this.retryCount - 1), 60000);
+            if (this.retryCount <= 3) {
+                console.warn(`[BRIDGE] Socket closed. Retry #${this.retryCount} in ${delay / 1000}s...`);
+            }
+            setTimeout(() => this.connect(), delay);
         };
 
         this.ws.onerror = (err) => {

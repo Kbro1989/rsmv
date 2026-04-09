@@ -487,42 +487,98 @@ export class RSEngine {
 
         this.collisionGroup.clear();
         const TILE_SIZE = 512;
-        
-        // Manifesting Prifddinas Pedagogy (Tower of Voices / Plane 1)
-        for (let x = -8; x < 8; x++) {
-            for (let z = -8; z < 8; z++) {
-                const tx = Math.floor(this.avatarTileX) + x;
-                const tz = Math.floor(this.avatarTileZ) + z;
-                
-                // Clinical Bitmask Mapping (Zoned Navigation)
-                // TT: 0x10 | O: 0x4 | TX: 0x1 | XT: 0x2 | X: 0x8
-                const hash = (tx * 31 + tz * 17) % 20;
-                let color = 0x00ff00; 
-                let bitmask = 0;
 
-                if (hash === 19) { color = 0x00ffff; bitmask = 0x10; } // TT: Interactable (Agility/Shop)
-                else if (hash === 18) { color = 0x00ff88; bitmask = 0x1; }  // TX: Passable Corner
-                else if (hash === 17) { color = 0xffa500; bitmask = 0x2; }  // XT: Project-over Block
-                else if (hash > 14) { color = 0xff0000; bitmask = 0x8; }    // X: Both Blocked
-                else if (hash > 12) { color = 0xffff00; bitmask = 0x4; }    // O: Object/NPC
-                else continue; // Walkable/None
+        if (!this.spatialManager) {
+            SovereignBridge.getInstance().log('WARN', 'Editor', 'No spatial manager — collision overlay unavailable.');
+            return;
+        }
 
-                // Clinical Visualization
-                const geometry = new THREE.EdgesGeometry(new THREE.PlaneGeometry(TILE_SIZE * 0.95, TILE_SIZE * 0.95));
-                const material = new THREE.LineBasicMaterial({ 
-                    color, 
-                    linewidth: 2, 
-                    transparent: true, 
-                    opacity: active ? (bitmask === 0x10 ? 1.0 : 0.6) : 0 
-                });
-                const wire = new THREE.LineSegments(geometry, material);
-                wire.rotation.x = -Math.PI / 2;
-                wire.position.set(tx * TILE_SIZE, 5, tz * TILE_SIZE);
-                wire.userData = { bitmask, tx, tz };
-                this.collisionGroup.add(wire);
+        const matrix = this.spatialManager.getCollisionMatrix();
+        if (matrix.size === 0) {
+            SovereignBridge.getInstance().log('WARN', 'Editor', 'Collision cache empty — load a synthesized region first.');
+            return;
+        }
+
+        let tileCount = 0;
+        let edgeCount = 0;
+
+        // Tile planes + edge walls from real collision_matrix
+        for (const [key, tile] of matrix) {
+            const parts = key.split('_');
+            if (parts.length !== 2) continue;
+            const tx = parseInt(parts[0]);
+            const tz = parseInt(parts[1]);
+            if (isNaN(tx) || isNaN(tz)) continue;
+
+            // Tile occupancy plane
+            let color: number;
+            if (!tile.walkable) {
+                color = 0xff3030; // Blocked — red
+            } else {
+                switch (tile.surfaceType) {
+                    case 'water':  color = 0x1a4a6b; break;
+                    case 'bridge': color = 0x6b4a1a; break;
+                    default:       color = 0x0a3a1a; break; // Walkable — dark green
+                }
+            }
+
+            const planeGeo = new THREE.PlaneGeometry(TILE_SIZE * 0.9, TILE_SIZE * 0.9);
+            const planeMat = new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity: tile.walkable ? 0.25 : 0.5,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const planeMesh = new THREE.Mesh(planeGeo, planeMat);
+            planeMesh.rotation.x = -Math.PI / 2;
+            planeMesh.position.set(tx * TILE_SIZE + TILE_SIZE * 0.5, 3, tz * TILE_SIZE + TILE_SIZE * 0.5);
+            this.collisionGroup.add(planeMesh);
+            tileCount++;
+
+            // Edge walls as thin boxes
+            const edges = tile.edges;
+            const wallMat = new THREE.MeshBasicMaterial({
+                color: 0xff3030,
+                transparent: true,
+                opacity: 0.8,
+                depthWrite: false
+            });
+
+            const WALL_HEIGHT = TILE_SIZE * 1.5;
+            const WALL_THICK = TILE_SIZE * 0.08;
+
+            if (edges.northBlocked) {
+                const geo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, WALL_THICK);
+                const mesh = new THREE.Mesh(geo, wallMat);
+                mesh.position.set(tx * TILE_SIZE + TILE_SIZE * 0.5, WALL_HEIGHT * 0.5, (tz + 1) * TILE_SIZE);
+                this.collisionGroup.add(mesh);
+                edgeCount++;
+            }
+            if (edges.southBlocked) {
+                const geo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, WALL_THICK);
+                const mesh = new THREE.Mesh(geo, wallMat);
+                mesh.position.set(tx * TILE_SIZE + TILE_SIZE * 0.5, WALL_HEIGHT * 0.5, tz * TILE_SIZE);
+                this.collisionGroup.add(mesh);
+                edgeCount++;
+            }
+            if (edges.eastBlocked) {
+                const geo = new THREE.BoxGeometry(WALL_THICK, WALL_HEIGHT, TILE_SIZE);
+                const mesh = new THREE.Mesh(geo, wallMat);
+                mesh.position.set((tx + 1) * TILE_SIZE, WALL_HEIGHT * 0.5, tz * TILE_SIZE + TILE_SIZE * 0.5);
+                this.collisionGroup.add(mesh);
+                edgeCount++;
+            }
+            if (edges.westBlocked) {
+                const geo = new THREE.BoxGeometry(WALL_THICK, WALL_HEIGHT, TILE_SIZE);
+                const mesh = new THREE.Mesh(geo, wallMat);
+                mesh.position.set(tx * TILE_SIZE, WALL_HEIGHT * 0.5, tz * TILE_SIZE + TILE_SIZE * 0.5);
+                this.collisionGroup.add(mesh);
+                edgeCount++;
             }
         }
-        SovereignBridge.getInstance().log('INFO', 'Editor', `Prifddinas Pedagogy Manifested: Bitmask Binding Active for Area Grid.`);
+
+        SovereignBridge.getInstance().log('INFO', 'Editor', `Collision Overlay Active: ${tileCount} tiles, ${edgeCount} edge walls from sovereign collision_matrix.`);
     }
 }
 

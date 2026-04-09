@@ -3,12 +3,12 @@ import { cacheMajors } from "../constants";
 import * as fs from "fs";
 import * as path from "path";
 
-// Authoritative Sovereign Substrate (Phase 43)
-const CACHE_DB = "D:\\sovereign\\cache_pedagogy\\rsmv_inspector\\cache\\fscache.sqlite3";
+// Authoritative Jagex Cache Path
+const CACHE_PATH = "C:\\ProgramData\\Jagex\\RuneScape";
 const JSON_DUMPS = "D:\\sovereign\\cache_pedagogy\\json_dumps";
 
 async function main() {
-    const source = new GameCacheLoader(CACHE_DB);
+    const source = new GameCacheLoader(CACHE_PATH);
     const commandsFound: Record<string, number[]> = {};
     
     // Dynamic Keyword Goldrush (Load from Sovereign Dumps)
