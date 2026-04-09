@@ -120,6 +120,8 @@ function allParsers() {
 		object: FileParser.fromJson<import("../generated/objects").objects>(readJsonc("./opcodes/objects.jsonc")),
 		achievement: FileParser.fromJson<import("../generated/achievements").achievements>(readJsonc("./opcodes/achievements.jsonc")),
 		mapsquareTiles: FileParser.fromJson<import("../generated/mapsquare_tiles").mapsquare_tiles>(readJsonc("./opcodes/mapsquare_tiles.jsonc")),
+		mapsquareTiles64: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_64.jsonc")),
+		mapsquareTiles66: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_66.jsonc")),
 		mapsquareTilesNxt: FileParser.fromJson<import("../generated/mapsquare_tiles_nxt").mapsquare_tiles_nxt>(readJsonc("./opcodes/mapsquare_tiles_nxt.jsonc")),
 		mapsquareWaterTiles: FileParser.fromJson<import("../generated/mapsquare_watertiles").mapsquare_watertiles>(readJsonc("./opcodes/mapsquare_watertiles.json")),
 		mapsquareUnderlays: FileParser.fromJson<import("../generated/mapsquare_underlays").mapsquare_underlays>(readJsonc("./opcodes/mapsquare_underlays.jsonc")),

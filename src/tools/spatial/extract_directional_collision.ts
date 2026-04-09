@@ -11,6 +11,7 @@ const POG_ROOT = path.resolve(__dirname, '../../../../');
 // Import RSMV logic from the Sovereign substrate natively
 import { GameCacheLoader } from '../../cache/sqlite';
 import { parse } from '../../opdecoder';
+import { cacheMapFiles } from '../../constants';
 
 async function extractDirectionalCollision(regionId: number) {
     const cachePath = "C:\\ProgramData\\Jagex\\RuneScape";
@@ -31,75 +32,98 @@ async function extractDirectionalCollision(regionId: number) {
     }
 
     const files = await loader.getFileArchive(archive);
-    const terrainData = files[3]?.buffer; // Subfile 3: Terrain
-    const locationData = files[0]?.buffer; // Subfile 0: Locations
 
-    if (!terrainData || !locationData) {
-        console.error(`Missing required subfiles in archive ${regionId}`);
+    // Subfile 3 = terrain tiles, Subfile 0 = locations
+    const terrainFile = files.find(f => f.fileid === cacheMapFiles.squares);
+    const locationFile = files.find(f => f.fileid === cacheMapFiles.locations);
+
+    if (!terrainFile || !locationFile) {
+        console.error(`Missing terrain or location subfile in archive ${regionId}`);
         return;
     }
-    
-    const terrain = parse.mapsquareTiles.read(Buffer.from(terrainData), loader);
-    const locations = parse.mapsquareLocations.read(Buffer.from(locationData), loader);
+
+    console.log(`[Forensics] Terrain subfile 3: ${terrainFile.buffer.length} bytes, Location subfile 0: ${locationFile.buffer.length} bytes`);
+
+    // Standard parser: 16384 tiles = 4 levels × 64 × 64, flat array
+    const terrain = parse.mapsquareTiles.read(terrainFile.buffer, loader, { buildnr: 927 });
+    const locations = parse.mapsquareLocations.read(locationFile.buffer, loader);
 
     // 3. Synthesis Matrix
     const matrix: any = {};
+    const stride = 64;
+    const tilesPerLevel = 64 * 64; // 4096
+    
+    const rx = regionId >> 8;
+    const ry = regionId & 0xff;
+    const baseX = rx * 64;
+    const baseY = ry * 64;
 
-    // Process Terrain first (Level 0)
-    for (let i = 0; i < terrain.level0.length; i++) {
-        const tile = terrain.level0[i];
-        // NXT Stride is 66 (1 tile padding on each side)
-        const tx = (i % 66) - 1;
-        const ty = (Math.floor(i / 66) % 66) - 1;
-        const plane = Math.floor(i / 4356);
-        
-        // Skip padding tiles (only process 0-63)
-        if (tx < 0 || tx >= 64 || ty < 0 || ty >= 64) continue;
+    for (let plane = 0; plane < 4; plane++) {
+        for (let ty = 0; ty < 64; ty++) {
+            for (let tx = 0; tx < 64; tx++) {
+                const tileIndex = (plane * tilesPerLevel) + (ty * stride) + tx;
+                const tile = terrain.tiles?.[tileIndex];
+                if (!tile) continue;
 
-        const key = `${plane}_${tx}_${ty}`;
-        matrix[key] = {
-            north: true, south: true, east: true, west: true,
-            npc_only: []
-        };
+                const worldX = baseX + tx;
+                const worldY = baseY + ty;
+                const key = `${plane}_${worldX}_${worldY}`;
+                
+                matrix[key] = {
+                    north: true, south: true, east: true, west: true
+                };
 
-        // NXT Bit 0x2: Blocking
-        if (tile.flags != null && (tile.flags & 0x02)) {
-            matrix[key] = { north: false, south: false, east: false, west: false, npc_only: [] };
+                // Bit 0x01 in settings = blocked tile (from upstream: 1=visible, but settings bit 1 = block)
+                // The standard parser uses "settings" field, not "flags"
+                const settings = tile.settings ?? 0;
+                if (settings & 1) {
+                    matrix[key] = { north: false, south: false, east: false, west: false };
+                }
+            }
         }
     }
 
-    // Process Locations (Walls & Objects)
+    // Process Locations (Walls & Objects) — NPCs have no collision
     for (const locGroup of locations.locations) {
         const objId = locGroup.id;
-        const objDef = await getObjectDef(loader, objId);
+        let objDef: any;
+        try {
+            objDef = await getObjectDef(loader, objId);
+        } catch { continue; }
         
-        if (!objDef.maybe_blocks_movement) continue;
+        if (!objDef.maybe_blocks_movement && !objDef.probably_nocollision) {
+            // Object has default collision (solid) unless probably_nocollision is set
+        }
 
         for (const use of locGroup.uses) {
-            const key = `${use.plane}_${use.x}_${use.y}`;
+            const worldX = baseX + use.x;
+            const worldY = baseY + use.y;
+            const key = `${use.plane}_${worldX}_${worldY}`;
             if (!matrix[key]) continue;
 
             const rotation = use.rotation;
             const type = use.type;
 
-            // Type 0-3: Wall logic
+            // Type 0-3: Wall logic (directional blocking)
             if (type >= 0 && type <= 3) {
                 if (rotation === 0) matrix[key].west = false;
                 if (rotation === 1) matrix[key].north = false;
                 if (rotation === 2) matrix[key].east = false;
                 if (rotation === 3) matrix[key].south = false;
             } 
-            // Type 10: Standard Object (Full Block)
-            else if (type === 10) {
+            // Type 10: Standard solid object (full block)
+            else if (type === 10 && !objDef.probably_nocollision) {
                 matrix[key].north = matrix[key].south = matrix[key].east = matrix[key].west = false;
             }
         }
     }
 
     // 4. Export Artifact
-    const outPath = path.join(POG_ROOT, 'atlas', 'spatial', `directional_${regionId}.json`);
+    const outDir = path.join(POG_ROOT, 'atlas', 'spatial');
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, `directional_${regionId}.json`);
     fs.writeFileSync(outPath, JSON.stringify(matrix, null, 2));
-    console.log(`Exported Directional Sovereignty for ${regionId} to ${outPath}`);
+    console.log(`Exported ${Object.keys(matrix).length} tile entries for region ${regionId} to ${outPath}`);
 }
 
 async function getObjectDef(loader: any, id: number) {
@@ -107,5 +131,18 @@ async function getObjectDef(loader: any, id: number) {
     return parse.object.read(data, loader);
 }
 
-// Example: Prifddinas (8755)
-extractDirectionalCollision(8755).catch(console.error);
+const args = process.argv.slice(2);
+let targetRegion = 6819; // Default: Prifddinas Loadstone Region
+
+if (args.length >= 2) {
+    const targetX = parseInt(args[0], 10);
+    const targetY = parseInt(args[1], 10);
+    const rx = Math.floor(targetX / 64);
+    const ry = Math.floor(targetY / 64);
+    targetRegion = (rx << 8) | ry;
+    console.log(`Resolved Absolute Coordinates [X: ${targetX}, Y: ${targetY}] to Region ID: ${targetRegion}`);
+} else if (args.length === 1) {
+    targetRegion = parseInt(args[0], 10);
+}
+
+extractDirectionalCollision(targetRegion).catch(console.error);

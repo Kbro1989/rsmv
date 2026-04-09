@@ -1,6 +1,6 @@
 ["struct",
-["magic", ["match","buildnr",{">=936":["tuple","uint","ubyte"],"other":null}]],
-["level0", ["array", 4356, ["struct",
+["magic", ["match","buildnr",{">=936":["tuple","uint","ubyte"],"other":"uint"}]],
+["level0", ["array", 4096, ["struct",
   ["flags", "ubyte"],
   ["height", ["match", "buildnr", {">=936": "ushort", "other": "ubyte"}]],
   ["rest", ["opt", ["flags", 0, "bitflag"], ["struct",
@@ -10,7 +10,7 @@
     ["shape", "ubyte"]
   ]]]
 ]]],
-["level1", ["array", 4356, ["struct",
+["level1", ["array", 4096, ["struct",
   ["flags", "ubyte"],
   ["height", ["match", "buildnr", {">=936": "ushort", "other": "ubyte"}]],
   ["rest", ["opt", ["flags", 0, "bitflag"], ["struct",
@@ -20,7 +20,7 @@
     ["shape", "ubyte"]
   ]]]
 ]]],
-["level2", ["array", 4356, ["struct",
+["level2", ["array", 4096, ["struct",
   ["flags", "ubyte"],
   ["height", ["match", "buildnr", {">=936": "ushort", "other": "ubyte"}]],
   ["rest", ["opt", ["flags", 0, "bitflag"], ["struct",
@@ -30,7 +30,7 @@
     ["shape", "ubyte"]
   ]]]
 ]]],
-["level3", ["array", 4356, ["struct",
+["level3", ["array", 4096, ["struct",
   ["flags", "ubyte"],
   ["height", ["match", "buildnr", {">=936": "ushort", "other": "ubyte"}]],
   ["rest", ["opt", ["flags", 0, "bitflag"], ["struct",

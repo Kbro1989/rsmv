@@ -52,6 +52,10 @@ module.exports = {
 	},
 	resolve: {
 		extensions: ['.tsx', '.ts', '.js'],
+		extensionAlias: {
+			'.js': ['.ts', '.js'],
+			'.mjs': ['.mts', '.mjs']
+		},
 		alias: {
 			fs: false,
 			path: false,
@@ -68,6 +72,7 @@ module.exports = {
 			util: require.resolve('util/'),
 			assert: require.resolve('assert/'),
 			stream: require.resolve('stream-browserify'),
+			url: false
 		}
 	},
 	output: {

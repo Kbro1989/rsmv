@@ -1,5 +1,5 @@
 import { GameCacheLoader } from "../cache/sqlite";
-import { cacheMajors, cacheConfigPages } from "../constants";
+import { cacheMajors, cacheConfigPages, cacheMapFiles } from "../constants";
 import { parse } from "../opdecoder";
 import * as fs from "fs";
 import * as path from "path";
@@ -105,27 +105,37 @@ async function synthesize() {
 
         console.log(`  Region [${region.rx}, ${region.ry}] (Archive ${archId})...`);
         const arch = await source.getFileArchive(archInfo);
-        const locFile = arch.find(f => f.fileid === 0);
-        const tileFile = arch.find(f => f.fileid === 3);
+        const locFile = arch.find(f => f.fileid === cacheMapFiles.locations);
+        const tileFile = arch.find(f => f.fileid === cacheMapFiles.squares);
 
         if (tileFile) {
             try {
-                const tilesData = parse.mapsquareTiles.read(tileFile.buffer, source);
-                let tileIndex = 0;
+                // Use standard parser: 16384 flat tiles (4 levels * 64 * 64) with build-conditioned height fields
+                const tilesData = parse.mapsquareTiles.read(tileFile.buffer, source, { buildnr: 927 });
+                const stride = 64;
+                const tilesPerLevel = 64 * 64;
+
                 for (let plane = 0; plane < 4; plane++) {
-                    for (let x = 0; x < 64; x++) {
-                        for (let y = 0; y < 64; y++) {
-                            const tile = tilesData.tiles[tileIndex++];
-                            if (tile && tile.settings && (tile.settings & 1) !== 0) {
-                                const worldX = (region.rx * 64) + x;
-                                const worldY = (region.ry * 64) + y;
+                    for (let ty = 0; ty < 64; ty++) {
+                        for (let tx = 0; tx < 64; tx++) {
+                            const tileIndex = (plane * tilesPerLevel) + (ty * stride) + tx;
+                            const tile = tilesData.tiles?.[tileIndex];
+                            if (!tile) continue;
+
+                            const settings = tile.settings ?? 0;
+                            // Bit 0x01 in settings = blocked tile 
+                            if (settings & 1) {
+                                const worldX = (region.rx * 64) + tx;
+                                const worldY = (region.ry * 64) + ty;
                                 const key = `${plane}_${worldX}_${worldY}`;
                                 collisionMatrix[key] = (collisionMatrix[key] || 0) | 0x200000;
                             }
                         }
                     }
                 }
-            } catch (e) { /* skip */ }
+            } catch (e) {
+                console.log(`  [ERR] Failed to parse terrain for Archive ${archId}: ${e}`);
+            }
         }
 
         if (!locFile) continue;

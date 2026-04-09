@@ -1,5 +1,5 @@
 ["struct",
-["magic", ["match","buildnr",{">=936":["tuple","uint","ubyte"],"other":null}]],
+["magic", ["match","buildnr",{">=936":["tuple","uint","ubyte"],"other":"uint"}]],
 ["level0", ["array", 4356, ["struct",
   ["flags", "ubyte"],
   ["height", ["match", "buildnr", {">=936": "ushort", "other": "ubyte"}]],
