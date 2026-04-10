@@ -38,7 +38,7 @@ export class GameCacheLoader extends cache.CacheFileSource {
 
 	async generateRootIndex() {
 		let files = fs.readdirSync(path.resolve(this.cachedir));
-		console.log("using generated cache index file meta, crc size and version missing");
+		console.log("🧬 GOLDRUSH: Mapping Authoritative NXT Substrate...");
 
 		let majors: CacheIndex[] = [];
 		for (let file of files) {
@@ -60,6 +60,17 @@ export class GameCacheLoader extends cache.CacheFileSource {
 			}
 		}
 
+		// Root Index 255 Fallback: If js5-index.jcache exists, it is the Authority
+		const rootIndexFile = path.resolve(this.cachedir, "js5-index.jcache");
+		if (fs.existsSync(rootIndexFile)) {
+			console.log("🔱 Authoritative Master Index (255) detected. Anchoring bridge...");
+			majors[cacheMajors.index] = {
+				major: cacheMajors.index,
+				minor: cacheMajors.index,
+				crc: 0, size: 0, subindexcount: 1, subindices: [0], subnames: null as any, name: 0 as any, version: 0, uncompressed_crc: 0, uncompressed_size: 0
+			};
+		}
+
 		return majors;
 	}
 
@@ -75,7 +86,16 @@ export class GameCacheLoader extends cache.CacheFileSource {
 			if (major == cacheMajors.index) {
 				indices = this.generateRootIndex() as any;
 				readFile = (minor) => this.openTable(minor).readIndexFile();
-				readIndexFile = () => { throw new Error("root index file not accesible for sqlite cache"); }
+				
+				// Actual Root Index data retrieval (js5-index.jcache)
+				const rootIndexFile = path.resolve(this.cachedir, "js5-index.jcache");
+				if (fs.existsSync(rootIndexFile)) {
+					const rootDb = new Database(rootIndexFile, { readonly: !this.writable });
+					readIndexFile = async () => rootDb.prepare(`SELECT DATA FROM cache_index`).get();
+				} else {
+					readIndexFile = () => { throw new Error("root index file not accessible for sqlite cache"); }
+				}
+
 				updateFile = (minor, data) => {
 					let table = this.openTable(minor);
 					return table.updateIndexFile(data);
@@ -83,13 +103,25 @@ export class GameCacheLoader extends cache.CacheFileSource {
 				updateIndexFile = (data) => { throw new Error("cannot write root index"); }
 			} else {
 				let dbfile = path.resolve(this.cachedir, `js5-${major}.jcache`);
-				//need separate throw here since sqlite just crashes instead of throwing
-				if (!fs.existsSync(dbfile)) { throw new Error(`cache index ${major} doesn't exist`); }
+				
+				// BRUTE FORCE FALLBACK: If major file is missing, check the 6GB "God Bundle" (Major 54 or similar)
+				// or the aggregated Master Index (255) if it contains the major data.
+				if (!fs.existsSync(dbfile)) { 
+					console.warn(`⚠️ Major ${major} not found as standalone. Checking Authoritative Master Index...`);
+					const rootIndexFile = path.resolve(this.cachedir, "js5-index.jcache");
+					if (fs.existsSync(rootIndexFile)) {
+						dbfile = rootIndexFile;
+					} else {
+						throw new Error(`cache index ${major} doesn't exist and no Master Index found`); 
+					}
+				}
 				
 				db = new Database(dbfile, { readonly: !this.writable });
 				
 				let dbget = async (query: string, args: any[]) => {
-					return db.prepare(query).get(args);
+					const row = db.prepare(query).get(args);
+					// If not found in the redirected major, this might be an index-only major retrieval
+					return row;
 				}
 				let dbrun = async (query: string, args: any[]) => {
 					return db.prepare(query).run(args);
@@ -100,6 +132,15 @@ export class GameCacheLoader extends cache.CacheFileSource {
 				updateFile = (minor, data) => dbrun(`UPDATE cache SET DATA=? WHERE KEY=?`, [data, minor]);
 				updateIndexFile = (data) => dbrun(`UPDATE cache_index SET DATA=?`, [data]);
 				indices = readIndexFile().then(async row => {
+					if (!row || !row.DATA) {
+						// Heuristic: If we are in the Master Index, the "index" for this major might be in Major 255.
+						if (dbfile.includes("index.jcache")) {
+							const rootTable = this.openTable(cacheMajors.index);
+							const rootRow = await rootTable.readFile(major);
+							if (rootRow) return cache.indexBufferToObject(major, decompress(rootRow.DATA), this);
+						}
+						throw new Error(`Could not load indices for major ${major}`);
+					}
 					let file = decompress(Buffer.from(row.DATA.buffer, row.DATA.byteOffset, row.DATA.byteLength));
 					return cache.indexBufferToObject(major, file, this);
 				});

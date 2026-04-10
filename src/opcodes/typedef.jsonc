@@ -34,7 +34,7 @@
 "1": 1, 
 "-1": -1, 
 "null": null, 
-"extrasmap": ["array","ubyte",["struct", ["type","ubyte"], ["intvalue",["opt","type==0","int"]], ["stringvalue",["opt","type==1","string"]] ]], 
+"extrasmap": ["array","ubyte",["struct", ["type","ubyte"], ["key","utribyte"], ["intvalue",["opt","type==0","int"]], ["stringvalue",["opt","type==1","string"]] ]], 
 "bitflag": "ubyte",
 "buildnr": ["buildnr"], 
 "item_modelid": ["match","buildnr",{">=670":"varuint",">=0":"ushort"}], 

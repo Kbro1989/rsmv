@@ -6,5 +6,6 @@
 ["primitive","ubyte"],
 ["defaultint",["opt","primitive==5","string"]]
 ]]]
-]}
+]},
+"0x04": { "name": "tableId", "read": "varuint" }
 }
