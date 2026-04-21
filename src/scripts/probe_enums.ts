@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function probeEnumById(targetId: number) {
     console.log(`🔍 Probing Enum ID: ${targetId} in Major ${cacheMajors.enums}...`);
@@ -41,3 +41,4 @@ const args = process.argv.slice(2);
 const id = parseInt(args[0]) || 4874; // Default to Prif destinations if none provided
 
 probeEnumById(id).catch(console.error);
+

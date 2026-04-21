@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import * as fs from "fs";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const SCRIPT_ID = 1537;
 
 async function main() {
@@ -49,3 +49,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

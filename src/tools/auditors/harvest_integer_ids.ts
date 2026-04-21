@@ -19,7 +19,7 @@ import { inflateSync, gunzipSync } from 'zlib';
  * Usage: npx tsx src/tools/auditors/harvest_integer_ids.ts [--dry-run]
  */
 
-const CACHE_DIR  = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR  = "C:\ProgramData\Jagex\RuneScape";
 const SCAN_ROOTS = [
     "D:\\sovereign\\cache_pedagogy\\json_dumps",
     "D:\\sovereign\\memory\\pedagogy",
@@ -223,3 +223,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

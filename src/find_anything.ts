@@ -2,7 +2,7 @@ import { GameCacheLoader } from "./cache/sqlite";
 import { cacheMajors } from "./constants";
 
 async function findRegionInAnyMajor(name: string) {
-    const loader = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const loader = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     const rootIndex = await loader.getCacheIndex(cacheMajors.index);
     
     console.log(`Searching for name "${name}" in all majors...`);
@@ -22,3 +22,4 @@ async function findRegionInAnyMajor(name: string) {
 }
 
 findRegionInAnyMajor("m58_52").catch(console.error);
+

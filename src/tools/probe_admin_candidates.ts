@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function run() {
     console.log("🚀 Sovereign Admin Logic Probe — Identifying Behavioral Dispatchers");
@@ -50,3 +50,4 @@ async function run() {
 }
 
 run().catch(console.error);
+

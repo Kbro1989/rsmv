@@ -3,7 +3,7 @@ import { GameCacheLoader } from '../cache/sqlite';
 import { cacheMajors } from '../constants';
 import { parse } from '../opdecoder';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUT_DIR = "D:\\sovereign\\atlas\\skinning";
 
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
@@ -62,3 +62,4 @@ async function probeSkinning(modelId: number, outFile: string) {
 
 // Extract Hans's Torso model
 probeSkinning(40820, "hans_torso.json");
+

@@ -4,7 +4,7 @@ import { parse } from "../opdecoder";
 import Database from "better-sqlite3";
 import * as path from "path";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const DB_PATH = path.join(process.cwd(), "rsmvCacheDB.sqlite");
 
 function initDb() {
@@ -94,3 +94,4 @@ async function extract() {
 }
 
 extract().catch(console.error);
+

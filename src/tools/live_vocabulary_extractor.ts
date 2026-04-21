@@ -5,7 +5,7 @@ import * as fs from 'fs';
 
 async function extractVocabulary() {
     console.log("== Sovereign Forensic Logic: Live Vocabulary Extractor ==");
-    const cache = new GameCacheLoader('C:\\ProgramData\\Jagex\\RuneScape');
+    const cache = new GameCacheLoader('C:\ProgramData\Jagex\RuneScape');
     const vocabulary: Record<string, number> = {};
 
     const configs = [
@@ -23,9 +23,9 @@ async function extractVocabulary() {
             try {
                 const file = await cache.getFileById(config.major, i);
                 if (!file) continue;
-                
+
                 const def = config.parser.read(file, cache);
-                
+
                 // Aggregator logic
                 Object.keys(def).forEach(key => {
                     if (key.includes('action') && def[key] && typeof def[key] === 'string') {
@@ -52,9 +52,10 @@ async function extractVocabulary() {
         actions: sorted
     };
 
-    fs.writeFileSync('C:\\Users\\Destiny\\Desktop\\pog-vibe-interactive\\files\\public\\interaction_vocabulary.json', JSON.stringify(output, null, 2));
+    fs.writeFileSync('D:\\Users\\POG2\\Desktop\\pog-vibe-interactive\\files\\public\\interaction_vocabulary.json', JSON.stringify(output, null, 2));
     console.log(`✅ Vocabulary Synthesis Complete. Extracted ${sorted.length} unique handles.`);
     cache.close();
 }
 
 extractVocabulary().catch(console.error);
+

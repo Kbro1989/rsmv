@@ -5,7 +5,7 @@ import { GameCacheLoader } from '../cache/sqlite';
 import { cacheMajors } from '../constants';
 import { parse } from '../opdecoder';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUT_DIR = "D:\\sovereign\\atlas\\skeletons";
 
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
@@ -92,3 +92,4 @@ async function extractSkeleton(targetAnimGroupId: number, outName: string) {
 
 // target: 1426 (Hans), 2533 (Player base)
 extractSkeleton(1426, "hans_base");
+

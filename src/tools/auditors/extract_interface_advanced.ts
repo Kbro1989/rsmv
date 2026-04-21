@@ -16,7 +16,7 @@ function decompress(raw: Buffer): Buffer {
     return raw;
 }
 
-const db = new Database('C:\\\\ProgramData\\\\Jagex\\\\RuneScape\\\\js5-3.jcache', { readonly: true });
+const db = new Database('D:\\\\ProgramData\\\\Jagex\\\\RuneScape\\\\js5-3.jcache', { readonly: true });
 
 function analyzeInterface(id: number) {
     const row = db.prepare('SELECT DATA FROM cache WHERE KEY = ?').get(id) as any;

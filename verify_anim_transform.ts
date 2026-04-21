@@ -4,7 +4,7 @@ import { cacheMajors } from './src/constants.js';
 
 async function verifyFrames() {
     console.log('--- Correlating Framemap Data with Frame AnimData ---');
-    const cache = new GameCacheLoader('C:\\ProgramData\\Jagex\\RuneScape');
+    const cache = new GameCacheLoader('C:\ProgramData\Jagex\RuneScape');
     
     // Get Framemap 0
     const fmIndex = await cache.getCacheIndex(cacheMajors.framemaps);
@@ -33,3 +33,4 @@ async function verifyFrames() {
 }
 
 verifyFrames().catch(console.error);
+

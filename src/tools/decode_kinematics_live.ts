@@ -4,7 +4,7 @@ import { parse } from '../opdecoder';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CACHE_DB = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DB = "C:\ProgramData\Jagex\RuneScape";
 const MEMORY_DIR = "D:\\sovereign\\memory\\pedagogy";
 
 const targetScripts = {
@@ -119,3 +119,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

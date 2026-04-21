@@ -3,7 +3,7 @@ import { cacheMajors, cacheConfigPages } from "./constants";
 import { parse } from "./opdecoder";
 
 async function locateHavenhythe() {
-    const loader = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const loader = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     const dbArchIndex = (await loader.getCacheIndex(cacheMajors.config))[cacheConfigPages.dbrows];
     const dbArch = await loader.getFileArchive(dbArchIndex);
     
@@ -47,3 +47,4 @@ async function locateHavenhythe() {
 }
 
 locateHavenhythe().catch(console.error);
+

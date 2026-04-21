@@ -3,7 +3,7 @@ import { cacheMajors } from '../constants';
 import { parse } from '../opdecoder';
 
 async function surgery() {
-    const cache = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const cache = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     
     console.log("--- NPC 3597 (Toy Mouse) Surgery ---");
     try {
@@ -46,3 +46,4 @@ async function surgery() {
 }
 
 surgery();
+

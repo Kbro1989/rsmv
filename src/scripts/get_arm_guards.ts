@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function probe() {
     const source = new GameCacheLoader(CACHE_DIR);
@@ -27,3 +27,4 @@ async function probe() {
 }
 
 probe().catch(console.error);
+

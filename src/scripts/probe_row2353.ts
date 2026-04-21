@@ -4,7 +4,7 @@ import { parse } from "../opdecoder";
 
 async function probeRow2353() {
     console.log("🔍 Forensic Probe of Row 2353 (Sextant Reference)...");
-    const source = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const source = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     
     try {
         const archInfo = (await source.getCacheIndex(cacheMajors.config))[cacheConfigPages.dbrows];
@@ -35,3 +35,4 @@ async function probeRow2353() {
 }
 
 probeRow2353().catch(console.error);
+

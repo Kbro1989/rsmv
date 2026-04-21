@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { inflateSync, gunzipSync } from 'zlib';
 
-const CACHE_DIR = 'C:\\ProgramData\\Jagex\\RuneScape';
+const CACHE_DIR = 'C:\ProgramData\Jagex\RuneScape';
 
 function decompress(raw: Buffer): Buffer {
     if (raw.length < 3) return raw;
@@ -103,3 +103,4 @@ for (const r of rows) {
     }
 }
 db.close();
+

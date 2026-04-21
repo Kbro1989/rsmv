@@ -3,7 +3,7 @@ import { cacheMajors } from '../constants';
 import { parse } from '../opdecoder';
 import * as fs from 'fs';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUT_DIR = "D:\\sovereign\\atlas\\kinematics";
 
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -114,3 +114,4 @@ async function extractKinematics() {
 }
 
 extractKinematics().catch(console.error);
+

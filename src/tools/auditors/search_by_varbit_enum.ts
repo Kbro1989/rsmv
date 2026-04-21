@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { inflateSync, gunzipSync } from 'zlib';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const MAJOR_SCRIPTS = 12;
 
 function decompress(raw: Buffer): Buffer {
@@ -74,3 +74,4 @@ async function searchMissingLogic() {
 }
 
 searchMissingLogic().catch(console.error);
+

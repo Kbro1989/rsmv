@@ -4,7 +4,7 @@ import { cacheMajors } from './src/constants.js';
 
 async function verifyFrames() {
     console.log('--- Verifying Frame 11546 (Sequence 18019 / Spirit Cyrisus) ---');
-    const cache = new GameCacheLoader('C:\\ProgramData\\Jagex\\RuneScape');
+    const cache = new GameCacheLoader('C:\ProgramData\Jagex\RuneScape');
     
     // Frames are Major 48. Arch ID is frameidhi (11546)
     const frIndex = await cache.getCacheIndex(cacheMajors.frames);
@@ -75,3 +75,4 @@ async function verifyFrames() {
 }
 
 verifyFrames().catch(console.error);
+

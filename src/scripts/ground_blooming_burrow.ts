@@ -4,7 +4,7 @@ import { parse } from "../opdecoder";
 import { archiveToFileId } from "../cache";
 import * as fs from "fs";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const targetObjectIds = new Set([
     129420, 129754, 129765, 129762, 129763, 129321, 
     129412, 129413, 129414, 129758, 129759, 129760
@@ -161,3 +161,4 @@ async function groundBloomingBurrow() {
 }
 
 groundBloomingBurrow().catch(console.error);
+

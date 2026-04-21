@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 // Authoritative Jagex Cache Path
-const CACHE_PATH = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_PATH = "C:\ProgramData\Jagex\RuneScape";
 const JSON_DUMPS = "D:\\sovereign\\cache_pedagogy\\json_dumps";
 
 async function main() {
@@ -118,3 +118,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

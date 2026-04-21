@@ -7,7 +7,7 @@ import * as path from "path";
 const POG_ROOT = path.resolve(__dirname, "../../../../");
 
 async function extractGlobalCollision() {
-    const cachePath = "C:\\ProgramData\\Jagex\\RuneScape";
+    const cachePath = "C:\ProgramData\Jagex\RuneScape";
     const loader = new GameCacheLoader(cachePath);
 
     const mapIndex = await loader.getCacheIndex(5); // Mapsquares
@@ -125,3 +125,4 @@ async function extractGlobalCollision() {
 }
 
 extractGlobalCollision().catch(console.error);
+

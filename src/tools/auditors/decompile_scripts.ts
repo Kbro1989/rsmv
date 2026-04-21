@@ -6,7 +6,7 @@ import { GameCacheLoader } from '../../cache/sqlite';
 import { renderClientScript } from '../../clientscript/index';
 import { cacheMajors } from '../../constants';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUTPUT_DIR = path.resolve(__dirname, "../../../output/decompiled");
 
 function decompress(raw: Buffer): Buffer {
@@ -79,3 +79,4 @@ async function renderAndSave(source: GameCacheLoader, buf: Buffer, scriptId: num
 }
 
 main().catch(console.error);
+

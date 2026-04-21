@@ -8,9 +8,9 @@ async function findAdminCommands() {
     const loader = new GameCacheLoader('C:/ProgramData/Jagex/RuneScape');
     
     const externalFiles = [
-        "C:\\ProgramData\\Jagex\\launcher\\instance.lock",
-        "C:\\ProgramData\\Jagex\\launcher\\preferences.cfg",
-        "C:\\ProgramData\\Jagex\\launcher\\rs2client.exe"
+        "D:\\ProgramData\\Jagex\\launcher\\instance.lock",
+        "D:\\ProgramData\\Jagex\\launcher\\preferences.cfg",
+        "D:\\ProgramData\\Jagex\\launcher\\rs2client.exe"
     ];
 
     const results: any[] = [];

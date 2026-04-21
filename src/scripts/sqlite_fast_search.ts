@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 
 function searchCache() {
-    const dbPath = 'C:\\ProgramData\\Jagex\\RuneScape\\js5-12.jcache';
+    const dbPath = 'C:\ProgramData\Jagex\RuneScape\\js5-12.jcache';
     console.log(`Open: ${dbPath}`);
     const db = new Database(dbPath, { readonly: true });
     
@@ -40,3 +40,4 @@ function searchCache() {
 }
 
 searchCache();
+

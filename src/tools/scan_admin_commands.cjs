@@ -2,7 +2,7 @@ const { GameCacheLoader } = require("../cache/sqlite");
 const { cacheMajors } = require("../constants");
 const { parse } = require("../opdecoder");
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "D:\\ProgramData\\Jagex\\RuneScape";
 
 async function scanAdminCommands() {
     console.log(`🔍 Scanning ClientScripts (Archive 12) for Admin Commands...`);

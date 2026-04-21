@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function fastSearch() {
     process.stdout.write("🔍 FAST Searching for 'level' constraints in Cache...\n");
@@ -51,3 +51,4 @@ async function fastSearch() {
 }
 
 fastSearch().catch(console.error);
+

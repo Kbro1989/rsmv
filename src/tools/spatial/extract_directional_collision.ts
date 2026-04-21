@@ -14,7 +14,7 @@ import { parse } from '../../opdecoder';
 import { cacheMapFiles } from '../../constants';
 
 async function extractDirectionalCollision(regionId: number) {
-    const cachePath = "C:\\ProgramData\\Jagex\\RuneScape";
+    const cachePath = "C:\ProgramData\Jagex\RuneScape";
     const loader = new GameCacheLoader(cachePath);
     
     // 1. Resolve coordinates from region ID
@@ -146,3 +146,4 @@ if (args.length >= 2) {
 }
 
 extractDirectionalCollision(targetRegion).catch(console.error);
+

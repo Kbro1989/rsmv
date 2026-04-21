@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const MAJOR_ENUMS = 17;
 const TARGET_ENUMS = [1, 4, 5, 33, 35, 53];
 
@@ -43,3 +43,4 @@ async function dump() {
 }
 
 dump().catch(console.error);
+

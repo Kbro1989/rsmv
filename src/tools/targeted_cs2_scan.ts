@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DB = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DB = "C:\ProgramData\Jagex\RuneScape";
 
 async function main() {
     console.log("🔍 Scanning ClientScripts (Major 12) from Live Cache for User Terms...");
@@ -45,3 +45,4 @@ async function main() {
     console.log("\n✅ Target Scan Complete:\n", JSON.stringify(results, null, 2));
 }
 main().catch(console.error);
+

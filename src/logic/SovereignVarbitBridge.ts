@@ -11,7 +11,7 @@ export class SovereignVarbitBridge {
     private cache: GameCacheLoader;
 
     private constructor() {
-        this.cache = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+        this.cache = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
         if (!fs.existsSync(VARBIT_OUT_DIR)) {
             fs.mkdirSync(VARBIT_OUT_DIR, { recursive: true });
         }
@@ -63,3 +63,4 @@ export class SovereignVarbitBridge {
         this.cache.close();
     }
 }
+

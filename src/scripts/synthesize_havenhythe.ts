@@ -4,7 +4,7 @@ import { parse } from "../opdecoder";
 import * as fs from "fs";
 import * as path from "path";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUTPUT_DIR = "D:\\sovereign\\atlas\\spatial\\hav_58_52";
 const MEMORY_DIR = "D:\\sovereign\\memory\\pedagogy";
 
@@ -256,3 +256,4 @@ async function synthesize() {
 }
 
 synthesize().catch(console.error);
+

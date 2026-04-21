@@ -6,7 +6,7 @@ import { cacheMajors } from "../constants";
 import { archiveToFileId } from "../cache";
 
 const PEDAGOGY_ROOT = "D:\\sovereign\\memory\\pedagogy";
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function extractTaxonomic() {
 	console.log("Starting Triple-Source Sovereign Taxonomic Synthesis...");
@@ -136,3 +136,4 @@ extractTaxonomic().catch(err => {
 	console.error("Extraction failed:", err);
 	process.exit(1);
 });
+

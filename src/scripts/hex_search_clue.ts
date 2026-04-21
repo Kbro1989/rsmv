@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function hexSearch() {
     process.stdout.write("🔍 Searching for 'Globetrotter' in Item Archive...\n");
@@ -34,3 +34,4 @@ async function hexSearch() {
 }
 
 hexSearch().catch(console.error);
+

@@ -12,7 +12,7 @@ import * as path from "path";
  * and enrich them with Wiki metadata & existing Pedagogy manifests.
  */
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUTPUT_DIR = path.resolve(__dirname, "../../pog-vibe-interactive/files/data/substrate");
 const PAD = 66; // 64x64 + 1 tile border
 
@@ -398,3 +398,4 @@ if (process.argv[2] === "--run") {
         synth.synthesizeRegion(rx, ry).then(() => synth.close());
     }
 }
+

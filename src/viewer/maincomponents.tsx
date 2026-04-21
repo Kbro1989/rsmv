@@ -320,14 +320,14 @@ function CacheDragNDropHelp() {
 						<React.Fragment>
 							{!canfsapi && <p className="mv-errortext">You browser does not support full folder loading!</p>}
 							<p>Drop the RuneScape folder into this window.</p>
-							<input type="text" onFocus={e => e.target.select()} readOnly value={"C:\\ProgramData\\Jagex"} />
+							<input type="text" onFocus={e => e.target.select()} readOnly value={"D:\\ProgramData\\Jagex"} />
 							<video src={new URL("../assets/dragndrop.mp4", import.meta.url).href} autoPlay loop style={{ aspectRatio: "352/292" }} />
 						</React.Fragment>
 					)}
 					{mode == "blob" && (
 						<React.Fragment>
 							<p>Drop and drop the cache files into this window.</p>
-							<input type="text" onFocus={e => e.target.select()} readOnly value={"C:\\ProgramData\\Jagex"} />
+							<input type="text" onFocus={e => e.target.select()} readOnly value={"D:\\ProgramData\\Jagex"} />
 							<video src={new URL("../assets/dragndropblob.mp4", import.meta.url).href} autoPlay loop style={{ aspectRatio: "458/380" }} />
 						</React.Fragment>
 					)}

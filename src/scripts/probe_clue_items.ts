@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function extractClueItems() {
     console.log("🔍 Scanning for Clue Hunting Items...");
@@ -79,3 +79,4 @@ async function extractClueItems() {
 }
 
 extractClueItems().catch(console.error);
+

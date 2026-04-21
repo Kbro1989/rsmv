@@ -3,7 +3,7 @@ import { cacheMajors } from "../constants";
 import { prepareClientScript } from "../clientscript/index";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const TARGET_IDS = [16441, 1024, 15125, 16525, 17147, 18819];
 
 async function run() {
@@ -42,3 +42,4 @@ async function run() {
 }
 
 run().catch(console.error);
+

@@ -3,8 +3,8 @@ import { cacheMajors, cacheConfigPages } from '../constants';
 import { parse } from '../opdecoder';
 import * as fs from 'fs';
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
-const OUT_DIR = "C:\\Users\\Destiny\\Desktop\\pog-vibe-interactive\\files\\public";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const OUT_DIR = "D:\\Users\\POG2\\Desktop\\pog-vibe-interactive\\files\\public";
 
 async function extractSovereignEntity(npcId: number) {
     console.log(`\n🧬 ═══ Sovereign Entity Archetype Extraction: NPC ${npcId} ═══`);
@@ -201,3 +201,4 @@ async function extractSovereignEntity(npcId: number) {
     await extractSovereignEntity(432);  // Cyrisus Melee Combat
     await extractSovereignEntity(30322); // Spirit of Um
 })();
+

@@ -3,7 +3,7 @@ import { cacheMajors } from './constants';
 import { parse } from './opdecoder';
 
 async function findLumbridgePortals() {
-    const cache = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const cache = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     console.log("[GODHEAD] Identifying Lumbridge Portal Signatures...");
 
     const entry = await cache.getIndexEntryById(255, cacheMajors.objects);
@@ -29,3 +29,4 @@ async function findLumbridgePortals() {
 }
 
 findLumbridgePortals();
+

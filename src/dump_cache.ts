@@ -9,7 +9,7 @@ import { GameCacheLoader } from "./cache/sqlite";
 import * as path from "path";
 
 async function dump() {
-    const cachePath = "C:\\ProgramData\\Jagex\\RuneScape";
+    const cachePath = "C:\ProgramData\Jagex\RuneScape";
     const loader = new GameCacheLoader(cachePath);
     console.log("Loading cache indices...");
     
@@ -28,3 +28,4 @@ async function dump() {
 }
 
 dump();
+

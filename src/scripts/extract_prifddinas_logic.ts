@@ -5,7 +5,7 @@ import Database from "better-sqlite3";
 import * as path from "path";
 import * as fs from "fs";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 const OUTPUT_PATH = "D:\\sovereign\\memory\\pedagogy\\prifddinas_grounding_raw.json";
 
 // Prifddinas Coordinate Range (Focused District Search)
@@ -95,3 +95,4 @@ async function extract() {
 }
 
 extract().catch(console.error);
+

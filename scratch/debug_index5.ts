@@ -2,7 +2,7 @@ import { GameCacheLoader } from "./src/cache/sqlite";
 import { cacheMajors } from "./src/constants";
 
 async function debugIndex5() {
-    const loader = new GameCacheLoader("C:\\ProgramData\\Jagex\\RuneScape");
+    const loader = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
     const index = await loader.getCacheIndex(cacheMajors.maps);
     
     console.log(`Index 5 total archives: ${index.length}`);
@@ -14,3 +14,4 @@ async function debugIndex5() {
 }
 
 debugIndex5().catch(console.error);
+

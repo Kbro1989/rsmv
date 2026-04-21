@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\\ProgramData\\Jagex\\RuneScape";
+const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
 
 async function findItemByName(targetName: string) {
     console.log(`🔍 Searching for raw string: "${targetName}" in Major ${cacheMajors.items}...`);
@@ -42,3 +42,4 @@ async function start() {
 }
 
 start().catch(console.error);
+
