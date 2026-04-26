@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function probeMapNpcs(zoneX: number, zoneY: number) {
     const zoneId = (zoneX << 8) | zoneY;
@@ -42,4 +42,5 @@ async function probeMapNpcs(zoneX: number, zoneY: number) {
 const x = parseInt(process.argv[2]) || 38;
 const y = parseInt(process.argv[3]) || 49;
 probeMapNpcs(x, y).catch(console.error);
+
 

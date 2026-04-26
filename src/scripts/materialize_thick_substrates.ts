@@ -5,7 +5,7 @@ import { cacheMajors } from "../constants.js";
 import { parse } from "../opdecoder.js";
 import { archiveToFileId } from "../cache/index.js";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const PEDAGOGY_DIR = "D:\\sovereign\\memory\\pedagogy";
 const MANIFEST_DIR = path.join(PEDAGOGY_DIR, "manifests");
 
@@ -59,4 +59,5 @@ async function materializeChunked(source: GameCacheLoader, major: number, parser
 }
 
 materialize().catch(console.error);
+
 

@@ -1,97 +1,88 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors, cacheConfigPages } from "../constants";
 import { parse } from "../opdecoder";
-import Database from "better-sqlite3";
-import * as path from "path";
+import { RSMVCacheDB } from "../utils/RSMVCacheDB";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
-const DB_PATH = path.join(process.cwd(), "rsmvCacheDB.sqlite");
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
-function initDb() {
-    const db = new Database(DB_PATH);
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS grounded_entities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type TEXT,
-            entity_id INTEGER,
-            name TEXT,
-            coord INTEGER,
-            table_id INTEGER,
-            row_id INTEGER,
-            metadata TEXT
-        )
-    `);
-    return db;
-}
-
-async function extract() {
-    console.log("🚀 Starting Sovereign Spatial Grounding Extraction (Exhaustive Column Pass)...");
-    const db = initDb();
+async function materializeSpatialGrounding() {
+    console.log("🚀 Initializing Sovereign Spatial Grounding Engine...");
     const source = new GameCacheLoader(CACHE_DIR);
+    const db = new RSMVCacheDB();
+    // await db.init(); // Constructor handles init
 
-    let npcsGrounded = 0;
-    
-    try {
-        const TABLE_ID = 39;
-        const archInfo = (await source.getCacheIndex(cacheMajors.config))[cacheConfigPages.dbrows];
-        const arch = await source.getFileArchive(archInfo);
-        
-        const tableRows = arch.filter(f => f.buffer.length >= 2 && f.buffer[1] === TABLE_ID);
-        console.log(`Found ${tableRows.length} potential rows for Table ${TABLE_ID}.`);
+    const archInfo = (await source.getCacheIndex(cacheMajors.config))[cacheConfigPages.dbrows];
+    const arch = await source.getFileArchive(archInfo);
+    console.log(`Loaded ${arch.length} DBRows. Starting extraction...`);
 
-        const insert = db.prepare(`
-            INSERT INTO grounded_entities (type, entity_id, name, coord, table_id, row_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `);
+    let count = 0;
+    for (const file of arch) {
+        try {
+            const row = parse.dbrows.read(file.buffer, source) as any;
+            const tableId = row.tableId;
+            if (!tableId) continue;
 
-        for (const file of tableRows) {
-            try {
-                const row = parse.dbrows.read(file.buffer, source) as any;
-                const colGroups = row.unk01?.columndata || row.unk02?.columndata;
-                
-                if (colGroups) {
-                    let coord: number | null = null;
-                    let name: string = "Unknown NPC";
-                    let npcId: number = 0;
+            const colGroups = [row.group1, row.group2, row.group3].filter(g => g && g.columndata);
+            
+            let entityId: number | null = null;
+            let entityName: string | null = null;
+            let coord: number | null = null;
 
-                    for (const group of colGroups) {
-                        for (const col of group.columns) {
-                            if (col.type === 33 || col.type === 22) {
-                                if (col.value?.[0] !== undefined) coord = Number(col.value[0]);
-                            }
-                            if (col.type === 36) {
-                                if (col.value?.[0] !== undefined) name = String(col.value[0]);
-                            }
-                            if (col.type === 32) {
-                                if (col.value?.[0] !== undefined) npcId = Number(col.value[0]);
-                            }
-                        }
+            for (const group of colGroups) {
+                for (const entry of group.columndata) {
+                    const colId = entry.id;
+                    const value = entry.columns?.[0]?.value;
+                    const type = entry.columns?.[0]?.type;
+
+                    if (tableId === 8961) { // NPCs
+                        if (colId === 0) entityId = Number(value);
+                        if (colId === 2) entityName = String(value);
+                        if (colId === 4 && type === 33) coord = Number(value);
+                    } else if (tableId === 39) { // POI / Mapzones
+                        if (colId === 7) entityName = String(value);
+                        if (colId === 0 && type === 33) coord = Number(value); // Col 0 is primary coord in Table 39
+                        if (!entityId && colId === 6) entityId = Number(value);
                     }
-                    
-                    if (coord !== null) {
-                        const lowName = name.toLowerCase();
-                        if (lowName.includes("professor") || lowName.includes("monster") || lowName.includes("npc")) {
-                            console.log(`[!] FOUND: ${name} at ${coord} (npcId: ${npcId})`);
-                        }
-                        
-                        insert.run("npc", npcId, name, coord, TABLE_ID, file.fileid);
-                        npcsGrounded++;
-                    }
+                    // Generic spatial extraction for other tables
+                    if (!coord && type === 33) coord = Number(value);
+                    if (!entityName && type === 36) entityName = String(value);
                 }
-            } catch (e) {
-                // Skip malformed rows
             }
+
+            if (coord && coord > 0) {
+                // Decode Jagex coord: plane << 28 | x << 14 | y
+                const plane = (coord >> 28) & 0x3;
+                const x = (coord >> 14) & 0x3FFF;
+                const z = coord & 0x3FFF; // Jagex 'y' is Sovereign 'z' (height) or just horizontal coordinate?
+                // In Runescape, (x, y) are horizontal, plane is vertical.
+                // Sovereign uses (x, y, z) where y is altitude? No, RSMVCacheDB says z is height.
+                
+                db.insertGrounded({
+                    entity_type: tableId === 8961 || tableId === 16130 ? 'npc' : 'object',
+                    entity_id: entityId || file.fileid,
+                    entity_name: entityName || undefined,
+                    x: x,
+                    y: z, // mapping RS y to Sovereign y
+                    z: 0, // altitude unknown from dbrows
+                    plane: plane,
+                    zone_id: (x >> 6) << 8 | (z >> 6), // approximate zone_id (map square)
+                    is_morphic: false,
+                    has_actions: true,
+                    learned_at: new Date().toISOString()
+                });
+                count++;
+            }
+        } catch (e) {
+            // Skip decoding errors
         }
         
-        console.log(`✅ Successfully grounded ${npcsGrounded} NPCs from Table ${TABLE_ID}.`);
-
-    } catch (error) {
-        console.error("❌ Extraction failed:", error);
-    } finally {
-        source.close();
-        db.close();
+        if (count % 1000 === 0 && count > 0) {
+            console.log(`Grounded ${count} entities...`);
+        }
     }
+
+    console.log(`✅ Sovereign Grounding Complete. Total entities grounded: ${count}`);
+    source.close();
 }
 
-extract().catch(console.error);
-
+materializeSpatialGrounding().catch(console.error);

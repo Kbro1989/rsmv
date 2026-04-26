@@ -1,6 +1,6 @@
 import { GameCacheLoader } from '../cache/sqlite';
-import { OpcodeReader } from '../opcode_reader';
 import { parse } from '../opdecoder';
+import { prepareClientScript } from '../clientscript/index';
 import * as fs from 'fs';
 
 async function findAdminCommands() {
@@ -8,9 +8,9 @@ async function findAdminCommands() {
     const loader = new GameCacheLoader('C:/ProgramData/Jagex/RuneScape');
     
     const externalFiles = [
-        "D:\\ProgramData\\Jagex\\launcher\\instance.lock",
-        "D:\\ProgramData\\Jagex\\launcher\\preferences.cfg",
-        "D:\\ProgramData\\Jagex\\launcher\\rs2client.exe"
+        "C:\\ProgramData\\Jagex\\launcher\\instance.lock",
+        "C:\\ProgramData\\Jagex\\launcher\\preferences.cfg",
+        "C:\\ProgramData\\Jagex\\launcher\\rs2client.exe"
     ];
 
     const results: any[] = [];
@@ -39,6 +39,9 @@ async function findAdminCommands() {
     const index = await loader.getCacheIndex(12);
     const scriptIds = Object.keys(index).map(Number).sort((a,b) => a-b);
     
+    console.log(`[Goldrush] Preparing Global String Pool...`);
+    await prepareClientScript(loader);
+    
     console.log(`[Goldrush] Scanning ${scriptIds.length} ClientScripts for '::' signatures...`);
 
     for (const scriptId of scriptIds) {
@@ -46,21 +49,18 @@ async function findAdminCommands() {
             const archive = index[scriptId];
             const files = await loader.getFileArchive(archive);
             const scriptData = files[0].buffer;
+            const script = parse.clientscript.read(scriptData, loader) as any;
+            const commandStrings = script.opcodedata
+                .filter((inst: any) => inst.imm_obj && typeof inst.imm_obj === 'string' && (inst.imm_obj.includes('::') || inst.imm_obj.includes(';;')))
+                .map((inst: any) => inst.imm_obj);
             
-            if (scriptData.includes(Buffer.from('::', 'utf-8'))) {
-                const script = parse.clientscript.read(scriptData, loader);
-                const commandStrings = script.instructions
-                    .filter((inst: any) => inst.opcode === 3 && typeof inst.imm === 'string' && inst.imm.includes('::'))
-                    .map((inst: any) => inst.imm);
-                
-                if (commandStrings.length > 0) {
-                    console.log(`[FOUND] Script ${scriptId}: ${commandStrings.join(", ")}`);
-                    results.push({
-                        type: "clientscript",
-                        id: scriptId,
-                        commands: commandStrings
-                    });
-                }
+            if (commandStrings.length > 0) {
+                console.log(`[FOUND] Script ${scriptId}: ${commandStrings.join(", ")}`);
+                results.push({
+                    type: "clientscript",
+                    id: scriptId,
+                    commands: commandStrings
+                });
             }
         } catch (e) { }
     }

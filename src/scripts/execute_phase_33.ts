@@ -5,7 +5,7 @@ import { GameCacheLoader } from '../cache/sqlite';
 import { cacheMajors } from '../constants';
 import { parse } from '../opdecoder';
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const TARGET_MS = "D:\\Users\\POG2\\Desktop\\pog-vibe-interactive\\files\\public\\ms_50_50.json";
 
 async function extract() {
@@ -105,4 +105,5 @@ async function extract() {
 }
 
 extract().catch(console.error);
+
 

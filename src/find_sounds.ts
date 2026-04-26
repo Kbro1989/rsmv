@@ -3,7 +3,7 @@ import { cacheMajors } from "./constants";
 import { GameCacheLoader } from "./cache/sqlite";
 
 async function run() {
-    const cachePath = "C:\ProgramData\Jagex\RuneScape";
+    const cachePath = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
     const cacheSource = new GameCacheLoader(cachePath);
     const engine = await EngineCache.create(cacheSource);
 
@@ -34,4 +34,5 @@ async function run() {
     }
 }
 run();
+
 

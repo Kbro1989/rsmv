@@ -140,7 +140,10 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 				if (debugdata) {
 					debugdata.opcodes.push({ op: (parser ? parser.key as string : `_0x${opt.toString(16)}_`), index: state.scan - 1, stacksize: state.stack.length });
 				}
-				if (!parser) { throw new Error("unknown chunk 0x" + opt.toString(16).toUpperCase()); }
+				if (!parser) { 
+					console.warn(`[RSMV] Unknown opcode 0x${opt.toString(16).toUpperCase()} at offset ${state.scan - 1}. Aborting this chunk parse.`);
+					break; 
+				}
 				(r as any)[parser.key] = parser.parser.read(state);
 			}
 			state.stack.pop();
@@ -1648,6 +1651,7 @@ parserPrimitives = {
 	}])),
 	bool: {
 		read(s) {
+			checkBounds(s, 1);
 			let r = s.buffer.readUInt8(s.scan++);
 			if (r != 0 && r != 1) { throw new Error("1 or 0 expected boolean value"); }
 			return r != 0;

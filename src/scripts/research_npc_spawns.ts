@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { parse } from "../opdecoder";
 import { cacheMajors, cacheConfigPages } from "../constants";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function researchNPCs() {
     console.log("Searching for NPC Spawn DBTable...");
@@ -36,4 +36,5 @@ async function researchNPCs() {
 }
 
 researchNPCs();
+
 

@@ -18,7 +18,7 @@ import { inflateSync, gunzipSync } from 'zlib';
 // ═══════════════════════════════════════════
 // COMMON PATH ENDPOINTS
 // ═══════════════════════════════════════════
-const CACHE_DIR = 'C:\ProgramData\Jagex\RuneScape';
+const CACHE_DIR = 'C:\\\\ProgramData\\\\Jagex\\\\RuneScape';
 const OUTPUT_DIR = 'audit_output';
 const INDEX_KEY = 1;
 
@@ -267,4 +267,5 @@ for (const [char, ids] of [...charGroups.entries()].sort()) {
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 fs.writeFileSync(path.join(OUTPUT_DIR, 'cache_boundary_map.json'), JSON.stringify(boundaries, null, 2));
 console.log(`\n✅ audit_output/cache_boundary_map.json`);
+
 

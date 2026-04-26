@@ -50,7 +50,7 @@ class ByteStream {
 
 async function verifyFrames() {
     console.log('--- Decoding Frame 11546 AnimData ---');
-    const cache = new GameCacheLoader('C:\ProgramData\Jagex\RuneScape');
+    const cache = new GameCacheLoader('C:\\\\ProgramData\\\\Jagex\\\\RuneScape');
     
     // Get Framemap 0
     const fmIndex = await cache.getCacheIndex(cacheMajors.framemaps);
@@ -104,4 +104,5 @@ async function verifyFrames() {
 }
 
 verifyFrames().catch(console.error);
+
 

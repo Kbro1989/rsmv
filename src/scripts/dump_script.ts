@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const SCRIPT_ID = 4166;
 
 async function dumpScript() {
@@ -29,4 +29,5 @@ async function dumpScript() {
 }
 
 dumpScript().catch(console.error);
+
 

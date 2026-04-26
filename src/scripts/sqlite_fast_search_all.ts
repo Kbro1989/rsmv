@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 
 function searchAllCaches() {
-    const dir = 'C:\ProgramData\Jagex\RuneScape';
+    const dir = 'C:\\\\ProgramData\\\\Jagex\\\\RuneScape';
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.jcache'));
     
     for (const f of files) {
@@ -37,4 +37,5 @@ function searchAllCaches() {
     }
 }
 searchAllCaches();
+
 

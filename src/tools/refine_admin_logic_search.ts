@@ -3,7 +3,7 @@ import { cacheMajors } from "../constants";
 import { prepareClientScript } from "../clientscript/index";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function refineAdminLogic() {
     console.log(`🔍 Refining Admin Logic Search — Filtering for Actual Command Handling...`);
@@ -66,4 +66,5 @@ async function refineAdminLogic() {
 }
 
 refineAdminLogic().catch(console.error);
+
 

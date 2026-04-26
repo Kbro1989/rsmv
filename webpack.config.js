@@ -14,32 +14,7 @@ module.exports = {
 		api: "./src/headless/api",
 		buildfiletypes: "./src/buildfiletypes.ts",
 		maprender: "./src/map/mapcli.ts",
-		runbrowser: "./src/headless/runbrowser.ts",
-		extract_sovereign_taxonomic: "./src/scripts/extract_sovereign_taxonomic.ts",
-		extract_spatial_grounding: "./src/scripts/extract_spatial_grounding.ts",
-		research_npc_spawns: "./src/scripts/research_npc_spawns.ts",
-		probe_dbrows: "./src/scripts/probe_dbrows.ts",
-		probe_dbtables: "./src/scripts/probe_dbtables.ts",
-		probe_hex: "./src/scripts/probe_hex.ts",
-		probe_items: "./src/scripts/probe_items.ts",
-		probe_npcs: "./src/scripts/probe_npcs.ts",
-		probe_sextant: "./src/scripts/probe_sextant.ts",
-		dump_script: "./src/scripts/dump_script.ts",
-		probe_table39: "./src/scripts/probe_table39.ts",
-		list_grounded: "./src/scripts/list_grounded.ts",
-		scan_table39: "./src/scripts/scan_table39.ts",
-		probe_locales: "./src/scripts/probe_locales.ts",
-		probe_map_npcs: "./src/scripts/probe_map_npcs.ts",
-		probe_row2353: "./src/scripts/probe_row2353.ts",
-		clear_grounded: "./src/scripts/clear_grounded.ts",
-		audit_pedagogy: "./src/scripts/audit_pedagogy.ts",
-		extract_prifddinas_logic: "./src/scripts/extract_prifddinas_logic.ts",
-		probe_all_tables: "./src/scripts/probe_all_tables.ts",
-		ground_prifddinas: "./src/scripts/ground_prifddinas.ts",
-		research_prifddinas_interactions: "./src/scripts/research_prifddinas_interactions.ts",
-		probe_enums: "./src/scripts/probe_enums.ts",
-		probe_item_id: "./src/scripts/probe_item_id.ts",
-		synthesize_prifddinas: "./src/scripts/synthesize_prifddinas.ts"
+		runbrowser: "./src/headless/runbrowser.ts"
 	},
 	module: {
 		rules: [
@@ -48,7 +23,8 @@ module.exports = {
 				loader: 'ts-loader',
 				exclude: /node_modules/,
 				options: {
-					onlyCompileBundledFiles: true
+					onlyCompileBundledFiles: true,
+					transpileOnly: true
 				}
 			},
 			{
@@ -79,10 +55,8 @@ module.exports = {
 	resolve: {
 		extensions: ['.tsx', '.ts', '.js'],
 		extensionAlias: {
-			".js": [".js", ".ts", ".tsx"]
-		},
-		alias: {
-			"sql.js/dist/sql-wasm-workerfs.js": path.resolve(__dirname, "src/libs/sqljsfork/dist/sql-wasm-workerfs.js")
+			'.js': ['.ts', '.js'],
+			'.mjs': ['.mts', '.mjs']
 		}
 	},
 	externalsType: "commonjs",

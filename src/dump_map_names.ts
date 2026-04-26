@@ -2,7 +2,7 @@ import { GameCacheLoader } from "./cache/sqlite";
 import { cacheMajors } from "./constants";
 
 async function dumpNames() {
-    const loader = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
+    const loader = new GameCacheLoader("C:\\\\ProgramData\\\\Jagex\\\\RuneScape");
     const index = await loader.getCacheIndex(cacheMajors.mapsquares);
     
     console.log("Valid Archive IDs in Major 5:");
@@ -18,4 +18,5 @@ async function dumpNames() {
 }
 
 dumpNames().catch(console.error);
+
 

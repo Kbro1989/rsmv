@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function bruteForce() {
     console.log("🚀 Sovereign Brute Force Admin Scan — Raw String Forensic");
@@ -33,4 +33,5 @@ async function bruteForce() {
 }
 
 bruteForce().catch(console.error);
+
 

@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const MAJOR_SCRIPTS = 12;
 const MAJOR_ENUMS = 17;
 
@@ -78,4 +78,5 @@ async function scan() {
 }
 
 scan().catch(console.error);
+
 

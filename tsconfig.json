@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"moduleResolution": "node",
+		"skipLibCheck": true,
 		"module": "ESNext",
 		"lib": [
 			"ESNext",
@@ -10,10 +11,8 @@
 		"sourceMap": false,
 		"alwaysStrict": true,
 		"jsx": "react",
-		"allowJs": true,
-		"checkJs": false,
+		"allowJs": false,
 		"strictNullChecks": true,
-		"baseUrl": "./src",
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"esModuleInterop": true,
@@ -21,16 +20,17 @@
 		"resolveJsonModule": true,
 		"noImplicitThis": true,
 		"strictFunctionTypes": true,
-		"strictPropertyInitialization": true,
-		"skipLibCheck": true
+		"strictPropertyInitialization":true
 	},
 	"include": [
 		"src/**/*"
 	],
 	"exclude": [
 		"node_modules",
+		"generated",
+		"scratch",
 		"dist",
-		"generated"
+		"*.ts"
 	],
 	"compileOnSave": false
-}
+}

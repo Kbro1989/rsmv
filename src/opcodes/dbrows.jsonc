@@ -1,11 +1,1192 @@
 {
-"0x03":{"name":"unk01","read":["struct",
-["cols","ubyte"],
-["columndata",["nullarray","ubyte",255,["struct",
-["id",["opt",["$opcode",2],"ubyte"]],
-["primitive","ubyte"],
-["defaultint",["opt","primitive==5","string"]]
-]]]
-]},
-"0x04": { "name": "tableId", "read": "varuint" }
+  "0x01": {
+    "name": "group1",
+    "read": [
+      "struct",
+      [
+        "cols",
+        "ubyte"
+      ],
+      [
+        "columndata",
+        [
+          "nullarray",
+          "ubyte",
+          255,
+          [
+            "struct",
+            [
+              "id",
+              [
+                "ref",
+                "$opcode",
+                [
+                  0,
+                  6
+                ]
+              ]
+            ],
+            [
+              "columns",
+              [
+                "chunkedarray",
+                "ubyte",
+                [
+                  [
+                    "type",
+                    "varushort"
+                  ]
+                ],
+                [
+                  [
+                    "value",
+                    [
+                      "match",
+                      [
+                        "ref",
+                        "type"
+                      ],
+                      {
+                        "0x21": "uint",
+                        "0x24": "string",
+                        "other": "varint"
+                      }
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  },
+  "0x02": {
+    "name": "group2",
+    "read": [
+      "struct",
+      [
+        "cols",
+        "ubyte"
+      ],
+      [
+        "columndata",
+        [
+          "nullarray",
+          "ubyte",
+          255,
+          [
+            "struct",
+            [
+              "id",
+              [
+                "ref",
+                "$opcode",
+                [
+                  0,
+                  6
+                ]
+              ]
+            ],
+            [
+              "columns",
+              [
+                "chunkedarray",
+                "ubyte",
+                [
+                  [
+                    "type",
+                    "varushort"
+                  ]
+                ],
+                [
+                  [
+                    "value",
+                    [
+                      "match",
+                      [
+                        "ref",
+                        "type"
+                      ],
+                      {
+                        "0x21": "uint",
+                        "0x24": "string",
+                        "other": "varint"
+                      }
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  },
+  "0x03": {
+    "name": "group3",
+    "read": [
+      "struct",
+      [
+        "cols",
+        "ubyte"
+      ],
+      [
+        "columndata",
+        [
+          "nullarray",
+          "ubyte",
+          255,
+          [
+            "struct",
+            [
+              "id",
+              [
+                "ref",
+                "$opcode",
+                [
+                  0,
+                  6
+                ]
+              ]
+            ],
+            [
+              "columns",
+              [
+                "chunkedarray",
+                "ubyte",
+                [
+                  [
+                    "type",
+                    "varushort"
+                  ]
+                ],
+                [
+                  [
+                    "value",
+                    [
+                      "match",
+                      [
+                        "ref",
+                        "type"
+                      ],
+                      {
+                        "0x21": "uint",
+                        "0x24": "string",
+                        "other": "varint"
+                      }
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  },
+  "0x04": {
+    "name": "tableId",
+    "read": "varushort"
+  },
+  "0x05": {
+    "name": "unk5",
+    "read": "ubyte"
+  },
+  "0x06": {
+    "name": "unk6",
+    "read": "ubyte"
+  },
+  "0x07": {
+    "name": "unk7",
+    "read": "ubyte"
+  },
+  "0x08": {
+    "name": "unk8",
+    "read": "ubyte"
+  },
+  "0x09": {
+    "name": "unk9",
+    "read": "ubyte"
+  },
+  "0x0a": {
+    "name": "unk10",
+    "read": "ubyte"
+  },
+  "0x0b": {
+    "name": "unk11",
+    "read": "ubyte"
+  },
+  "0x0c": {
+    "name": "unk12",
+    "read": "ubyte"
+  },
+  "0x0d": {
+    "name": "unk13",
+    "read": "ubyte"
+  },
+  "0x0e": {
+    "name": "unk14",
+    "read": "ubyte"
+  },
+  "0x0f": {
+    "name": "unk15",
+    "read": "ubyte"
+  },
+  "0x10": {
+    "name": "unk16",
+    "read": "ubyte"
+  },
+  "0x11": {
+    "name": "unk17",
+    "read": "ubyte"
+  },
+  "0x12": {
+    "name": "unk18",
+    "read": "ubyte"
+  },
+  "0x13": {
+    "name": "unk19",
+    "read": "ubyte"
+  },
+  "0x14": {
+    "name": "unk20",
+    "read": "ubyte"
+  },
+  "0x15": {
+    "name": "unk21",
+    "read": "ubyte"
+  },
+  "0x16": {
+    "name": "unk22",
+    "read": "ubyte"
+  },
+  "0x17": {
+    "name": "unk23",
+    "read": "ubyte"
+  },
+  "0x18": {
+    "name": "unk24",
+    "read": "ubyte"
+  },
+  "0x19": {
+    "name": "unk25",
+    "read": "ubyte"
+  },
+  "0x1a": {
+    "name": "unk26",
+    "read": "ubyte"
+  },
+  "0x1b": {
+    "name": "unk27",
+    "read": "ubyte"
+  },
+  "0x1c": {
+    "name": "unk28",
+    "read": "ubyte"
+  },
+  "0x1d": {
+    "name": "unk29",
+    "read": "ubyte"
+  },
+  "0x1e": {
+    "name": "unk30",
+    "read": "ubyte"
+  },
+  "0x1f": {
+    "name": "unk31",
+    "read": "ubyte"
+  },
+  "0x20": {
+    "name": "unk32",
+    "read": "ubyte"
+  },
+  "0x21": {
+    "name": "unk33",
+    "read": "ubyte"
+  },
+  "0x22": {
+    "name": "unk34",
+    "read": "ubyte"
+  },
+  "0x23": {
+    "name": "unk35",
+    "read": "ubyte"
+  },
+  "0x24": {
+    "name": "unk36",
+    "read": "ubyte"
+  },
+  "0x25": {
+    "name": "unk37",
+    "read": "ubyte"
+  },
+  "0x26": {
+    "name": "unk38",
+    "read": "ubyte"
+  },
+  "0x27": {
+    "name": "unk39",
+    "read": "ubyte"
+  },
+  "0x28": {
+    "name": "unk40",
+    "read": "ubyte"
+  },
+  "0x29": {
+    "name": "unk41",
+    "read": "ubyte"
+  },
+  "0x2a": {
+    "name": "unk42",
+    "read": "ubyte"
+  },
+  "0x2b": {
+    "name": "unk43",
+    "read": "ubyte"
+  },
+  "0x2c": {
+    "name": "unk44",
+    "read": "ubyte"
+  },
+  "0x2d": {
+    "name": "unk45",
+    "read": "ubyte"
+  },
+  "0x2e": {
+    "name": "unk46",
+    "read": "ubyte"
+  },
+  "0x2f": {
+    "name": "unk47",
+    "read": "ubyte"
+  },
+  "0x30": {
+    "name": "unk48",
+    "read": "ubyte"
+  },
+  "0x31": {
+    "name": "unk49",
+    "read": "ubyte"
+  },
+  "0x32": {
+    "name": "unk50",
+    "read": "ubyte"
+  },
+  "0x33": {
+    "name": "unk51",
+    "read": "ubyte"
+  },
+  "0x34": {
+    "name": "unk52",
+    "read": "ubyte"
+  },
+  "0x35": {
+    "name": "unk53",
+    "read": "ubyte"
+  },
+  "0x36": {
+    "name": "unk54",
+    "read": "ubyte"
+  },
+  "0x37": {
+    "name": "unk55",
+    "read": "ubyte"
+  },
+  "0x38": {
+    "name": "unk56",
+    "read": "ubyte"
+  },
+  "0x39": {
+    "name": "unk57",
+    "read": "ubyte"
+  },
+  "0x3a": {
+    "name": "unk58",
+    "read": "ubyte"
+  },
+  "0x3b": {
+    "name": "unk59",
+    "read": "ubyte"
+  },
+  "0x3c": {
+    "name": "unk60",
+    "read": "ubyte"
+  },
+  "0x3d": {
+    "name": "unk61",
+    "read": "ubyte"
+  },
+  "0x3e": {
+    "name": "unk62",
+    "read": "ubyte"
+  },
+  "0x3f": {
+    "name": "unk63",
+    "read": "ubyte"
+  },
+  "0x40": {
+    "name": "unk64",
+    "read": "ubyte"
+  },
+  "0x41": {
+    "name": "unk65",
+    "read": "ubyte"
+  },
+  "0x42": {
+    "name": "unk66",
+    "read": "ubyte"
+  },
+  "0x43": {
+    "name": "unk67",
+    "read": "ubyte"
+  },
+  "0x44": {
+    "name": "unk68",
+    "read": "ubyte"
+  },
+  "0x45": {
+    "name": "unk69",
+    "read": "ubyte"
+  },
+  "0x46": {
+    "name": "unk70",
+    "read": "ubyte"
+  },
+  "0x47": {
+    "name": "unk71",
+    "read": "ubyte"
+  },
+  "0x48": {
+    "name": "unk72",
+    "read": "ubyte"
+  },
+  "0x49": {
+    "name": "unk73",
+    "read": "ubyte"
+  },
+  "0x4a": {
+    "name": "unk74",
+    "read": "ubyte"
+  },
+  "0x4b": {
+    "name": "unk75",
+    "read": "ubyte"
+  },
+  "0x4c": {
+    "name": "unk76",
+    "read": "ubyte"
+  },
+  "0x4d": {
+    "name": "unk77",
+    "read": "ubyte"
+  },
+  "0x4e": {
+    "name": "unk78",
+    "read": "ubyte"
+  },
+  "0x4f": {
+    "name": "unk79",
+    "read": "ubyte"
+  },
+  "0x50": {
+    "name": "unk80",
+    "read": "ubyte"
+  },
+  "0x51": {
+    "name": "unk81",
+    "read": "ubyte"
+  },
+  "0x52": {
+    "name": "unk82",
+    "read": "ubyte"
+  },
+  "0x53": {
+    "name": "unk83",
+    "read": "ubyte"
+  },
+  "0x54": {
+    "name": "unk84",
+    "read": "ubyte"
+  },
+  "0x55": {
+    "name": "unk85",
+    "read": "ubyte"
+  },
+  "0x56": {
+    "name": "unk86",
+    "read": "ubyte"
+  },
+  "0x57": {
+    "name": "unk87",
+    "read": "ubyte"
+  },
+  "0x58": {
+    "name": "unk88",
+    "read": "ubyte"
+  },
+  "0x59": {
+    "name": "unk89",
+    "read": "ubyte"
+  },
+  "0x5a": {
+    "name": "unk90",
+    "read": "ubyte"
+  },
+  "0x5b": {
+    "name": "unk91",
+    "read": "ubyte"
+  },
+  "0x5c": {
+    "name": "unk92",
+    "read": "ubyte"
+  },
+  "0x5d": {
+    "name": "unk93",
+    "read": "ubyte"
+  },
+  "0x5e": {
+    "name": "unk94",
+    "read": "ubyte"
+  },
+  "0x5f": {
+    "name": "unk95",
+    "read": "ubyte"
+  },
+  "0x60": {
+    "name": "unk96",
+    "read": "ubyte"
+  },
+  "0x61": {
+    "name": "unk97",
+    "read": "ubyte"
+  },
+  "0x62": {
+    "name": "unk98",
+    "read": "ubyte"
+  },
+  "0x63": {
+    "name": "unk99",
+    "read": "ubyte"
+  },
+  "0x64": {
+    "name": "unk100",
+    "read": "ubyte"
+  },
+  "0x65": {
+    "name": "unk101",
+    "read": "ubyte"
+  },
+  "0x66": {
+    "name": "unk102",
+    "read": "ubyte"
+  },
+  "0x67": {
+    "name": "unk103",
+    "read": "ubyte"
+  },
+  "0x68": {
+    "name": "unk104",
+    "read": "ubyte"
+  },
+  "0x69": {
+    "name": "unk105",
+    "read": "ubyte"
+  },
+  "0x6a": {
+    "name": "unk106",
+    "read": "ubyte"
+  },
+  "0x6b": {
+    "name": "unk107",
+    "read": "ubyte"
+  },
+  "0x6c": {
+    "name": "unk108",
+    "read": "ubyte"
+  },
+  "0x6d": {
+    "name": "unk109",
+    "read": "ubyte"
+  },
+  "0x6e": {
+    "name": "unk110",
+    "read": "ubyte"
+  },
+  "0x6f": {
+    "name": "unk111",
+    "read": "ubyte"
+  },
+  "0x70": {
+    "name": "unk112",
+    "read": "ubyte"
+  },
+  "0x71": {
+    "name": "unk113",
+    "read": "ubyte"
+  },
+  "0x72": {
+    "name": "unk114",
+    "read": "ubyte"
+  },
+  "0x73": {
+    "name": "unk115",
+    "read": "ubyte"
+  },
+  "0x74": {
+    "name": "unk116",
+    "read": "ubyte"
+  },
+  "0x75": {
+    "name": "unk117",
+    "read": "ubyte"
+  },
+  "0x76": {
+    "name": "unk118",
+    "read": "ubyte"
+  },
+  "0x77": {
+    "name": "unk119",
+    "read": "ubyte"
+  },
+  "0x78": {
+    "name": "unk120",
+    "read": "ubyte"
+  },
+  "0x79": {
+    "name": "unk121",
+    "read": "ubyte"
+  },
+  "0x7a": {
+    "name": "unk122",
+    "read": "ubyte"
+  },
+  "0x7b": {
+    "name": "unk123",
+    "read": "ubyte"
+  },
+  "0x7c": {
+    "name": "unk124",
+    "read": "ubyte"
+  },
+  "0x7d": {
+    "name": "unk125",
+    "read": "ubyte"
+  },
+  "0x7e": {
+    "name": "unk126",
+    "read": "ubyte"
+  },
+  "0x7f": {
+    "name": "unk127",
+    "read": "ubyte"
+  },
+  "0x80": {
+    "name": "unk128",
+    "read": "ubyte"
+  },
+  "0x81": {
+    "name": "unk129",
+    "read": "ubyte"
+  },
+  "0x82": {
+    "name": "unk130",
+    "read": "ubyte"
+  },
+  "0x83": {
+    "name": "unk131",
+    "read": "ubyte"
+  },
+  "0x84": {
+    "name": "unk132",
+    "read": "ubyte"
+  },
+  "0x85": {
+    "name": "unk133",
+    "read": "ubyte"
+  },
+  "0x86": {
+    "name": "unk134",
+    "read": "ubyte"
+  },
+  "0x87": {
+    "name": "unk135",
+    "read": "ubyte"
+  },
+  "0x88": {
+    "name": "unk136",
+    "read": "ubyte"
+  },
+  "0x89": {
+    "name": "unk137",
+    "read": "ubyte"
+  },
+  "0x8a": {
+    "name": "unk138",
+    "read": "ubyte"
+  },
+  "0x8b": {
+    "name": "unk139",
+    "read": "ubyte"
+  },
+  "0x8c": {
+    "name": "unk140",
+    "read": "ubyte"
+  },
+  "0x8d": {
+    "name": "unk141",
+    "read": "ubyte"
+  },
+  "0x8e": {
+    "name": "unk142",
+    "read": "ubyte"
+  },
+  "0x8f": {
+    "name": "unk143",
+    "read": "ubyte"
+  },
+  "0x90": {
+    "name": "unk144",
+    "read": "ubyte"
+  },
+  "0x91": {
+    "name": "unk145",
+    "read": "ubyte"
+  },
+  "0x92": {
+    "name": "unk146",
+    "read": "ubyte"
+  },
+  "0x93": {
+    "name": "unk147",
+    "read": "ubyte"
+  },
+  "0x94": {
+    "name": "unk148",
+    "read": "ubyte"
+  },
+  "0x95": {
+    "name": "unk149",
+    "read": "ubyte"
+  },
+  "0x96": {
+    "name": "unk150",
+    "read": "ubyte"
+  },
+  "0x97": {
+    "name": "unk151",
+    "read": "ubyte"
+  },
+  "0x98": {
+    "name": "unk152",
+    "read": "ubyte"
+  },
+  "0x99": {
+    "name": "unk153",
+    "read": "ubyte"
+  },
+  "0x9a": {
+    "name": "unk154",
+    "read": "ubyte"
+  },
+  "0x9b": {
+    "name": "unk155",
+    "read": "ubyte"
+  },
+  "0x9c": {
+    "name": "unk156",
+    "read": "ubyte"
+  },
+  "0x9d": {
+    "name": "unk157",
+    "read": "ubyte"
+  },
+  "0x9e": {
+    "name": "unk158",
+    "read": "ubyte"
+  },
+  "0x9f": {
+    "name": "unk159",
+    "read": "ubyte"
+  },
+  "0xa0": {
+    "name": "unk160",
+    "read": "ubyte"
+  },
+  "0xa1": {
+    "name": "unk161",
+    "read": "ubyte"
+  },
+  "0xa2": {
+    "name": "unk162",
+    "read": "ubyte"
+  },
+  "0xa3": {
+    "name": "unk163",
+    "read": "ubyte"
+  },
+  "0xa4": {
+    "name": "unk164",
+    "read": "ubyte"
+  },
+  "0xa5": {
+    "name": "unk165",
+    "read": "ubyte"
+  },
+  "0xa6": {
+    "name": "unk166",
+    "read": "ubyte"
+  },
+  "0xa7": {
+    "name": "unk167",
+    "read": "ubyte"
+  },
+  "0xa8": {
+    "name": "unk168",
+    "read": "ubyte"
+  },
+  "0xa9": {
+    "name": "unk169",
+    "read": "ubyte"
+  },
+  "0xaa": {
+    "name": "unk170",
+    "read": "ubyte"
+  },
+  "0xab": {
+    "name": "unk171",
+    "read": "ubyte"
+  },
+  "0xac": {
+    "name": "unk172",
+    "read": "ubyte"
+  },
+  "0xad": {
+    "name": "unk173",
+    "read": "ubyte"
+  },
+  "0xae": {
+    "name": "unk174",
+    "read": "ubyte"
+  },
+  "0xaf": {
+    "name": "unk175",
+    "read": "ubyte"
+  },
+  "0xb0": {
+    "name": "unk176",
+    "read": "ubyte"
+  },
+  "0xb1": {
+    "name": "unk177",
+    "read": "ubyte"
+  },
+  "0xb2": {
+    "name": "unk178",
+    "read": "ubyte"
+  },
+  "0xb3": {
+    "name": "unk179",
+    "read": "ubyte"
+  },
+  "0xb4": {
+    "name": "unk180",
+    "read": "ubyte"
+  },
+  "0xb5": {
+    "name": "unk181",
+    "read": "ubyte"
+  },
+  "0xb6": {
+    "name": "unk182",
+    "read": "ubyte"
+  },
+  "0xb7": {
+    "name": "unk183",
+    "read": "ubyte"
+  },
+  "0xb8": {
+    "name": "unk184",
+    "read": "ubyte"
+  },
+  "0xb9": {
+    "name": "unk185",
+    "read": "ubyte"
+  },
+  "0xba": {
+    "name": "unk186",
+    "read": "ubyte"
+  },
+  "0xbb": {
+    "name": "unk187",
+    "read": "ubyte"
+  },
+  "0xbc": {
+    "name": "unk188",
+    "read": "ubyte"
+  },
+  "0xbd": {
+    "name": "unk189",
+    "read": "ubyte"
+  },
+  "0xbe": {
+    "name": "unk190",
+    "read": "ubyte"
+  },
+  "0xbf": {
+    "name": "unk191",
+    "read": "ubyte"
+  },
+  "0xc0": {
+    "name": "unk192",
+    "read": "ubyte"
+  },
+  "0xc1": {
+    "name": "unk193",
+    "read": "ubyte"
+  },
+  "0xc2": {
+    "name": "unk194",
+    "read": "ubyte"
+  },
+  "0xc3": {
+    "name": "unk195",
+    "read": "ubyte"
+  },
+  "0xc4": {
+    "name": "unk196",
+    "read": "ubyte"
+  },
+  "0xc5": {
+    "name": "unk197",
+    "read": "ubyte"
+  },
+  "0xc6": {
+    "name": "unk198",
+    "read": "ubyte"
+  },
+  "0xc7": {
+    "name": "unk199",
+    "read": "ubyte"
+  },
+  "0xc8": {
+    "name": "unk200",
+    "read": "ubyte"
+  },
+  "0xc9": {
+    "name": "unk201",
+    "read": "ubyte"
+  },
+  "0xca": {
+    "name": "unk202",
+    "read": "ubyte"
+  },
+  "0xcb": {
+    "name": "unk203",
+    "read": "ubyte"
+  },
+  "0xcc": {
+    "name": "unk204",
+    "read": "ubyte"
+  },
+  "0xcd": {
+    "name": "unk205",
+    "read": "ubyte"
+  },
+  "0xce": {
+    "name": "unk206",
+    "read": "ubyte"
+  },
+  "0xcf": {
+    "name": "unk207",
+    "read": "ubyte"
+  },
+  "0xd0": {
+    "name": "unk208",
+    "read": "ubyte"
+  },
+  "0xd1": {
+    "name": "unk209",
+    "read": "ubyte"
+  },
+  "0xd2": {
+    "name": "unk210",
+    "read": "ubyte"
+  },
+  "0xd3": {
+    "name": "unk211",
+    "read": "ubyte"
+  },
+  "0xd4": {
+    "name": "unk212",
+    "read": "ubyte"
+  },
+  "0xd5": {
+    "name": "unk213",
+    "read": "ubyte"
+  },
+  "0xd6": {
+    "name": "unk214",
+    "read": "ubyte"
+  },
+  "0xd7": {
+    "name": "unk215",
+    "read": "ubyte"
+  },
+  "0xd8": {
+    "name": "unk216",
+    "read": "ubyte"
+  },
+  "0xd9": {
+    "name": "unk217",
+    "read": "ubyte"
+  },
+  "0xda": {
+    "name": "unk218",
+    "read": "ubyte"
+  },
+  "0xdb": {
+    "name": "unk219",
+    "read": "ubyte"
+  },
+  "0xdc": {
+    "name": "unk220",
+    "read": "ubyte"
+  },
+  "0xdd": {
+    "name": "unk221",
+    "read": "ubyte"
+  },
+  "0xde": {
+    "name": "unk222",
+    "read": "ubyte"
+  },
+  "0xdf": {
+    "name": "unk223",
+    "read": "ubyte"
+  },
+  "0xe0": {
+    "name": "unk224",
+    "read": "ubyte"
+  },
+  "0xe1": {
+    "name": "unk225",
+    "read": "ubyte"
+  },
+  "0xe2": {
+    "name": "unk226",
+    "read": "ubyte"
+  },
+  "0xe3": {
+    "name": "unk227",
+    "read": "ubyte"
+  },
+  "0xe4": {
+    "name": "unk228",
+    "read": "ubyte"
+  },
+  "0xe5": {
+    "name": "unk229",
+    "read": "ubyte"
+  },
+  "0xe6": {
+    "name": "unk230",
+    "read": "ubyte"
+  },
+  "0xe7": {
+    "name": "unk231",
+    "read": "ubyte"
+  },
+  "0xe8": {
+    "name": "unk232",
+    "read": "ubyte"
+  },
+  "0xe9": {
+    "name": "unk233",
+    "read": "ubyte"
+  },
+  "0xea": {
+    "name": "unk234",
+    "read": "ubyte"
+  },
+  "0xeb": {
+    "name": "unk235",
+    "read": "ubyte"
+  },
+  "0xec": {
+    "name": "unk236",
+    "read": "ubyte"
+  },
+  "0xed": {
+    "name": "unk237",
+    "read": "ubyte"
+  },
+  "0xee": {
+    "name": "unk238",
+    "read": "ubyte"
+  },
+  "0xef": {
+    "name": "unk239",
+    "read": "ubyte"
+  },
+  "0xf0": {
+    "name": "unk240",
+    "read": "ubyte"
+  },
+  "0xf1": {
+    "name": "unk241",
+    "read": "ubyte"
+  },
+  "0xf2": {
+    "name": "unk242",
+    "read": "ubyte"
+  },
+  "0xf3": {
+    "name": "unk243",
+    "read": "ubyte"
+  },
+  "0xf4": {
+    "name": "unk244",
+    "read": "ubyte"
+  },
+  "0xf5": {
+    "name": "unk245",
+    "read": "ubyte"
+  },
+  "0xf6": {
+    "name": "unk246",
+    "read": "ubyte"
+  },
+  "0xf7": {
+    "name": "unk247",
+    "read": "ubyte"
+  },
+  "0xf8": {
+    "name": "unk248",
+    "read": "ubyte"
+  },
+  "0xf9": {
+    "name": "unk249",
+    "read": "ubyte"
+  },
+  "0xfa": {
+    "name": "unk250",
+    "read": "ubyte"
+  },
+  "0xfb": {
+    "name": "unk251",
+    "read": "ubyte"
+  },
+  "0xfc": {
+    "name": "unk252",
+    "read": "ubyte"
+  },
+  "0xfd": {
+    "name": "unk253",
+    "read": "ubyte"
+  },
+  "0xfe": {
+    "name": "unk254",
+    "read": "ubyte"
+  }
 }

@@ -12,7 +12,7 @@ const __local_dirname = typeof __dirname !== 'undefined'
 	: path.dirname(fileURLToPath(eval('import.meta.url')));
 
 const readJsonc = (relPath: string) => {
-	const fullPath = path.join(__local_dirname, relPath);
+	const fullPath = path.join(__local_dirname, "..", relPath);
 	return fs.readFileSync(fullPath, "utf-8");
 };
 
@@ -47,17 +47,17 @@ export class FileParser<T> {
 		if (state.scan != state.endoffset) {
 			bytesleftoverwarncount++;
 			if (bytesleftoverwarncount < 100) {
-				console.log(`bytes left over after decoding file: ${state.endoffset - state.scan}`);
+				// console.log(`bytes left over after decoding file: ${state.endoffset - state.scan}`);
 				// let name = `cache/bonusbytes-${Date.now()}.bin`;
 				// require("fs").writeFileSync(name, scanbuf.slice(scanbuf.scan));
 			}
 			if (bytesleftoverwarncount == 100) {
-				console.log("too many bytes left over warning, no more warnings will be logged");
+				// console.log("too many bytes left over warning, no more warnings will be logged");
 			}
 			// TODO remove this stupid condition, needed this to fail only in some situations
 			if (state.buffer.byteLength < 100000) {
 				// throw new Error(`bytes left over after decoding file: ${state.endoffset - state.scan}`);
-				if (bytesleftoverwarncount < 5) console.log(`Warning: bytes left over (${state.endoffset - state.scan}) but continuing...`);
+				// if (bytesleftoverwarncount < 5) console.log(`Warning: bytes left over (${state.endoffset - state.scan}) but continuing...`);
 			}
 		}
 		return res;
@@ -120,8 +120,8 @@ function allParsers() {
 		object: FileParser.fromJson<import("../generated/objects").objects>(readJsonc("./opcodes/objects.jsonc")),
 		achievement: FileParser.fromJson<import("../generated/achievements").achievements>(readJsonc("./opcodes/achievements.jsonc")),
 		mapsquareTiles: FileParser.fromJson<import("../generated/mapsquare_tiles").mapsquare_tiles>(readJsonc("./opcodes/mapsquare_tiles.jsonc")),
-		mapsquareTiles64: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_64.jsonc")),
-		mapsquareTiles66: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_66.jsonc")),
+		// mapsquareTiles64: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_64.jsonc")),
+		// mapsquareTiles66: FileParser.fromJson<any>(readJsonc("./opcodes/mapsquare_tiles_66.jsonc")),
 		mapsquareTilesNxt: FileParser.fromJson<import("../generated/mapsquare_tiles_nxt").mapsquare_tiles_nxt>(readJsonc("./opcodes/mapsquare_tiles_nxt.jsonc")),
 		mapsquareWaterTiles: FileParser.fromJson<import("../generated/mapsquare_watertiles").mapsquare_watertiles>(readJsonc("./opcodes/mapsquare_watertiles.json")),
 		mapsquareUnderlays: FileParser.fromJson<import("../generated/mapsquare_underlays").mapsquare_underlays>(readJsonc("./opcodes/mapsquare_underlays.jsonc")),
@@ -130,7 +130,7 @@ function allParsers() {
 		mapsquareEnvironment: FileParser.fromJson<import("../generated/mapsquare_envs").mapsquare_envs>(readJsonc("./opcodes/mapsquare_envs.jsonc")),
 		mapZones: FileParser.fromJson<import("../generated/mapzones").mapzones>(readJsonc("./opcodes/mapzones.json")),
 		enums: FileParser.fromJson<import("../generated/enums").enums>(readJsonc("./opcodes/enums.json")),
-		fontmetrics: FileParser.fromJson<import("../generated/fontmetrics").fontmetrics>(readJsonc("./opcodes/fontmetrics.jsonc")),
+		// fontmetrics: FileParser.fromJson<import("../generated/fontmetrics").fontmetrics>(readJsonc("./opcodes/fontmetrics.jsonc")),
 		mapscenes: FileParser.fromJson<import("../generated/mapscenes").mapscenes>(readJsonc("./opcodes/mapscenes.json")),
 		sequences: FileParser.fromJson<import("../generated/sequences").sequences>(readJsonc("./opcodes/sequences.json")),
 		framemaps: FileParser.fromJson<import("../generated/framemaps").framemaps>(readJsonc("./opcodes/framemaps.jsonc")),

@@ -31,7 +31,8 @@ module.exports = {
 				loader: 'ts-loader',
 				exclude: /node_modules/,
 				options: {
-					onlyCompileBundledFiles: true
+					onlyCompileBundledFiles: true,
+					transpileOnly: true
 				}
 			},
 			{
@@ -53,8 +54,7 @@ module.exports = {
 	resolve: {
 		extensions: ['.tsx', '.ts', '.js'],
 		extensionAlias: {
-			'.js': ['.ts', '.js'],
-			'.mjs': ['.mts', '.mjs']
+			".js": [".ts", ".tsx", ".js"]
 		},
 		alias: {
 			fs: false,
@@ -63,6 +63,8 @@ module.exports = {
 			sharp: false,
 			net: false,
 			sqlite3: false,
+			url: false,
+			os: false,
 			process: require.resolve('process/browser'),
 			"electron/renderer": false
 		},
@@ -72,7 +74,6 @@ module.exports = {
 			util: require.resolve('util/'),
 			assert: require.resolve('assert/'),
 			stream: require.resolve('stream-browserify'),
-			url: false
 		}
 	},
 	output: {

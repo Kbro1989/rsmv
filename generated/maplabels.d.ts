@@ -69,7 +69,8 @@ export type maplabels = {
 	unknown_1c?: number | null
 	unknown_1e?: number | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null

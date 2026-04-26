@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function probeLocales(target: string) {
     console.log(`🔍 Searching for "${target}" in Major 34 (Locales)...`);
@@ -34,4 +34,5 @@ async function probeLocales(target: string) {
 
 const target = process.argv[2] || "Observatory professor";
 probeLocales(target).catch(console.error);
+
 

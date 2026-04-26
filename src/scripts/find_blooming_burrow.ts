@@ -5,7 +5,7 @@ import { parse } from "../opdecoder";
 import { cacheMajors } from "../constants";
 import { archiveToFileId } from "../cache";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function findBloomingBurrow() {
 	if (!fs.existsSync(CACHE_DIR)) {
@@ -98,4 +98,5 @@ findBloomingBurrow().catch(err => {
 	console.error(err);
 	process.exit(1);
 });
+
 

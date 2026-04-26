@@ -8,17 +8,5 @@ export type clientscript = {
 	switches: {
 		value: number,
 		jump: number,
-	}[][],
-	longargcount: number,
-	stringargcount: number,
-	intargcount: number,
-	locallongcount: number,
-	localstringcount: number,
-	localintcount: number,
-	instructioncount: number,
-	opcodedata: {
-		opcode:number,
-		imm:number,
-		imm_obj:number|string|[number,number]|null,
 	}[],
 };

@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const SEXTANT_ID = 2574;
 
 async function probeSextant() {
@@ -36,4 +36,5 @@ async function probeSextant() {
 }
 
 probeSextant().catch(console.error);
+
 

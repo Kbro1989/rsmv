@@ -3,7 +3,7 @@ import { cacheMajors, cacheConfigPages } from "../constants";
 import { parse } from "../opdecoder";
 import * as fs from "fs";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const OUTPUT_PATH = "D:\\sovereign\\memory\\pedagogy\\prifddinas_research_results.json";
 
 async function research() {
@@ -105,4 +105,5 @@ async function research() {
 }
 
 research().catch(console.error);
+
 

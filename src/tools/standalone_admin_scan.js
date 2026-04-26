@@ -4,7 +4,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 
 // Path to your RuneScape cache
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const MAJOR_CLIENTSCRIPT = 12;
 
 function decompress(data) {
@@ -71,4 +71,5 @@ async function scan() {
 }
 
 scan().catch(console.error);
+
 

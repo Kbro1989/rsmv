@@ -4,7 +4,7 @@ import { cacheMajors } from "../constants";
 import * as fs from "fs";
 import * as path from "path";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const SCRIPT_ID = 1537;
 const OUTPUT_DIR = "D:\\sovereign\\atlas\\forensics";
 
@@ -42,4 +42,5 @@ async function main() {
 }
 
 main().catch(console.error);
+
 

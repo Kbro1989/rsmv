@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const TARGET_ID = 16441;
 
 async function analyze() {
@@ -46,4 +46,5 @@ async function analyze() {
 }
 
 analyze().catch(console.error);
+
 

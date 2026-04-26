@@ -8,6 +8,7 @@ const logger = createLogger('RSMVCacheDB');
 export interface GroundedEntity {
     entity_type: 'npc' | 'object';
     entity_id: number;
+    entity_name?: string;
     x: number;
     y: number;        // renamed from z in some parsers — keeping consistent with RS coords
     z: number;
@@ -37,6 +38,7 @@ export class RSMVCacheDB {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 entity_type TEXT NOT NULL,
                 entity_id INTEGER NOT NULL,
+                entity_name TEXT,
                 x INTEGER NOT NULL,
                 y INTEGER NOT NULL,
                 z INTEGER NOT NULL,
@@ -60,13 +62,14 @@ export class RSMVCacheDB {
     public insertGrounded(entity: GroundedEntity): void {
         const stmt = this.db.prepare(`
             INSERT OR REPLACE INTO grounded_entities 
-            (entity_type, entity_id, x, y, z, plane, zone_id, varbit_flags, is_morphic, has_actions, material_flags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (entity_type, entity_id, entity_name, x, y, z, plane, zone_id, varbit_flags, is_morphic, has_actions, material_flags)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         stmt.run(
             entity.entity_type,
             entity.entity_id,
+            entity.entity_name || null,
             entity.x,
             entity.y,
             entity.z,

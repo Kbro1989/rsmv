@@ -1,7 +1,7 @@
 import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function findNpcByName(targetName: string) {
     console.log(`🔍 Searching for raw string: "${targetName}" in Major ${cacheMajors.npcs}...`);
@@ -26,4 +26,5 @@ async function start() {
 }
 
 start().catch(console.error);
+
 

@@ -5,7 +5,7 @@ import * as fs from 'fs';
 
 async function extractVocabulary() {
     console.log("== Sovereign Forensic Logic: Live Vocabulary Extractor ==");
-    const cache = new GameCacheLoader('C:\ProgramData\Jagex\RuneScape');
+    const cache = new GameCacheLoader('C:\\\\ProgramData\\\\Jagex\\\\RuneScape');
     const vocabulary: Record<string, number> = {};
 
     const configs = [
@@ -58,4 +58,5 @@ async function extractVocabulary() {
 }
 
 extractVocabulary().catch(console.error);
+
 

@@ -239,10 +239,9 @@ export type objects = {
 		default: number,
 	} | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null
-	morphs_1?: { unk1: number, unk2: number[], unk3: number } | null
-	morphs_2?: { unk1: number, unk2: number, unk3: number[], unk4: number } | null
 };

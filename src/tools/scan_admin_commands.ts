@@ -3,7 +3,7 @@ import { cacheMajors } from "../constants";
 import { prepareClientScript } from "../clientscript/index";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function scanAdminCommands() {
     console.log(`🔍 Scanning ClientScripts (Archive 12) for Admin Commands...`);
@@ -71,4 +71,5 @@ async function scanAdminCommands() {
 }
 
 scanAdminCommands().catch(console.error);
+
 

@@ -22,11 +22,11 @@ const RSMV_ROOT = path.resolve(__dirname, '../../..');
 
 async function runDiscovery(regionId: number) {
     console.log(`\n[FORENSIC DISCOVERY] Region: ${regionId}`);
-    console.log(`[STATUS] Connecting to Jagex Cache: C:\ProgramData\Jagex\RuneScape`);
+    console.log(`[STATUS] Connecting to Jagex Cache: C:\\\\ProgramData\\\\Jagex\\\\RuneScape`);
 
     // In a real execution, we would import these. For this draft, I'm outlining
     // the precise forensic query logic.
-    const cachePath = "C:\ProgramData\Jagex\RuneScape";
+    const cachePath = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
     
     // Discovery Target: Prifddinas (8755)
     // Coordinates: (regionId >> 8, regionId & 0xFF) => (34, 51)
@@ -81,4 +81,5 @@ async function runDiscovery(regionId: number) {
 runDiscovery(8755).catch(err => {
     console.error(`[FAILURE] Discovery aborted: ${err.message}`);
 });
+
 

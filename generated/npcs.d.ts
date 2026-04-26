@@ -39,7 +39,7 @@ export type npcs = {
 	modelContract?: number | null
 	head_icon_data?: number | null
 	unknown_67?: number | null
-	varbitId?: {
+	morphs_1?: {
 		unk1: number,
 		unk2: number[],
 		unk3: (number|number),
@@ -59,7 +59,7 @@ export type npcs = {
 		number,
 		number,
 	] | null
-	varpId?: {
+	morphs_2?: {
 		unk1: number,
 		unk2: number,
 		unk3: number[],
@@ -140,7 +140,7 @@ export type npcs = {
 	unknown_B4?: number | null
 	unknown_B5?: {
 		unknown_1: number,
-		unknown_2: number,
+		unsigned byte: number,
 	} | null
 	unknown_B6?: true | null
 	unknown_B7?: number | null
@@ -201,11 +201,10 @@ export type npcs = {
 	} | null
 	unknown_DB?: number | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null
 	unknown_FD?: number | null
-	morphs_1?: { unk1: number, unk2: number[], unk3: number } | null
-	morphs_2?: { unk1: number, unk2: number, unk3: number[], unk4: number } | null
 };

@@ -5,7 +5,7 @@ import { parse } from './opdecoder';
 
 async function resolveLumbridgeObjects() {
     const data = JSON.parse(fs.readFileSync("D:\\Users\\POG2\\Desktop\\pog-vibe-interactive\\files\\public\\ms_50_50.json", 'utf-8'));
-    const cache = new GameCacheLoader("C:\ProgramData\Jagex\RuneScape");
+    const cache = new GameCacheLoader("C:\\\\ProgramData\\\\Jagex\\\\RuneScape");
 
     console.log("[GODHEAD] Resolving Object Names for ms_50_50...");
 
@@ -35,4 +35,5 @@ async function resolveLumbridgeObjects() {
 }
 
 resolveLumbridgeObjects();
+
 

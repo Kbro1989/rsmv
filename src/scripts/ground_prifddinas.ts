@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 const PRIIF_LODESTONE_ID = 93371;
 
 async function groundPrifddinas() {
@@ -62,4 +62,5 @@ async function groundPrifddinas() {
 }
 
 groundPrifddinas().catch(console.error);
+
 

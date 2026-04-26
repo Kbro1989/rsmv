@@ -2,7 +2,7 @@ import { GameCacheLoader } from "../cache/sqlite";
 import { cacheMajors, cacheConfigPages } from "../constants";
 import { parse } from "../opdecoder";
 
-const CACHE_DIR = "C:\ProgramData\Jagex\RuneScape";
+const CACHE_DIR = "C:\\\\ProgramData\\\\Jagex\\\\RuneScape";
 
 async function probeAllTables() {
     console.log(`🔍 Probing ALL DBTables for Spatial Columns (Major ${cacheMajors.config}, Archive ${cacheConfigPages.dbtables})...`);
@@ -46,4 +46,5 @@ async function probeAllTables() {
 }
 
 probeAllTables().catch(console.error);
+
 
