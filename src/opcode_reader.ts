@@ -1,6 +1,6 @@
-import { lastLegacyBuildnr } from "./constants";
+import { lastLegacyBuildnr } from "./constants.js";
 import type * as jsonschema from "json-schema";
-import type { ClientscriptObfuscation } from "./clientscript/callibrator";
+import type { ClientscriptObfuscation } from "./clientscript/callibrator.js";
 
 export type TypeDef = { [name: string]: unknown };
 
@@ -54,9 +54,13 @@ export type ChunkParser = {
 	read(state: DecodeState): any,
 	write(state: EncodeState, v: unknown): void,
 	getTypescriptType(indent: string): string,
-	getJsonSchema(): jsonschema.JSONSchema6Definition,
+	getJsonSchema(): any,
 	readConst?(state: SharedEncoderState): any
 }
+
+var parserFunctions: any;
+var parserPrimitives: any;
+var hardcodes: any;
 
 type ChunkParentCallback = (prop: string, childresolve: ResolvedReference) => ResolvedReference;
 
@@ -76,7 +80,15 @@ function resolveAlias(typename: string, parent: ChunkParentCallback, typedef: Ty
 }
 
 export function buildParser(parent: ChunkParentCallback | null, chunkdef: unknown, typedef: TypeDef): ChunkParser {
-	parent ??= () => { throw new Error("reference failed to resolve"); };
+	parent ??= (name, child) => {
+		if (name == "$opcode" || name == "buildnr") {
+			return {
+				stackdepth: child.stackdepth + 1,
+				resolve(v, old) { return old; }
+			};
+		}
+		throw new Error(`reference '${name}' failed to resolve at the top level`);
+	};
 	switch (typeof chunkdef) {
 		case "boolean":
 		case "number":
@@ -128,8 +140,11 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 				if (debugdata) {
 					debugdata.opcodes.push({ op: (parser ? parser.key as string : `_0x${opt.toString(16)}_`), index: state.scan - 1, stacksize: state.stack.length });
 				}
-				if (!parser) { throw new Error("unknown chunk 0x" + opt.toString(16).toUpperCase()); }
-				r[parser.key] = parser.parser.read(state);
+				if (!parser) { 
+					console.warn(`[RSMV] Unknown opcode 0x${opt.toString(16).toUpperCase()} at offset ${state.scan - 1}. Aborting this chunk parse.`);
+					break; 
+				}
+				(r as any)[parser.key] = parser.parser.read(state);
 			}
 			state.stack.pop();
 			state.hiddenstack.pop();
@@ -179,7 +194,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -297,12 +312,12 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
 			for (let key of keys) {
 				if (debugdata) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
-				let v = props[key].read(state);
+				let v = (props as any)[key].read(state);
 				if (v !== undefined) {
 					if (key[0] == "$") {
-						hidden[key] = v;
+						(hidden as any)[key] = v;
 					} else {
-						r[key] = v;
+						(r as any)[key] = v;
 					}
 				}
 			}
@@ -316,8 +331,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			state.stack.push(value);
 			state.hiddenstack.push(hiddenvalue);
 			for (let key of keys) {
-				let propvalue = value[key as string];
-				let prop = props[key];
+				let propvalue = (value as any)[key as string];
+				let prop = (props as any)[key];
 
 				if (key.startsWith("$")) {
 					if (prop.readConst != undefined) {
@@ -330,7 +345,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 							propvalue = ref.resolve(value, propvalue);
 						}
 					}
-					hiddenvalue[key] = propvalue;
+					(hiddenvalue as any)[key] = propvalue;
 				}
 				prop.write(state, propvalue);
 			}
@@ -342,7 +357,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			let newindent = indent + "\t";
 			for (let key of keys) {
 				if (key[0] == "$") { continue; }
-				r += newindent + key + ": " + props[key].getTypescriptType(newindent) + ",\n";
+				r += newindent + key + ": " + (props as any)[key].getTypescriptType(newindent) + ",\n";
 			}
 			r += indent + "}";
 			return r;
@@ -364,7 +379,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -381,8 +396,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 	for (let propdef of args) {
 		if (!Array.isArray(propdef) || propdef.length != 2) { throw new Error("each struct args should be a [name,type] pair"); }
 		if (typeof propdef[0] != "string") { throw new Error("prop name should be string"); }
-		if (props[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
-		props[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
+		if ((props as any)[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
+		(props as any)[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
 	}
 	let keys = Object.keys(props);
 	return r;
@@ -472,6 +487,16 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 	let r: ChunkParser = {
 		read(state) {
 			let len = lengthtype.read(state);
+			// Jagex rev 221+ version sentinel: 0xFFFF means versioned header
+			// Format: [0xFFFF][version_ubyte][actual_ushort_length]
+			if (len === 0xFFFF) {
+				let version = state.buffer.readUInt8(state.scan);
+				state.scan += 1;
+				len = lengthtype.read(state);
+				if (debugdata) {
+					debugdata.opcodes.push({ op: `chunkedarray_version_${version}`, index: state.scan, stacksize: state.stack.length });
+				}
+			}
 			let r: object[] = [];
 			let hiddenprops: object[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
@@ -484,22 +509,22 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 					let obj: object;
 					if (chunkindex == 0) {
 						obj = {};
-						r.push(obj);
+						(r as any).push(obj);
 						hidden = {};
 						hiddenprops.push(hidden);
 					} else {
-						obj = r[i];
+						obj = (r as any)[i];
 						hidden = hiddenprops[i];
 					}
 					//TODO check if we can save speed by manually overwriting stack[length-1] instead of pop->push
 					state.stack.push(obj);
 					state.hiddenstack.push(hidden);
 					for (let key in proptype) {
-						let value = proptype[key].read(state);
+						let value = (proptype as any)[key].read(state);
 						if (key.startsWith("$")) {
-							hidden[key] = value;
+							(hidden as any)[key] = value;
 						} else {
-							obj[key] = value;
+							(obj as any)[key] = value;
 						}
 					}
 					state.stack.pop();
@@ -522,8 +547,8 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 					state.hiddenstack.push(hiddenvalue);
 					if (typeof entry != "object" || !entry) { throw new Error("object expected"); }
 					for (let key in proptype) {
-						let prop = proptype[key];
-						let propvalue = entry[key];
+						let prop = (proptype as any)[key];
+						let propvalue = (entry as any)[key];
 						if (key.startsWith("$")) {
 							if (prop.readConst != undefined) {
 								propvalue = prop.readConst(state);
@@ -535,7 +560,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 									propvalue = ref.resolve(entry, propvalue);
 								}
 							}
-							hiddenvalue[key] = propvalue;
+							(hiddenvalue as any)[key] = propvalue;
 						}
 						prop.write(state, propvalue);
 					}
@@ -583,7 +608,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as any)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -1112,7 +1137,7 @@ function conditionParser(parent: ChunkParentCallback, optionstrings: string[], w
 }
 
 
-const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) => ChunkParser> = {
+hardcodes = {
 	playeritem: function () {
 		return {
 			read(state) {
@@ -1226,7 +1251,7 @@ const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, t
 					throw new Error("write not supported");
 				}
 			}
-			if (name == "$opcode") { return res; }
+			if (name == "$opcode" || name == "buildnr") { return res; }
 			return buildReference(name, parent, res);
 		}
 
@@ -1420,65 +1445,74 @@ function getClientVersion(args: Record<string, unknown>) {
 	return args.clientVersion;
 }
 
+function checkBounds(s: DecodeState, bytes: number) {
+	if (s.scan + bytes > s.endoffset) {
+		console.warn(`[GhostLimb] Buffer underrun at ${s.scan}/${s.endoffset} (reading ${bytes} bytes)`);
+		throw new RangeError(`Buffer underrun at ${s.scan}/${s.endoffset}`);
+	}
+}
+
 const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s: EncodeState, v: number) => void, min: number, max: number }> = {
 	ubyte: {
-		read(s) { let r = s.buffer.readUInt8(s.scan); s.scan += 1; return r; },
+		read(s) { checkBounds(s, 1); let r = s.buffer.readUInt8(s.scan); s.scan += 1; return r; },
 		write(s, v) { s.buffer.writeUInt8(v, s.scan); s.scan += 1; },
 		min: 0, max: 255
 	},
 	byte: {
-		read(s) { let r = s.buffer.readInt8(s.scan); s.scan += 1; return r; },
+		read(s) { checkBounds(s, 1); let r = s.buffer.readInt8(s.scan); s.scan += 1; return r; },
 		write(s, v) { s.buffer.writeInt8(v, s.scan); s.scan += 1; },
 		min: -128, max: 127
 	},
 	ushort: {
-		read(s) { let r = s.buffer.readUInt16BE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readUInt16BE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeUInt16BE(v, s.scan); s.scan += 2; },
 		min: 0, max: 2 ** 16 - 1
 	},
 	short: {
-		read(s) { let r = s.buffer.readInt16BE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readInt16BE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeInt16BE(v, s.scan); s.scan += 2; },
 		min: -(2 ** 15), max: 2 ** 15 - 1
 	},
 	uint: {
-		read(s) { let r = s.buffer.readUInt32BE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readUInt32BE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeUInt32BE(v, s.scan); s.scan += 4; },
 		min: 0, max: 2 ** 32 - 1
 	},
 	int: {
-		read(s) { let r = s.buffer.readInt32BE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readInt32BE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeInt32BE(v, s.scan); s.scan += 4; },
 		min: -(2 ** 31), max: 2 ** 31 - 1
 	},
 
 	uint_le: {
-		read(s) { let r = s.buffer.readUInt32LE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readUInt32LE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeUint32LE(v, s.scan); s.scan += 4; },
 		min: 0, max: 2 ** 32 - 1
 	},
 	ushort_le: {
-		read(s) { let r = s.buffer.readUInt16LE(s.scan); s.scan += 2; return r; },
+		read(s) { checkBounds(s, 2); let r = s.buffer.readUInt16LE(s.scan); s.scan += 2; return r; },
 		write(s, v) { s.buffer.writeUint16LE(v, s.scan); s.scan += 2; },
 		min: 0, max: 2 ** 16 - 1
 	},
 	utribyte: {
-		read(s) { let r = s.buffer.readUIntBE(s.scan, 3); s.scan += 3; return r; },
+		read(s) { checkBounds(s, 3); let r = s.buffer.readUIntBE(s.scan, 3); s.scan += 3; return r; },
 		write(s, v) { s.buffer.writeUintBE(v, s.scan, 3); s.scan += 3; },
 		min: 0, max: 2 ** 24 - 1
 	},
 	float: {
-		read(s) { let r = s.buffer.readFloatBE(s.scan); s.scan += 4; return r; },
+		read(s) { checkBounds(s, 4); let r = s.buffer.readFloatBE(s.scan); s.scan += 4; return r; },
 		write(s, v) { s.buffer.writeFloatBE(v, s.scan); s.scan += 4; },
 		min: Number.MIN_VALUE, max: Number.MAX_VALUE
 	},
 
 	varushort: {
 		read(s) {
+			checkBounds(s, 1);
 			let firstByte = s.buffer.readUInt8(s.scan++);
 			if ((firstByte & 0x80) == 0) {
 				return firstByte;
 			}
+			checkBounds(s, 1);
 			let secondByte = s.buffer.readUInt8(s.scan++);
 			return ((firstByte & 0x7f) << 8) | secondByte;
 		},
@@ -1495,11 +1529,13 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varshort: {
 		read(s) {
+			checkBounds(s, 1);
 			let firstByte = s.buffer.readUInt8(s.scan++);
 			if ((firstByte & 0x80) == 0) {
 				//sign extend from 7nth bit (>> fills using 32th bit)
 				return (firstByte << (32 - 7)) >> (32 - 7);
 			}
+			checkBounds(s, 1);
 			let secondByte = s.buffer.readUInt8(s.scan++);
 			return ((((firstByte & 0x7f) << 8) | secondByte) << (32 - 15)) >> (32 - 15);
 		},
@@ -1516,11 +1552,13 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varuint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if ((firstWord & 0x8000) == 0) {
 				return firstWord;
 			} else {
+				checkBounds(s, 2);
 				let secondWord = s.buffer.readUInt16BE(s.scan);
 				s.scan += 2;
 				return ((firstWord & 0x7fff) << 16) | secondWord;
@@ -1540,6 +1578,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varnullint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if (firstWord == 0x7fff) {
@@ -1547,6 +1586,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 			} else if ((firstWord & 0x8000) == 0) {
 				return firstWord;
 			} else {
+				checkBounds(s, 2);
 				let secondWord = s.buffer.readUInt16BE(s.scan);
 				s.scan += 2;
 				return ((firstWord & 0x7fff) << 16) | secondWord;
@@ -1569,12 +1609,14 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	},
 	varint: {
 		read(s) {
+			checkBounds(s, 2);
 			let firstWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			if ((firstWord & 0x8000) == 0) {
 				//sign extend from 7nth bit (>> fills using 32th bit)
 				return (firstWord << (32 - 15)) >> (32 - 15);
 			}
+			checkBounds(s, 2);
 			let secondWord = s.buffer.readUInt16BE(s.scan);
 			s.scan += 2;
 			return ((((firstWord & 0x7fff) << 16) | secondWord) << (32 - 31)) >> (32 - 31);
@@ -1593,7 +1635,7 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 	}
 }
 
-const parserPrimitives: Record<string, ChunkParser> = {
+parserPrimitives = {
 	...Object.fromEntries(Object.entries(numberTypes).map<[string, ChunkParser]>(([k, e]) => [k, {
 		read: e.read,
 		write: (s, v) => {
@@ -1609,6 +1651,7 @@ const parserPrimitives: Record<string, ChunkParser> = {
 	}])),
 	bool: {
 		read(s) {
+			checkBounds(s, 1);
 			let r = s.buffer.readUInt8(s.scan++);
 			if (r != 0 && r != 1) { throw new Error("1 or 0 expected boolean value"); }
 			return r != 0;
@@ -1628,7 +1671,7 @@ const parserPrimitives: Record<string, ChunkParser> = {
 	paddedstring: stringParser([0]),
 }
 
-const parserFunctions = {
+parserFunctions = {
 	ref: referenceValueParser,
 	accum: intAccumolatorParser,
 	opt: optParser,

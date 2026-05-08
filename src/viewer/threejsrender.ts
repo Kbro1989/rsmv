@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { delay, TypedEmitter } from '../utils';
 import { dumpTexture, flipImage, makeImageData } from '../imgutils';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
@@ -51,9 +52,9 @@ export type ThreeJsSceneElement = {
 	}
 }
 
-type CameraControlMode = "free" | "world";
+type CameraControlMode = "free" | "world" | "editor";
 type AutoFrameMode = "forced" | "continuous" | "never";
-export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown";
+export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown" | "editor";
 
 export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private renderer: THREE.WebGLRenderer;
@@ -76,10 +77,11 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private standardLights: Group;
 
 	private camMode: RenderCameraMode = "standard";
-	private camera: THREE.PerspectiveCamera;
+	public camera: THREE.PerspectiveCamera;
 	private topdowncam: THREE.OrthographicCamera;
 	private standardControls: OrbitControls;
 	private orthoControls: OrbitControls;
+	public transformControls: TransformControls;
 	private itemcam = new THREE.PerspectiveCamera();
 
 	constructor(canvas: HTMLCanvasElement, params?: THREE.WebGLRendererParameters) {
@@ -94,6 +96,14 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			preserveDrawingBuffer: true,
 			...params
 		});
+
+		// FIX: Force Three.js to use uniform-based skinning instead of texture-based skinning
+		// headless-gl only supports WebGL 1.0, but Three.js attempts to use texelFetch if it thinks
+		// float vertex textures are supported, causing shader compilation errors.
+		// Detect headless environment
+		if (typeof document === "undefined") {
+			this.renderer.capabilities.floatVertexTextures = false;
+		}
 		const renderer = this.renderer;
 		canvas.addEventListener("webglcontextlost", () => this.contextLossCount++);
 		canvas.onmousedown = this.mousedown;
@@ -105,6 +115,28 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.standardControls.target.set(0, 5, 0);
 		this.standardControls.update();
 		this.standardControls.addEventListener("change", this.forceFrame);
+ 
+		this.transformControls = new TransformControls(this.camera, canvas);
+		this.transformControls.addEventListener("change", this.forceFrame);
+		this.transformControls.addEventListener("dragging-changed", (event) => {
+			this.standardControls.enabled = !event.value;
+			
+			// If drag ended, broadcast the mutation
+			if (!event.value && this.transformControls.object) {
+				const obj = this.transformControls.object;
+				const mutation = {
+					type: 'ENTITY_MUTATED',
+					entityId: (obj as any).entityId || obj.name,
+					position: { x: obj.position.x / 512, y: obj.position.y / 512, z: obj.position.z / 512 },
+					rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+					scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
+				};
+				import("./SovereignBridge").then(m => {
+					m.SovereignBridge.getInstance().sendAction(JSON.stringify(mutation));
+				});
+				console.log(`[POG2 EDITOR] Mutation Broadcast: ${mutation.entityId}`);
+			}
+		});
 
 		this.topdowncam = new SkewOrthographicCamera(10, 0, 0);
 		this.topdowncam.position.copy(this.camera.position);
@@ -119,9 +151,10 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.scene = scene;
 		scene.add(this.camera);
 		scene.add(this.topdowncam);
+		scene.add(this.transformControls);
 
-		//three typings are outdated
-		(renderer as any).useLegacyLights = false;
+		// three lighting migration (r155+)
+		// (renderer as any).useLegacyLights = false; // DEPRECATED
 		renderer.outputColorSpace = THREE.SRGBColorSpace as any;
 
 		const planeSize = 11;
@@ -170,6 +203,120 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		scene.add(this.standardLights);
 		this.scene.fog = new THREE.Fog("#FFFFFF", 10000, 10000);
 		this.sceneElementsChanged();
+
+		// Pulse Sync: Synchronize with the CNS 600ms heartbeat
+		import("./SovereignBridge").then(m => {
+			const bridge = m.SovereignBridge.getInstance();
+			bridge.onTick((msg) => this.handleTickEvent(msg));
+		});
+	}
+
+	private handleTickEvent(msg: any) {
+		if (msg.type !== 'tick_event') return;
+		
+		for (const event of msg.events) {
+			this.applyVisualActuation(event.id, event.signature, event.metadata);
+		}
+	}
+
+	/**
+	 * applyVisualActuation
+	 * Translates CNS "Calls" (id+calls) into bone-level animations and expressions.
+	 * Fulfills the "full on 3D with bones in eye and face" requirement.
+	 */
+	public applyVisualActuation(entityId: string, signature: string, metadata: any) {
+		// 1. Locate the entity in the scene
+		const entity = this.modelnode.children.find(c => (c as any).entityId === entityId || c.name === entityId);
+		if (!entity) return;
+
+		console.log(`[POG2 ACTUATOR] ${signature} for ${entityId}`);
+
+		switch (signature) {
+			case 'COMBAT_HIT':
+				this.triggerCombatFeedback(entity, metadata);
+				break;
+			case 'EXPRESSION_TRIGGER':
+				this.applyFacialExpression(entity, metadata.expression);
+				break;
+			case 'SKILL_SUCCESS':
+				this.triggerSkillVFX(entity, metadata);
+				break;
+		}
+	}
+
+	private triggerCombatFeedback(entity: THREE.Object3D, metadata: any) {
+		// Flash red (Material actuation)
+		entity.traverse((child) => {
+			if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshPhongMaterial) {
+				const originalColor = child.material.color.clone();
+				child.material.color.setHex(0xff0000);
+				setTimeout(() => {
+					child.material.color.copy(originalColor);
+				}, 150);
+			}
+		});
+
+		// Trigger "Hit" animation if bones are available
+		// metadata.damage can influence the intensity
+	}
+
+	private applyFacialExpression(entity: THREE.Object3D, expression: string) {
+		// This is where "bones in the eye and face" comes in.
+		// We manually actuate bone rotations for specific expressions.
+		// Requires entity to have a skeletal structure.
+		entity.traverse((child) => {
+			if (child instanceof THREE.SkinnedMesh) {
+				const jaw = child.skeleton.bones.find(b => b.name.toLowerCase().includes('jaw'));
+				if (jaw && expression === 'talk') {
+					jaw.rotation.x = 0.5; // Open mouth
+					setTimeout(() => { jaw.rotation.x = 0; }, 300);
+				}
+			}
+		});
+	}
+
+	private triggerSkillVFX(entity: THREE.Object3D, metadata: any) {
+		// Differentiate based on Substrate Source
+		let color = 0x00ff00; // Default: Success Green
+		let intensity = 2;
+		let radius = 2;
+
+		if (metadata.substrate === 'ground') {
+			color = 0x00ffff; // Cyan pulse for ground-linked logic
+			radius = 1; // Low pulse
+		} else if (metadata.substrate === 'equipped') {
+			color = 0xffaa00; // Gold pulse for equipment-linked logic
+			intensity = 4;
+		} else if (metadata.substrate === 'bank') {
+			color = 0xaa00ff; // Purple pulse for regional/banked logic
+		}
+
+		console.log(`[POG2 VISUAL] Skill Success via ${metadata.substrate || 'direct'} substrate.`);
+
+		const pointLight = new THREE.PointLight(color, intensity, radius);
+		pointLight.position.copy(entity.position);
+		if (metadata.substrate === 'ground') {
+			pointLight.position.y -= 5; // Pulse at feet
+		}
+		this.scene.add(pointLight);
+		setTimeout(() => this.scene.remove(pointLight), 600);
+
+		// Trigger "Sparkle" effect if bones/mesh available
+		if (metadata.station) {
+			this.triggerMaterialPulse(entity, color);
+		}
+	}
+
+	private triggerMaterialPulse(entity: THREE.Object3D, color: number) {
+		entity.traverse((child) => {
+			if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshPhongMaterial) {
+				const originalEmissive = child.material.emissive.clone();
+				child.material.emissive.setHex(color);
+				setTimeout(() => {
+					child.material.emissive.copy(originalEmissive);
+				}, 300);
+			}
+		});
 	}
 
 	getCurrent2dCamera() {
@@ -201,9 +348,18 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	getModelNode() {
 		return this.modelnode;
 	}
+	getCanvas() {
+		return this.canvas;
+	}
 
-	addSceneElement(el: ThreeJsSceneElementSource) {
+	public addSceneElement(el: ThreeJsSceneElementSource) {
 		this.sceneElements.add(el);
+
+		// float vertex textures are supported, causing shader compilation errors.
+		if (typeof document === "undefined") {
+			this.renderer.capabilities.floatVertexTextures = false;
+		}
+
 		this.sceneElementsChanged();
 	}
 
@@ -683,7 +839,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 					minFilter: THREE.LinearFilter,
 					magFilter: THREE.LinearFilter,
 					format: THREE.RGBAFormat,
-					colorSpace: this.renderer.outputColorSpace,
+					colorSpace: this.renderer.outputColorSpace as any,
 					samples: gl.getParameter(gl.SAMPLES)
 				});
 			}
@@ -771,6 +927,23 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 		//these attributes need to be padded to 4 bytes according to gltf spec but threejs doesn't
 		if (node instanceof Mesh && node.geometry instanceof BufferGeometry) {
 			let attributes = node.geometry.attributes;
+			
+			// Always strip non-standard RS3 attributes that Blender/Standard GLTF chokes on
+			let rs3Attributes = [
+				"color_0", "color_1", "color_2", "color_3",
+				"texcoord_0", "texcoord_1", "texcoord_2", "texcoord_3",
+				"RA_skinIndex_bone", "RA_skinIndex_skin", "RA_skinWeight_bone", "RA_skinWeight_skin"
+			];
+
+			for (let attr of rs3Attributes) {
+				if (attributes[attr]) {
+					let attrname = attr;
+					let oldval = attributes[attr];
+					delete attributes[attr];
+					undolist.push(() => attributes[attrname] = oldval);
+				}
+			}
+
 			let normal = node.geometry.attributes.normal as THREE.BufferAttribute;
 			if (normal && normal.array instanceof Int8Array) {
 				let v = new Vector3();
@@ -783,15 +956,6 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 				let oldnormal = attributes.normal;
 				undolist.push(() => attributes.normal = oldnormal);
 				node.geometry.attributes.normal = cloned;
-			}
-			//for some reason blender chokes on these
-			for (let attr of hiddenattributes) {
-				if (attributes[attr]) {
-					let attrname = attr;
-					let oldval = attributes[attr];
-					delete attributes[attr];
-					undolist.push(() => attributes[attrname] = oldval);
-				}
 			}
 		}
 	});

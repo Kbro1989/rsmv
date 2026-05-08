@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\sequences.json'
+// This source data is located at '../src/opcodes/sequences.json'
 // run `npm run filetypes` to rebuild
 
 export type sequences = {
@@ -56,7 +56,8 @@ export type sequences = {
 		number,
 	] | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null

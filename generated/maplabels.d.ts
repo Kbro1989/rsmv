@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\maplabels.jsonc'
+// This source data is located at '../src/opcodes/maplabels.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type maplabels = {
@@ -69,7 +69,8 @@ export type maplabels = {
 	unknown_1c?: number | null
 	unknown_1e?: number | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null

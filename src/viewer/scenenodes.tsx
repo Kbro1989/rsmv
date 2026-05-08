@@ -38,6 +38,8 @@ import { UiCameraParams, updateItemCamera } from "./camerautils";
 import { boundMethod } from "autobind-decorator";
 import * as cmdts from "cmd-ts";
 import { EngineCache, ThreejsSceneCache, constModelsIds } from "../3d/modeltothree";
+import { GroundingHUD, VarbitMonitor } from "./grounding_ui";
+import { SovereignGrounding } from "../map/grounding_logic";
 
 
 type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map" | "avatar" | "spotanim" | "scenario" | "scripts";
@@ -365,6 +367,7 @@ function ScenarioComponentControl(p: { ctx: UIContextReady | null, comp: Scenari
 	let revert = async () => {
 		if (p.comp.type != "custom" || !p.ctx) { return; }
 		let def = await modelInitToModel(p.ctx.sceneCache, p.comp.basecomp);
+		if (!def) { return; }
 		p.onChange({
 			type: "simple",
 			modelkey: p.comp.basecomp,
@@ -472,7 +475,7 @@ function modeldefJsonToModel(cache: any, json: string): SimpleModelInfo<null, st
 
 type SimpleModelInitTypes = "model" | "item" | "loc" | "npc" | "spotanim" | "player";
 type ModelInitTypes = SimpleModelInitTypes | "custom" | "map";
-async function modelInitToModel(cache: ThreejsSceneCache, init: string): Promise<SimpleModelInfo<any, any>> {
+async function modelInitToModel(cache: ThreejsSceneCache, init: string): Promise<SimpleModelInfo<any, any> | null> {
 	let [key] = init.split(":", 1) as [ModelInitTypes];
 	let id = init.slice(key.length + 1);
 	if (key == "model") { return modelToModel(cache, +id); }
@@ -537,6 +540,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 			});
 		} else {
 			let prim = await modelInitToModel(this.props.ctx.sceneCache, `${this.state.addModelType}:${id}`);
+			if (!prim) { return; }
 			let compid = this.idcounter++;
 			this.editComp(compid, {
 				type: "simple",
@@ -583,7 +587,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 	}
 
 	setSceneState(components: Record<number, ScenarioComponent> | null, actions: ScenarioAction[] | null) {
-		this.setState(prev => {
+		this.setState((prev: { components: any; actions: any; }) => {
 			let scenestate: ScenarioState = {
 				components: components ?? prev.components,
 				actions: actions ?? prev.actions
@@ -753,7 +757,7 @@ export class SceneScenario extends React.Component<LookupModeProps, ScenarioInte
 		if (this.state.addModelType == "npc") {
 			selectEntity(this.props.ctx, "npcs", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
 		} else if (this.state.addModelType == "item") {
-			selectEntity(this.props.ctx, "items", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
+			selectEntity(this.props.ctx, "items", id => this.addComp("" + id), [{ path: ["equipSlotId"], search: "" }, { path: ["name"], search: "" }])
 		} else if (this.state.addModelType == "loc") {
 			selectEntity(this.props.ctx, "objects", id => this.addComp("" + id), [{ path: ["name"], search: "" }])
 		}
@@ -1130,22 +1134,14 @@ function ExportSceneMenu(p: { ctx: UIContextReady, renderopts: ThreeJsSceneEleme
 
 	let saveGltf = async () => {
 		let file = await exportThreeJsGltf(p.ctx.renderer.getModelNode());
-<<<<<<< HEAD
-		downloadBlob("model.glb", new Blob([new Uint8Array(file as any)]));
-=======
 		// Convert Buffer to ArrayBuffer for Blob
 		downloadBlob("model.glb", new Blob([file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)] as any));
->>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
 	}
 
 	let saveStl = async () => {
 		let file = await exportThreeJsStl(p.ctx.renderer.getModelNode());
-<<<<<<< HEAD
-		downloadBlob("model.stl", new Blob([new Uint8Array(file as any)]));
-=======
 		// Convert Uint8Array to ArrayBuffer for Blob
 		downloadBlob("model.stl", new Blob([file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)] as any));
->>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
 	}
 
 	let clicktab = (v: typeof tab) => {
@@ -1202,6 +1198,7 @@ function ExportSceneMenu(p: { ctx: UIContextReady, renderopts: ThreeJsSceneEleme
 		</div>
 	)
 }
+
 
 export function RendererControls(p: { ctx: UIContext }) {
 	const elconfig = React.useRef<ThreeJsSceneElement>({ options: {} });
@@ -1276,7 +1273,7 @@ function ImageDataView(p: { img: HTMLImageElement | HTMLCanvasElement | HTMLVide
 	)
 }
 
-function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID>>) {
+function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID> | null>) {
 	let pendingId = React.useRef<ID | null>(null);
 	let [loadedModel, setLoadedModel] = React.useState<RSModel | null>(null);
 	let [visible, setVisible] = React.useState<SimpleModelInfo<T, ID> | null>(null);
@@ -1292,11 +1289,9 @@ function useAsyncModelData<ID, T>(ctx: UIContextReady | null, getter: (cache: Th
 				setLoadedId(id);
 			}
 		} catch (err) {
+			console.warn("Failed to load model", id, err);
 			if (pendingId.current == id) {
-				localStorage.rsmv_lastsearch = JSON.stringify(id);
-				setVisible(null);
 				setLoadedId(id);
-				console.error(err);//TODO make ui
 			}
 		}
 	}, [ctx]);
@@ -1623,7 +1618,7 @@ type SceneMapState = {
 };
 export class SceneMapModel extends React.Component<LookupModeProps, SceneMapState> {
 	selectCleanup: (() => void)[] = [];
-	constructor(p) {
+	constructor(p: LookupModeProps) {
 		super(p);
 		this.state = {
 			chunkgroups: [],
@@ -1638,8 +1633,8 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 	@boundMethod
 	clear() {
 		this.selectCleanup.forEach(q => q());
-		this.state.chunkgroups.forEach(q => q.models.forEach(q => q.cleanup()));
-		this.setState({ chunkgroups: [], toggles: Object.create(null) });
+		this.state.chunkgroups.forEach(q => (q.models as Map<ThreejsSceneCache, RSMapChunk>).forEach(q => q.cleanup()));
+		this.setState({ chunkgroups: [], toggles: Object.create(null) } as any);
 	}
 
 	@boundMethod
@@ -1713,6 +1708,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 		this.forceUpdate();
 	}
 
+
 	@boundMethod
 	async meshSelected(e: ThreeJsRendererEvents["select"]) {
 		this.selectCleanup.forEach(q => q());
@@ -1767,7 +1763,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 	}
 
 	loadChunk(chunkx: number, chunkz: number, sceneCache: ThreejsSceneCache | undefined) {
-		this.setState(prevstate => {
+		this.setState((prevstate: { center: any; chunkgroups: any[]; }) => {
 			const renderer = this.props.ctx?.renderer;
 			if (!sceneCache || !renderer) { return; }
 
@@ -1793,7 +1789,10 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 				let match = this.state.versions.find(q => q.cache == sceneCache);
 				chunk.setToggles(toggles, match && !match.visible);
 				if (changed) {
-					this.setState({ toggles });
+					this.setState({
+						toggles,
+						chunkgroups: []
+					});
 					this.fixVisibility(toggles);
 				}
 			})
@@ -1812,6 +1811,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 			let group = prevstate.chunkgroups.find(q => q.chunkx == chunkx && q.chunkz == chunkz);
 			let newstate: Partial<SceneMapState> = {};
 			newstate.center = center;
+			this.props.ctx.setMapCenter(center);
 			if (!group) {
 				group = { chunkx, chunkz, models: new Map(), diffs: [] };
 				newstate.chunkgroups = [...prevstate.chunkgroups, group];
@@ -1844,7 +1844,7 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 	}
 
 	setToggle(toggle: string, value: boolean) {
-		this.setState(old => {
+		this.setState((old: { toggles: { [x: string]: any; }; }) => {
 			let newtoggles = Object.create(null);
 			for (let key in old.toggles) {
 				newtoggles[key] = (key == toggle ? value : old.toggles[key]);
@@ -2016,6 +2016,12 @@ export class SceneMapModel extends React.Component<LookupModeProps, SceneMapStat
 							)
 						}))}
 						<JsonDisplay obj={this.state.selectionData} />
+						{this.props.ctx && (
+							<>
+								<GroundingHUD ctx={this.props.ctx as any} mapCenter={this.state.center} />
+								<VarbitMonitor ctx={this.props.ctx as any} />
+							</>
+						)}
 					</div>
 				)}
 			</React.Fragment>
@@ -2027,6 +2033,8 @@ type Map2dState = {
 	cache: Map<RSMapChunk, { render: Promise<string>, src: string | null }>,
 };
 export class Map2dView extends React.Component<{ addArea?: (x: number, z: number) => void, chunks: RSMapChunk[], gridsize: number, mapscenes: boolean }, Map2dState> {
+	props: any;
+	state: { cache: Map<any, any>; };
 	constructor(p) {
 		super(p);
 

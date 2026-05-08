@@ -108,7 +108,7 @@ export class CachingFileSource extends CacheFileSource {
         }
     }
     getBuildNr() {
-        return this.rawsource.getBuildNr();
+        return (typeof this.rawsource.getBuildNr === 'function') ? this.rawsource.getBuildNr() : 999;
     }
     getCacheMeta() {
         return this.rawsource.getCacheMeta();

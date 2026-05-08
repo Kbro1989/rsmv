@@ -92,43 +92,48 @@ export async function parseAnimationSequence4(loader: ThreejsSceneCache, sequenc
 
 	//some animations seem to use index instead of id, this seems to fix anim on npc 182
 	// let frames = Object.fromEntries(framearch.map((q, i) => [i + 1, parse.frames.read(q.buffer, loader.engine.rawsource)]));
-	let frames = Object.fromEntries(framearch.map((q, i) => [q.fileid, parse.frames.read(q.buffer, loader.engine.rawsource)]));
-
-	//three.js doesn't interpolate from end frame to start, so insert the start frame at the end
-	const insertLoopFrame = true;
-
-	//calculate frame times
-	let endtime = 0;
-	let keyframetimeslist: number[] = [];
-	let orderedframes: frames[] = [];
-	for (let i = 0; i < sequenceframes.length; i++) {
-		let seqframe = sequenceframes[i];
-		if (frames[seqframe.frameidlow]) {
-			keyframetimeslist.push(endtime);
-			endtime += seqframe.framelength * 0.020;
-			orderedframes.push(frames[seqframe.frameidlow]);
-		} else {
-			console.log(`missing animation frame ${seqframe.frameidlow} in sequence ${seqframe.frameidhi}`)
+	try {
+		let frames = Object.fromEntries(framearch.map((q, i) => [q.fileid, parse.frames.read(q.buffer, loader.engine.rawsource)]));
+	
+		//three.js doesn't interpolate from end frame to start, so insert the start frame at the end
+		const insertLoopFrame = true;
+	
+		//calculate frame times
+		let endtime = 0;
+		let keyframetimeslist: number[] = [];
+		let orderedframes: frames[] = [];
+		for (let i = 0; i < sequenceframes.length; i++) {
+			let seqframe = sequenceframes[i];
+			if (frames[seqframe.frameidlow]) {
+				keyframetimeslist.push(endtime);
+				endtime += seqframe.framelength * 0.020;
+				orderedframes.push(frames[seqframe.frameidlow]);
+			} else {
+				console.log(`missing animation frame ${seqframe.frameidlow} in sequence ${seqframe.frameidhi}`)
+			}
 		}
-	}
-
-	if (insertLoopFrame) {
-		orderedframes.push(orderedframes[0]);
-		keyframetimeslist.push(endtime);
-	}
-	let framebase = parse.framemaps.read(await loader.engine.getFileById(cacheMajors.framemaps, orderedframes[0].probably_framemap_id), loader.engine.rawsource);
-
-	// let { bones } = buildFramebaseSkeleton(framebase);
-	let keyframetimes = new Float32Array(keyframetimeslist);
-	let clips = getFrameClips(framebase, orderedframes);
-
-	return (model: ModelData) => {
-		let centers = getBoneCenters(model);
-		let transforms = bakeAnimation(framebase, clips, keyframetimes, centers)
-			.map((arr, i) => ({ id: i, trans: arr }));
-
-		let nframes = keyframetimes.length;
-		let tracks: KeyframeTrack[] = [];
+	
+		if (insertLoopFrame && orderedframes.length > 0) {
+			orderedframes.push(orderedframes[0]);
+			keyframetimeslist.push(endtime);
+		}
+		
+		if (orderedframes.length === 0) {
+			throw new Error("No frames succeeded");
+		}
+		let framebase = parse.framemaps.read(await loader.engine.getFileById(cacheMajors.framemaps, orderedframes[0].probably_framemap_id), loader.engine.rawsource);
+	
+		// let { bones } = buildFramebaseSkeleton(framebase);
+		let keyframetimes = new Float32Array(keyframetimeslist);
+		let clips = getFrameClips(framebase, orderedframes);
+	
+		return (model: ModelData) => {
+			let centers = getBoneCenters(model);
+			let transforms = bakeAnimation(framebase, clips, keyframetimes, centers)
+				.map((arr, i) => ({ id: i, trans: arr }));
+	
+			let nframes = keyframetimes.length;
+			let tracks: KeyframeTrack[] = [];
 
 		//reused holders
 		let matrix = new Matrix4();
@@ -171,6 +176,13 @@ export async function parseAnimationSequence4(loader: ThreejsSceneCache, sequenc
 		}
 		let clip = new AnimationClip("anim", undefined, tracks);
 		return clip;
+	  }
+	} catch (e) {
+		console.warn(`[GhostLimb] Animation parse failure for sequence ${secframe0.frameidhi}: ${e instanceof Error ? e.message : e}`);
+		return (model: ModelData) => {
+			// Sovereign Fallback Protocol: T-pose static fallback
+			return new AnimationClip("GhostLimb_Anim_Fallback", 1, []);
+		};
 	}
 }
 

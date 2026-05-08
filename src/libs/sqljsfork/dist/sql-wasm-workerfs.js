@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 // We are modularizing this manually because the current modularize setting in Emscripten has some issues:
 // https://github.com/kripken/emscripten/issues/5820
@@ -92,3 +93,4 @@ else if (typeof define === 'function' && define['amd']) {
 else if (typeof exports === 'object'){
     exports["Module"] = initSqlJs;
 }
+

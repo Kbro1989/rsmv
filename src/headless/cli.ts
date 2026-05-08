@@ -145,6 +145,22 @@ import * as cmdts from "cmd-ts";
 import { renderAppearance, runServer } from "./api";
 import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
 import { promises as fs } from "fs";
+import { ModelModifications } from "../utils";
+
+function parseMods(str: string): [number, number][] {
+	if (!str) return [];
+	try {
+		if (str.startsWith("[") || str.startsWith("{")) return JSON.parse(str);
+		return str.split(',').map(pair => {
+			const [from, to] = pair.split(':').map(Number);
+			return [from, to] as [number, number];
+		}).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+	} catch (e) {
+		console.error("Failed to parse mods:", str, e);
+		return [];
+	}
+}
+
 
 let cmd = cmdts.command({
 	name: "render",
@@ -155,7 +171,10 @@ let cmd = cmdts.command({
 		endpoint: cmdts.option({ long: "endpoint", short: "e", defaultValue: () => "" }),
 		auth: cmdts.option({ long: "auth", short: "p", defaultValue: () => "" }),
 		analyze: cmdts.flag({ long: "analyze" }),
-		wiki: cmdts.option({ long: "wiki", defaultValue: () => "" })
+		wiki: cmdts.option({ long: "wiki", defaultValue: () => "" }),
+		anim: cmdts.option({ long: "anim", defaultValue: () => "" }),
+		colors: cmdts.option({ long: "colors", short: "c", defaultValue: () => "" }),
+		materials: cmdts.option({ long: "materials", short: "mats", defaultValue: () => "" })
 	},
 	handler: async (args) => {
 		let src = await args.source();
@@ -166,22 +185,56 @@ let cmd = cmdts.command({
 			let engine = await EngineCache.create(src);
 			let scene = await ThreejsSceneCache.create(engine);
 
-			let ava: { imgfile: Buffer; modelfile: Buffer };
 			const modelStr = args.model;
+			let overrides: ModelModifications = {
+				replaceColors: parseMods(args.colors),
+				replaceMaterials: parseMods(args.materials)
+			};
+            
+            const animId = args.anim ? parseInt(args.anim) : undefined;
 
-			if (modelStr.startsWith('npc:')) {
-				const id = modelStr.split(':')[1];
-				ava = await renderAppearance(scene, 'npc', id, args.head);
-			} else if (modelStr.startsWith('item:')) {
-				const id = modelStr.split(':')[1];
-				ava = await renderAppearance(scene, 'item', id, args.head);
+			let ava: any;
+			if (modelStr.includes(':')) {
+				const [m, id] = modelStr.split(':');
+				ava = await renderAppearance(scene, m as any, id, args.head, overrides, animId);
 			} else {
-				let modelparts = modelStr.split(":");
-				ava = await renderAppearance(scene, modelparts[0] as any, modelparts[1], args.head);
+				ava = await renderAppearance(scene, 'appearance', modelStr, args.head, overrides, animId);
 			}
+			
+			// Detect actual output format
+			let ext = "glb";
+			if (modelStr.startsWith('sound:') || modelStr.startsWith('music:')) {
+				const buf = Buffer.from(ava.modelfile);
+				const magic = buf.toString('utf8', 0, 4);
+				if (magic === 'OggS') {
+					ext = "ogg";
+				} else if (magic === 'RIFF') {
+					ext = "wav";
+				} else if (magic === 'JAGA') {
+					// This is Archive 40 PCM data. 
+					// It needs a WAV header to not be "static noise".
+					ext = "wav";
+					try {
+						const { wrapPcmInWav } = await import("./wav_utils.js");
+						const { parse } = await import("../opdecoder.js");
+						const audio = parse.audio.read(buf, engine.rawsource);
+						// Combine all chunks into one PCM buffer
+						const pcm = Buffer.concat(audio.chunks.map(c => c.data).filter(Boolean) as Buffer[]);
+						ava.modelfile = wrapPcmInWav(pcm, audio.samplefreq || 44100);
+						console.log(`Audible Forensic Fix: Wrapped ${pcm.length} bytes of PCM in WAV at ${audio.samplefreq}Hz`);
+					} catch (e) {
+						console.warn("Failed to wrap PCM in WAV:", e);
+					}
+				} else {
+					ext = "bin";
+				}
+			}
+			if (modelStr.startsWith('sprite:')) ext = "png";
 
-			await fs.writeFile("model.png", ava.imgfile);
-			await fs.writeFile("model.glb", Buffer.from(ava.modelfile));
+			if (ava.imgfile && ava.imgfile.length > 0) {
+				await fs.writeFile("model.png", ava.imgfile);
+			}
+			await fs.writeFile(`model.${ext}`, Buffer.from(ava.modelfile));
 
 			if (args.analyze) {
 				let wikiData = { role: 'Unknown', intent: 'Studied asset', url: '' };
@@ -197,7 +250,7 @@ let cmd = cmdts.command({
 						console.error("Failed to parse wiki data:", e);
 					}
 				}
-				const profile = await StructuralAnalyzer.analyze(modelStr, modelStr, "model.glb", wikiData);
+				const profile = await StructuralAnalyzer.analyze(modelStr, modelStr, `model.${ext}`, wikiData, ava.semantic);
 				await fs.writeFile("pedagogy_profile.json", JSON.stringify(profile, null, 2));
 				console.log("pedagogy profile generated.");
 			}

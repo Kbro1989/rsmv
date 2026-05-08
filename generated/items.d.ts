@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\items.jsonc'
+// This source data is located at '../src/opcodes/items.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type items = {
@@ -12,6 +12,7 @@ export type items = {
 	rotation_1?: number | null
 	modelTranslate_0?: number | null
 	modelTranslate_1?: number | null
+	unknown_09?: number | null
 	unknown_0A?: number | null
 	stackable_1?: true | null
 	value?: number | null
@@ -175,7 +176,8 @@ export type items = {
 		number,
 	] | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null

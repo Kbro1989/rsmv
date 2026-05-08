@@ -320,14 +320,14 @@ function CacheDragNDropHelp() {
 						<React.Fragment>
 							{!canfsapi && <p className="mv-errortext">You browser does not support full folder loading!</p>}
 							<p>Drop the RuneScape folder into this window.</p>
-							<input type="text" onFocus={e => e.target.select()} readOnly value={"C:\\ProgramData\\Jagex"} />
+							<input type="text" onFocus={e => e.target.select()} readOnly value={"D:\\ProgramData\\Jagex"} />
 							<video src={new URL("../assets/dragndrop.mp4", import.meta.url).href} autoPlay loop style={{ aspectRatio: "352/292" }} />
 						</React.Fragment>
 					)}
 					{mode == "blob" && (
 						<React.Fragment>
 							<p>Drop and drop the cache files into this window.</p>
-							<input type="text" onFocus={e => e.target.select()} readOnly value={"C:\\ProgramData\\Jagex"} />
+							<input type="text" onFocus={e => e.target.select()} readOnly value={"D:\\ProgramData\\Jagex"} />
 							<video src={new URL("../assets/dragndropblob.mp4", import.meta.url).href} autoPlay loop style={{ aspectRatio: "458/380" }} />
 						</React.Fragment>
 					)}
@@ -346,6 +346,8 @@ export class UIContext extends TypedEmitter<{ openfile: UIOpenedFile | null, sta
 	sceneCache: ThreejsSceneCache | null = null;
 	renderer: ThreeJsRenderer | null = null;
 	openedfile: UIOpenedFile | null = null;
+	grounding: import("../map/grounding_logic").SovereignGrounding | null = null;
+	mapCenter: { x: number, z: number } | null = null;
 	rootElement: HTMLElement;
 	useServiceWorker: boolean;
 
@@ -359,6 +361,16 @@ export class UIContext extends TypedEmitter<{ openfile: UIOpenedFile | null, sta
 			//across tab reloads
 			navigator.serviceWorker?.register(new URL('../assets/contextholder.js', import.meta.url).href, { scope: './', });
 		}
+	}
+
+	setGrounding(grounding: import("../map/grounding_logic").SovereignGrounding | null) {
+		this.grounding = grounding;
+		this.emit("statechange", undefined);
+	}
+
+	setMapCenter(center: { x: number, z: number } | null) {
+		this.mapCenter = center;
+		this.emit("statechange", undefined);
 	}
 
 	setCacheSource(source: CacheFileSource | null) {
@@ -712,11 +724,7 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
 			<div className="mv-modal-head">
 				<span>{p.file.name}</span>
-<<<<<<< HEAD
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([p.file.data as any]))}>download</span>
-=======
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([typeof p.file.data === "string" ? p.file.data : new Uint8Array(p.file.data.buffer, p.file.data.byteOffset, p.file.data.byteLength)]))}>download</span>
->>>>>>> d8740c43a729917dccebaaf59b0bd547b40926bf
+				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([typeof p.file.data === "string" ? p.file.data : new Uint8Array(p.file.data.buffer, p.file.data.byteOffset, p.file.data.byteLength) as any]))}>download</span>
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>

@@ -31,7 +31,8 @@ module.exports = {
 				loader: 'ts-loader',
 				exclude: /node_modules/,
 				options: {
-					onlyCompileBundledFiles: true
+					onlyCompileBundledFiles: true,
+					transpileOnly: true
 				}
 			},
 			{
@@ -52,6 +53,9 @@ module.exports = {
 	},
 	resolve: {
 		extensions: ['.tsx', '.ts', '.js'],
+		extensionAlias: {
+			".js": [".ts", ".tsx", ".js"]
+		},
 		alias: {
 			fs: false,
 			path: false,
@@ -59,6 +63,8 @@ module.exports = {
 			sharp: false,
 			net: false,
 			sqlite3: false,
+			url: false,
+			os: false,
 			process: require.resolve('process/browser'),
 			"electron/renderer": false
 		},

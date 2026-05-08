@@ -1,5 +1,7 @@
 import { cacheConfigPages } from "../constants";
 import { rs3opnames } from "./opnames";
+import { clientscript } from "../../generated/clientscript";
+import { clientscriptdata } from "../../generated/clientscriptdata";
 
 export const variableSources = {
     player: { key: 0, index: cacheConfigPages.varplayer },
@@ -1038,4 +1040,37 @@ export class StackDiff {
         res = res.replace(/, $/, "");
         return res;
     }
+}
+
+export function getArgType(script: clientscriptdata | clientscript) {
+    let res = new StackDiff();
+    res.int = script.intargcount;
+    res.long = script.longargcount;
+    res.string = script.stringargcount;
+    return res;
+}
+
+export function getReturnType(calli: { getNamedOp: (opcode: number) => any }, ops: ClientScriptOp[], endindex = ops.length) {
+    let res = new StackList();
+    //the jagex compiler appends a default return with null constants to the script, even if this would be dead code
+    //endindex-1=return, pushconsts begins at -2
+    for (let i = endindex - 2; i >= 0; i--) {
+        let op = ops[i];
+        let opinfo = calli.getNamedOp(op.opcode);
+        if (opinfo.id == namedClientScriptOps.pushconst) {
+            if (op.imm == 0) { res.int(); }
+            if (op.imm == 1) { res.long(); }
+            if (op.imm == 2) { res.string(); }
+        } else if (opinfo.id == namedClientScriptOps.pushint) {
+            res.int();
+        } else if (opinfo.id == namedClientScriptOps.pushlong) {
+            res.long();
+        } else if (opinfo.id == namedClientScriptOps.pushstring) {
+            res.string();
+        } else {
+            break;
+        }
+    }
+    res.values.reverse();
+    return res;
 }

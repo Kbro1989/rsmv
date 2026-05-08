@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 /**
  * Extracted from a decompiled rshd client. several changes are made to
@@ -8468,8 +8469,10 @@ BufferPool.smallBuffers_$LI$();
 
 
 
+
 module.exports={
     Texture,
     Buffer
 }
 })()
+

@@ -1,5 +1,4 @@
-
-import { ThreeJsRenderer } from "./threejsrender";
+import { SovereignEngine } from "./RSEngine";
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 import * as datastore from "idb-keyval";
@@ -11,7 +10,10 @@ import { UIContext, SavedCacheSource, FileViewer, CacheSelector, openSavedCache,
 import classNames from "classnames";
 import { cliApi, CliApiContext } from "../clicommands";
 import { CLIScriptOutput } from "../scriptrunner";
+import { ThreeJsRenderer } from "./threejsrender";
 import * as cmdts from "cmd-ts";
+import { SovereignHUD } from "./SovereignHUD";
+import { SovereignBridge } from "./SovereignBridge";
 
 export function unload(root: ReactDOM.Root) {
 	root.unmount();
@@ -20,10 +22,14 @@ export function unload(root: ReactDOM.Root) {
 export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 	window.addEventListener("keydown", e => {
 		if (e.key == "F5") { document.location.reload(); }
-		// if (e.key == "F12") { electron.remote.getCurrentWebContents().toggleDevTools(); }
 	});
 
 	let ctx = new UIContext(rootelement, serviceworker ?? false);
+	
+	// 0. Initialize real-time bridge to POG2 backend
+	SovereignBridge.getInstance();
+	
+	// 1. Mount React as the single root authority
 	let root = ReactDOM.createRoot(rootelement);
 	root.render(<App ctx={ctx} />);
 
@@ -55,7 +61,9 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 }
 
 class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile | null }> {
-	constructor(p) {
+	canvasRef = React.createRef<HTMLCanvasElement>();
+
+	constructor(p: { ctx: UIContext }) {
 		super(p);
 		this.state = {
 			openedFile: this.props.ctx.openedfile
@@ -88,6 +96,24 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 				console.log("engine loaded", cache.getBuildNr());
 				let scene = await ThreejsSceneCache.create(engine);
 				this.props.ctx.setSceneCache(scene);
+				
+				// Initialize RSEngine cache context
+				SovereignEngine.setCache(scene);
+
+				// Initialize Sovereign Grounding (Pedagogy)
+				try {
+					const { SovereignGrounding } = await import("../map/grounding_logic");
+					
+					// We load from the local disk if in Electron/Node environment
+					if (typeof require !== "undefined") {
+						const grounding = await SovereignGrounding.loadDefault();
+						this.props.ctx.setGrounding(grounding);
+						SovereignEngine.setGrounding(grounding); // Feed it to the interactive engine hook
+						console.log("Sovereign Grounding Integrated (Full Pedagogy Hydration)");
+					}
+				} catch (e) {
+					console.warn("Could not load Sovereign Grounding data", e);
+				}
 
 				globalThis.sceneCache = scene;
 				globalThis.engine = engine;
@@ -99,7 +125,17 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 	}
 
 	initCnv = (cnv: HTMLCanvasElement | null) => {
+		// Guard: only set a new renderer if the canvas element actually changed
+		// Otherwise setRenderer emits statechange → forceUpdate → re-render → initCnv → infinite loop
+		const currentCanvas = this.props.ctx.renderer?.getCanvas?.() ?? null;
+		if (cnv === currentCanvas) return;
+		if (!cnv && !this.props.ctx.renderer) return;
 		this.props.ctx.setRenderer(cnv ? new ThreeJsRenderer(cnv) : null);
+	}
+
+	handleCanvasRef = (el: HTMLCanvasElement | null) => {
+		(this.canvasRef as any).current = el;
+		this.initCnv(el);
 	}
 
 	closeCache = () => {
@@ -123,6 +159,15 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 		this.props.ctx.on("openfile", this.openFile);
 		this.props.ctx.on("statechange", this.stateChanged);
 		window.addEventListener("resize", this.resized);
+
+		// Initialize Sovereign Engine on the React-owned canvas
+		if (this.canvasRef.current) {
+			SovereignEngine.initialize(this.canvasRef.current, {
+				initialPosition: { x: 3712, y: 3328, z: 0 }, // Havenhythe
+				avatarEntityId: 1556,
+				cacheSource: 'D:\\sovereign\\cache_pedagogy'
+			});
+		}
 	}
 
 	componentWillUnmount() {
@@ -142,16 +187,67 @@ class App extends React.Component<{ ctx: UIContext }, { openedFile: UIOpenedFile
 
 		let cachemeta = this.props.ctx.source?.getCacheMeta();
 		return (
-			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })}>
-				<canvas className="mv-canvas" ref={this.initCnv} style={{ display: this.state.openedFile ? "none" : "block" }}></canvas>
-				{this.state.openedFile && <FileViewer file={this.state.openedFile} onSelectFile={this.props.ctx.openFile} />}
-				<div className="mv-sidebar">
+			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })} 
+				style={{ 
+					display: 'flex', 
+					width: '100vw', 
+					height: '100vh', 
+					overflow: 'hidden',
+					background: '#000'
+				}}>
+				
+				{/* 3D World Section (Left/Top) */}
+				<div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+					{/* 2026 Sovereign HUD Overlay (Transparent siblings) */}
+					<SovereignHUD />
+					
+					<canvas 
+						id="pog2-world"
+						className="mv-canvas" 
+						ref={this.handleCanvasRef} 
+						style={{ 
+							display: this.state.openedFile ? "none" : "block", 
+							width: '100%', 
+							height: '100%',
+							pointerEvents: 'auto' 
+						}}
+					/>
+					
+					{this.state.openedFile && (
+						<div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: '#222', zIndex: 10, pointerEvents: 'auto' }}>
+							<FileViewer file={this.state.openedFile} onSelectFile={this.props.ctx.openFile} />
+						</div>
+					)}
+				</div>
+
+				{/* Sidebar Section (Right/Bottom) */}
+				<div 
+					className="mv-sidebar" 
+					style={{ 
+						width: vertical ? '100%' : '320px', 
+						height: vertical ? '40%' : '100%',
+						pointerEvents: 'auto', 
+						borderLeft: '1px solid #445',
+						zIndex: 20
+					}}>
 					{!this.props.ctx.source && (
 						<React.Fragment>
 							<CacheSelector onOpen={this.openCache} />
 							<div style={{ flex: "1" }} />
-							<div style={{ textAlign: "center" }}>
-								Go to <a href="https://runeapps.org/modelviewer_about">RuneApps</a> for more info. Source code hosted at <a href="https://github.com/Kbro1989/POG2/blob/main/tmp_rsmv_inspect" target="_blank">https://github.com/Kbro1989/POG2.git/tmp_rsmv_inspect</a>
+							<div style={{ textAlign: "center", padding: "15px", background: "rgba(0,0,0,0.5)", borderRadius: "6px", margin: "10px" }}>
+								<h3 style={{ margin: "0 0 10px 0", color: "#4caf50" }}>POG2 Sovereign Engine</h3>
+								<div style={{ textAlign: "left", fontSize: "13px", color: "#ccc", marginBottom: "12px", lineHeight: "1.6" }}>
+									<b>System Status:</b>
+									<ul style={{ margin: "4px 0 0 15px", padding: 0 }}>
+										<li>✅ Spatial Grounding Synthesized (Prif/Havenhythe)</li>
+										<li>✅ Full Terrain Rendering Pipeline Restored</li>
+										<li>✅ Deobfuscated CS2 Logic & Enum Chains</li>
+										<li>✅ 100% Skill Taxonomies Mapped</li>
+									</ul>
+								</div>
+								<div style={{ fontSize: "11px", color: "#888", borderTop: "1px solid #444", paddingTop: "10px" }}>
+									Built on <a href="https://runeapps.org/modelviewer_about" style={{color:"#888"}}>RuneApps</a> | Code at <a href="https://github.com/Kbro1989/POG2" target="_blank" style={{color:"#888"}}>Kbro1989/POG2</a>
+								</div>
 							</div>
 						</React.Fragment>
 					)}

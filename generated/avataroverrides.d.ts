@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\avataroverrides.jsonc'
+// This source data is located at '../src/opcodes/avataroverrides.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type avataroverrides = {
@@ -7,16 +7,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -25,16 +22,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -43,16 +37,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -61,16 +52,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -79,16 +67,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -97,16 +82,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -115,16 +97,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -133,16 +112,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -151,16 +127,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -169,16 +142,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -187,16 +157,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -205,16 +172,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -223,16 +187,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -241,16 +202,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -259,16 +217,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,
@@ -277,16 +232,13 @@ export type avataroverrides = {
 		{
 			slot: any,
 			cust: {
-				model: number[] | null,
-				flag2: true | null,
-				color: {
-					col2: number[] | null,
-					col4: [
-						number,
-						number,
-					][] | null,
+				type: number,
+				models: number[],
+				flag2: {
+					coltype: number,
+					colors: number[],
 				} | null,
-				material: {
+				col4: {
 					header: number,
 					materials: number[],
 				} | null,

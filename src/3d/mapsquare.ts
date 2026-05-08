@@ -2023,17 +2023,22 @@ export async function generateLocationMeshgroups(scene: ThreejsSceneCache, locba
 	let loadproms: Promise<any>[] = [];
 	//dedupe fetches even though the scenecache already dedupes it, this still prevents a bunch of async microtasks
 	let queuedmodels = new Set<number>();
+	let missingModels: { model: number, loc: string | number }[] = [];
 	for (let loc of locs) {
 		for (let model of loc.models) {
 			if (queuedmodels.has(model.model)) { continue; }
 			queuedmodels.add(model.model);
 			loadproms.push(scene.getModelData(model.model).catch(e => {
-				console.warn("ignoring missing model", model.model, "in loc", loc.extras.locationInstance.location.name ?? loc.extras.locationid);
+				missingModels.push({ model: model.model, loc: loc.extras.locationInstance.location.name ?? loc.extras.locationid });
 				return { bonecount: 0, skincount: 0, miny: 0, maxy: 0, meshes: [] } as ModelData;
 			}).then(m => loadedmodels.set(model.model, m)));
 		}
 	}
 	await Promise.all(loadproms);
+	if (missingModels.length > 0) {
+		const locSet = new Set(missingModels.map(m => String(m.loc)));
+		console.warn(`[Spatial] ${missingModels.length} missing models across ${locSet.size} locs (benign — incomplete cache)`);
+	}
 
 	for (let index = 0; index < locs.length; index++) {
 		let obj = locs[index];

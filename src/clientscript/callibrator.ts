@@ -9,7 +9,7 @@ import { Openrs2CacheSource } from "../cache/openrs2loader";
 import * as fs from "fs/promises";
 import { crc32, crc32addInt } from "../libs/crc32util";
 import { params } from "../../generated/params";
-import { ClientScriptOp, ImmediateType, StackConstants, StackDiff, StackInOut, StackList, namedClientScriptOps, variableSources, typeToPrimitive, getOpName, knownClientScriptOpNames } from "./definitions";
+import { ClientScriptOp, ImmediateType, StackConstants, StackDiff, StackInOut, StackList, namedClientScriptOps, variableSources, typeToPrimitive, getOpName, knownClientScriptOpNames, getArgType, getReturnType } from "./definitions";
 import { dbtables } from "../../generated/dbtables";
 import { reverseHashes } from "../libs/rshashnames";
 import { CodeBlockNode, RawOpcodeNode, generateAst, parseClientScriptIm } from "./ast";
@@ -38,13 +38,26 @@ export type StackDiffEquation = {
 let varInfoParser = new FileParser<{ type: number }>({
     "0x03": { "name": "type", "read": "ubyte" },
     "0x04": { "name": "0x04", "read": "ubyte" },
+    "0x05": { "name": "0x05", "read": true },
+    "0x06": { "name": "0x06", "read": "ubyte" },
     "0x07": { "name": "0x07", "read": true },
+    "0x08": { "name": "0x08", "read": true },
+    "0x09": { "name": "0x09", "read": true },
+    "0x0a": { "name": "0x0a", "read": true },
+    "0x0b": { "name": "0x0b", "read": true },
+    "0x10": { "name": "0x10", "read": true },
+    "0x11": { "name": "0x11", "read": true },
     "0x6e": { "name": "0x6e", "read": "ushort" },
 });
 
 var varbitInfoParser = new FileParser<{ varid: number, bits: [number, number] }>({
     "0x01": { "name": "varid", "read": "utribyte" },//[8bit domain][16bit id] read as tribyte since thats also how we read pushvar/popvar imm
-    "0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] }
+    "0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] },
+    "0x03": { "name": "unk03", "read": "ubyte" },
+    "0x04": { "name": "unk04", "read": "ubyte" },
+    "0x08": { "name": "unk08", "read": true },
+    "0x10": { "name": "unk10", "read": true },
+    "0x11": { "name": "unk11", "read": true }
 });
 
 export class OpcodeInfo {
@@ -380,7 +393,12 @@ export class ClientscriptObfuscation {
         }
         let res = new ClientscriptObfuscation(source);
         globalThis.deob = res;//TODO remove
-        await res.preloadData();
+        try {
+            await res.preloadData();
+        } catch (e) {
+            console.warn(`⚠️ Warning: Failed to preload CS2 metadata: ${e instanceof Error ? e.message : e}`);
+            console.warn(`🔍 Proceeding with raw ID mode for decompilation.`);
+        }
         await res.loadCandidates();
         return res;
     }
@@ -1062,40 +1080,6 @@ function callibrateOperants(calli: ClientscriptObfuscation, candidates: Map<numb
     calli.foundParameters = true;
 }
 
-export function getArgType(script: clientscriptdata | clientscript) {
-    let res = new StackDiff();
-    res.int = script.intargcount;
-    res.long = script.longargcount;
-    res.string = script.stringargcount;
-    return res;
-}
-
-export function getReturnType(calli: ClientscriptObfuscation, ops: ClientScriptOp[], endindex = ops.length) {
-    let res = new StackList();
-    //the jagex compiler appends a default return with null constants to the script, even if this would be dead code
-    //endindex-1=return, pushconsts begins at -2
-    for (let i = endindex - 2; i >= 0; i--) {
-        let op = ops[i];
-        let opinfo = calli.getNamedOp(op.opcode);
-        if (opinfo.id == namedClientScriptOps.pushconst) {
-            if (op.imm == 0) { res.int(); }
-            if (op.imm == 1) { res.long(); }
-            if (op.imm == 2) { res.string(); }
-        } else if (opinfo.id == namedClientScriptOps.pushint) {
-            res.int();
-        } else if (opinfo.id == namedClientScriptOps.pushlong) {
-            res.long();
-        } else if (opinfo.id == namedClientScriptOps.pushstring) {
-            res.string();
-        } else {
-            break;
-        }
-    }
-    res.values.reverse();
-    return res;
-}
-
-//TODO remove/hide
 globalThis.getop = (opid: string) => {
     let id = -1;
     //don't use match because it breaks console hints

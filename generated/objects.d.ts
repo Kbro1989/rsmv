@@ -1,5 +1,5 @@
 // GENERATED DO NOT EDIT
-// This source data is located at '..\src\opcodes\objects.jsonc'
+// This source data is located at '../src/opcodes/objects.jsonc'
 // run `npm run filetypes` to rebuild
 
 export type objects = {
@@ -78,7 +78,7 @@ export type objects = {
 	unknown_49?: true | null
 	unknown_4A?: true | null
 	unknown_4B?: number | null
-	morphs_1?: {
+	varbitId?: {
 		unk1: number,
 		unk2: (number|number)[],
 		unk3: (number|number),
@@ -99,7 +99,7 @@ export type objects = {
 	unknown_59?: true | null
 	unknown_5A?: true | null
 	isMembers?: true | null
-	morphs_2?: {
+	varpId?: {
 		unk1: number,
 		unk2: (number|number),
 		unk3: (number|number)[],
@@ -239,7 +239,8 @@ export type objects = {
 		default: number,
 	} | null
 	extra?: {
-		prop: number,
+		type: number,
+		key: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null

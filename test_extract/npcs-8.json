@@ -1,0 +1,21 @@
+{
+  "animation_group": 4,
+  "boundSize": 1,
+  "actions_1": "Attack",
+  "combat": 14,
+  "color_replacements": [[25238, 47399], [8741, 6930]],
+  "name": "Thief",
+  "models": [215, 246, 292, 151, 179, 254, 185, 320],
+  "headModels": [39836, 39223],
+  "extra": [
+    {"prop": 2865, "intvalue": 202, "stringvalue": null},
+    {"prop": 2848, "intvalue": 4, "stringvalue": null},
+    {"prop": 14, "intvalue": 4, "stringvalue": null},
+    {"prop": 641, "intvalue": 400, "stringvalue": null},
+    {"prop": 29, "intvalue": 202, "stringvalue": null},
+    {"prop": 26, "intvalue": 1, "stringvalue": null}
+  ],
+  "movementCapabilities": 3,
+  "attackCursor": 42,
+  "$schema": ".schema-npcs.json"
+}

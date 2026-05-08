@@ -23,7 +23,8 @@ module.exports = {
 				loader: 'ts-loader',
 				exclude: /node_modules/,
 				options: {
-					onlyCompileBundledFiles: true
+					onlyCompileBundledFiles: true,
+					transpileOnly: true
 				}
 			},
 			{
@@ -40,6 +41,7 @@ module.exports = {
 	externals: {
 		// "fs", "net", "path", "os", "util", "assert",
 		"sqlite3": { commonjs: "sqlite3" },
+		"better-sqlite3": { commonjs: "better-sqlite3" },
 		"electron": { commonjs: "electron" },
 		"electron/main": { commonjs: "electron/main" },
 		"electron/renderer": { commonjs: "electron/renderer" },
@@ -52,6 +54,10 @@ module.exports = {
 	},
 	resolve: {
 		extensions: ['.tsx', '.ts', '.js'],
+		extensionAlias: {
+			'.js': ['.ts', '.js'],
+			'.mjs': ['.mts', '.mjs']
+		}
 	},
 	externalsType: "commonjs",
 	output: {

@@ -38,7 +38,8 @@
                 ["unk2",["opt","hasdefault&0x02 && $colindex==1","ubyte"]]
             ]]]
         ]]]
-    ]}
+    ]},
+	"0x10":{"name":"unk10","read":"ubyte"}
 }
 
 // alternative if the first byte were a version (it isn't because an empty dbtable starts with the 0x00 footer byte)
