@@ -58,18 +58,18 @@ export class CrcBuilder {
 		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ (byte & 0xff)) & 0xff];
 	}
 	addUint16Flipped(u16: number) {
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 16) & 0xff)) & 0xff];
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >>> 8) & 0xff)) & 0xff];
 		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ (u16 & 0xff)) & 0xff];
 	}
 	addUint16(u16: number) {
 		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ (u16 & 0xff)) & 0xff];
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 16) & 0xff)) & 0xff];
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >>> 8) & 0xff)) & 0xff];
 	}
-	addUint32(u16: number) {
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 0) & 0xff)) & 0xff];
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 16) & 0xff)) & 0xff];
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 24) & 0xff)) & 0xff];
-		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((u16 >> 32) & 0xff)) & 0xff];
+	addUint32(value: number) {
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ (value & 0xff)) & 0xff];
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((value >>> 8) & 0xff)) & 0xff];
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((value >>> 16) & 0xff)) & 0xff];
+		this.crc = (this.crc >>> 8) ^ crc32_table[(this.crc ^ ((value >>> 24) & 0xff)) & 0xff];
 	}
 	get() {
 		return (this.crc ^ 0xffffffff) >>> 0;
