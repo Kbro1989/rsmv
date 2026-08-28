@@ -1,0 +1,156 @@
+{
+  "npcs": [
+    {
+      "id": 1835,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 3688,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 7197,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 7410,
+      "name": "Easter Bunny Jr"
+    },
+    {
+      "id": 7411,
+      "name": "Easter Bunny Jr"
+    },
+    {
+      "id": 7412,
+      "name": "Easter Bunny Jr"
+    },
+    {
+      "id": 9687,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 13651,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 20947,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 22415,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 24173,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 26270,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 27016,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 27017,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 30816,
+      "name": "Easter Bunny"
+    },
+    {
+      "id": 30817,
+      "name": "Fizzy Bunny"
+    },
+    {
+      "id": 30818,
+      "name": "Nougat Bunny"
+    },
+    {
+      "id": 30819,
+      "name": "Gummy Bunny"
+    },
+    {
+      "id": 30820,
+      "name": "Stewy Bunny"
+    },
+    {
+      "id": 30825,
+      "name": "Cocoa Bunny"
+    },
+    {
+      "id": 30844,
+      "name": "Cocoa Bunny"
+    },
+    {
+      "id": 30845,
+      "name": "Cocoa Bunny"
+    }
+  ],
+  "objects": [
+    {
+      "id": 96570,
+      "name": "Easter Bunny's desk"
+    },
+    {
+      "id": 129321,
+      "name": "Egg Plant sign"
+    },
+    {
+      "id": 129412,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129413,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129414,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129420,
+      "name": "Blooming Burrow sign"
+    },
+    {
+      "id": 129421,
+      "name": "Egg Plant sign"
+    },
+    {
+      "id": 129754,
+      "name": "Blooming Burrow burrow"
+    },
+    {
+      "id": 129758,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129759,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129760,
+      "name": "Chocolate rock"
+    },
+    {
+      "id": 129762,
+      "name": "Foil storage"
+    },
+    {
+      "id": 129763,
+      "name": "Soft metal forge"
+    },
+    {
+      "id": 129765,
+      "name": "Chocolate burrow"
+    },
+    {
+      "id": 134722,
+      "name": "Blooming Burrow portal"
+    }
+  ],
+  "mapzones": [],
+  "items": []
+}
