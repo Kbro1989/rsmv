@@ -1,0 +1,22 @@
+{
+  "animation_group": 4,
+  "boundSize": 1,
+  "ambience": 25,
+  "actions_2": "Pickpocket",
+  "actions_1": "Attack",
+  "combat": 7,
+  "name": "Farmer",
+  "models": [48098],
+  "headModels": [48093],
+  "extra": [
+    {"prop": 2865, "intvalue": 150, "stringvalue": null},
+    {"prop": 2848, "intvalue": 4, "stringvalue": null},
+    {"prop": 14, "intvalue": 6, "stringvalue": null},
+    {"prop": 641, "intvalue": 300, "stringvalue": null},
+    {"prop": 29, "intvalue": 150, "stringvalue": null},
+    {"prop": 26, "intvalue": 1, "stringvalue": null}
+  ],
+  "movementCapabilities": 3,
+  "attackCursor": 42,
+  "$schema": ".schema-npcs.json"
+}

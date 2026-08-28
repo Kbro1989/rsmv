@@ -1,0 +1,32 @@
+{
+  "animation_group": 4,
+  "boundSize": 1,
+  "actions_1": "Attack",
+  "actions_2": "Pickpocket",
+  "actions_0": "Talk to",
+  "combat": 4,
+  "color_replacements": [
+    [8741, 557],
+    [6024, 7830],
+    [25238, 920],
+    [43072, 4550],
+    [6798, 6852]
+  ],
+  "recolor_indices": 55,
+  "material_replacements": [[745, 746]],
+  "name": "Woman",
+  "models": [393, 456, 40401, 10218, 435, 414],
+  "headModels": [39016, 38861],
+  "extra": [
+    {"prop": 2865, "intvalue": 130, "stringvalue": null},
+    {"prop": 2848, "intvalue": 4, "stringvalue": null},
+    {"prop": 14, "intvalue": 4, "stringvalue": null},
+    {"prop": 641, "intvalue": 120, "stringvalue": null},
+    {"prop": 29, "intvalue": 130, "stringvalue": null},
+    {"prop": 26, "intvalue": 1, "stringvalue": null}
+  ],
+  "movementCapabilities": 3,
+  "action_cursors_0": 44,
+  "attackCursor": 42,
+  "$schema": ".schema-npcs.json"
+}

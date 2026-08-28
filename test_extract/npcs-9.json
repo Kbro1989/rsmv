@@ -1,0 +1,24 @@
+{
+  "animation_group": 2701,
+  "boundSize": 1,
+  "actions_1": "Attack",
+  "actions_2": "Pickpocket",
+  "combat": 18,
+  "color_replacements": [[25238, 10508], [8741, 6930], [61, 5652]],
+  "name": "Guard",
+  "models": [107502],
+  "extra": [
+    {"prop": 2816, "intvalue": 14923, "stringvalue": null},
+    {"prop": 2955, "intvalue": 2687, "stringvalue": null},
+    {"prop": 2918, "intvalue": 18025, "stringvalue": null},
+    {"prop": 2865, "intvalue": 234, "stringvalue": null},
+    {"prop": 2848, "intvalue": 4, "stringvalue": null},
+    {"prop": 14, "intvalue": 4, "stringvalue": null},
+    {"prop": 641, "intvalue": 520, "stringvalue": null},
+    {"prop": 29, "intvalue": 234, "stringvalue": null},
+    {"prop": 26, "intvalue": 1, "stringvalue": null}
+  ],
+  "movementCapabilities": 3,
+  "attackCursor": 42,
+  "$schema": ".schema-npcs.json"
+}

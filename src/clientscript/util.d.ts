@@ -1,0 +1,12 @@
+import { enums } from "../../generated/enums";
+import { params } from "../../generated/params";
+import { structs } from "../../generated/structs";
+import { CacheFileSource } from "../cache";
+export declare function loadParams(source: CacheFileSource): Promise<Map<number, params>>;
+export declare function loadEnum(source: CacheFileSource, id: number): Promise<enums>;
+export declare function getEnumIntPairs(enumjson: enums): [number, number][];
+export declare function loadStruct(source: CacheFileSource, structid: number): Promise<structs>;
+export declare function getEnumInt(enumjson: enums, key: number): number;
+export declare function getEnumString(enumjson: enums, key: number): string;
+export declare function getStructInt(paramtable: Map<number, params>, struct: structs | null, paramid: number): number;
+export declare function getStructString(paramtable: Map<number, params>, struct: structs | null, paramid: number): string;
