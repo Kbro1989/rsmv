@@ -21,6 +21,7 @@ import { CanvasImage } from "../imgutils";
 import { minimapFloorMaterial, minimapWaterMaterial } from "../rs3shaders";
 import { mapsquare_tiles_nxt } from "../../generated/mapsquare_tiles_nxt";
 import { crc32addInt } from "../libs/crc32util";
+import { generateLocationHashBoxes, generateFloorHashBoxes } from "../map/chunksummary";
 
 
 export const tiledimensions = 512;
@@ -1230,11 +1231,10 @@ export async function renderMapSquare(cache: ThreejsSceneCache, parsedsquare: Re
 			if (rawboxes) { chunkroot.add(rawboxes); }
 		}
 		if (opts.hashboxes) {
-			throw new Error("hashbox render currently not supported");
-			// for (let level = 0; level < squareLevels; level++) {
-			// 	chunkroot.add(await generateLocationHashBoxes(cache, locmeshes.byLogical, grid, chunk.mapsquarex, chunk.mapsquarez, level));
-			// 	chunkroot.add(await generateFloorHashBoxes(cache, grid, chunk, level));
-			// }
+			for (let level = 0; level < squareLevels; level++) {
+				chunkroot.add(await generateLocationHashBoxes(cache, locmeshes.byLogical, grid, chunk.mapsquarex, chunk.mapsquarez, level));
+				chunkroot.add(await generateFloorHashBoxes(cache, grid, chunk, level));
+			}
 		}
 		modeldata = locmeshes.byLogical;
 	} else {

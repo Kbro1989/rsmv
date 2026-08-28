@@ -100,8 +100,8 @@ export function getRenderer(width: number, height: number, extraopts?: WebGLRend
 		cnv = {
 			width, height,
 			clientWidth: width, clientHeight: height,
-			addEventListener: event => { },
-			removeEventListener: event => { },
+			addEventListener: (_event: Event) => { },
+			removeEventListener: (_event: Event) => { },
 			style: {}
 		} as any;
 		ctx = __non_webpack_require__("gl")(width, height, opts);
@@ -158,4 +158,8 @@ export async function renderAppearance(scene: ThreejsSceneCache, mode: "player" 
 	render.dispose();
 
 	return { imgfile, modelfile };
+}
+
+function __non_webpack_require__(arg0: string): any {
+	throw new Error("Function not implemented.");
 }

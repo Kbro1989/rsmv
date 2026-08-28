@@ -89,7 +89,7 @@ export function cliApi(ctx: CliApiContext) {
 
 			let output = ctx.getConsole();
 			let source = await args.source();
-			let mode = cacheFileJsonModes[args.mode];
+			let mode = cacheFileJsonModes[args.mode as keyof typeof cacheFileJsonModes];
 			if (!mode) { throw new Error(`mode ${args.mode} not found, possible modes: ${Object.keys(cacheFileJsonModes).join(", ")}`) }
 			let opts = defaultTestDecodeOpts();
 			opts.outmode = "hextext";

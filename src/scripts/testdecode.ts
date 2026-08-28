@@ -159,7 +159,7 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 					subfiles = await source.getFileArchive(index);
 				} catch (e) {
 					subfiles = [];
-					error = e;
+					error = e instanceof Error ? e : new Error(String(e));
 				}
 				currentarch = { index, subfiles, error };
 				memuse += subfiles.reduce((a, v) => a + v.size, 0);
@@ -176,7 +176,10 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 				continue;
 			}
 			let entry: DecodeEntry = { major: index.major, minor: index.minor, subfile: file.subindex, file: subfile.buffer };
-			if (globalThis.testDecodeFilter && !globalThis.testDecodeFilter(entry)) {
+			const testDecodeFilter = (globalThis as typeof globalThis & {
+				testDecodeFilter?: (entry: DecodeEntry) => boolean
+			}).testDecodeFilter;
+			if (testDecodeFilter && !testDecodeFilter(entry)) {
 				continue;
 			}
 			if (orderBySize) {
@@ -208,7 +211,10 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 		let res = testDecodeFile(mode.parser, file.file, source);
 
 		if (output.state == "running") {
-			if (!globalThis.testDecodeOutputFilter || globalThis.testDecodeOutputFilter(res.state, res.debugdata.rootstate)) {
+			const testDecodeOutputFilter = (globalThis as typeof globalThis & {
+				testDecodeOutputFilter?: (state: any, rootstate: any) => boolean
+			}).testDecodeOutputFilter;
+			if (!testDecodeOutputFilter || testDecodeOutputFilter(res.state, res.debugdata.rootstate)) {
 				if (res.success) {
 					nsuccess++;
 				} else {
@@ -266,7 +272,7 @@ export function testDecodeFile(decoder: FileParser<any>, buffer: Buffer, source:
 		res = decoder.readInternal(state);
 		success = true;
 	} catch (e) {
-		error = e;
+		error = e instanceof Error ? e : new Error(String(e));
 	}
 	let debugdata = getDebug(false)!;
 

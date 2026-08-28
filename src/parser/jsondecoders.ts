@@ -88,14 +88,14 @@ export class FileParser<T> {
 		state.buffer.copyWithin(state.scan, state.endoffset, scratchbuf.byteLength);
 		state.scan += scratchbuf.byteLength - state.endoffset;
 		//do the weird prototype slice since we need a copy, not a ref
-		let r: Buffer = Uint8Array.prototype.slice.call(scratchbuf, 0, state.scan);
+		let r: Buffer = Buffer.from(scratchbuf.subarray(0, state.scan));
 		//clear it for next use
 		scratchbuf.fill(0, 0, state.scan);
 		return r;
 	}
 }
 
-globalThis.parserTimings = () => {
+(globalThis as typeof globalThis & { parserTimings: () => void }).parserTimings = () => {
 	let all = Object.entries(parse).map(q => ({ name: q[0], t: q[1].totaltime }));
 	all.sort((a, b) => b.t - a.t);
 	all.slice(0, 10).filter(q => q.t > 0.01).forEach(q => console.log(`${q.name} ${q.t.toFixed(3)}s`));
@@ -222,6 +222,7 @@ export const cacheFileJsonModes = {
 	mappastes: JsonBasedFile(parse.mapPastes, singleMinorIndex(cacheMajors.worldmap, 1)),
 	mapzones_sub3: JsonBasedFile(parse.mapZonesSub3, singleMinorIndex(cacheMajors.worldmap, 3)),
 	mapzones_sub4: JsonBasedFile(parse.mapZonesSub4, singleMinorIndex(cacheMajors.worldmap, 4)),
+	poh: JsonBasedFile(parse.loc, chunkedIndex(cacheMajors.locs, internalNameFiles.loc)),
 	cutscenes: JsonBasedFile(parse.cutscenes, noArchiveIndex(cacheMajors.cutscenes)),
 
 	particles0: JsonBasedFile(parse.particles_0, singleMinorIndex(cacheMajors.particles, 0)),

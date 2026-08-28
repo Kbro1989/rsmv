@@ -9,8 +9,8 @@ export function RsUIViewer(p: { data: string }) {
 	let [ui, setui] = React.useState<RsInterfaceDomTree | null>(null);
 	let [hovering, sethovering] = React.useState(true);
 	let [refreshcount, refresh] = React.useReducer((v: number) => v + 1, 0);
-	let scene: ThreejsSceneCache = globalThis.sceneCache;//TODO pass this properly using args
-	let render: ThreeJsRenderer = globalThis.render;//TODO
+	let scene: ThreejsSceneCache = (globalThis as typeof globalThis & { sceneCache: ThreejsSceneCache }).sceneCache;//TODO pass this properly using args
+	let render: ThreeJsRenderer = (globalThis as typeof globalThis & { render: ThreeJsRenderer }).render;//TODO
 	let ctx = React.useMemo(() => {
 		let res = new UiRenderContext(scene.engine);
 		res.sceneCache = scene;

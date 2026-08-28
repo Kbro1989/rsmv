@@ -1,21 +1,21 @@
 import * as THREE from "three";
 
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { delay, TypedEmitter } from '../utils';
 import { dumpTexture, flipImage, makeImageData } from '../imgutils';
 import { boundMethod } from 'autobind-decorator';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
-import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { ModelExtras, MeshTileInfo, ClickableMesh } from '../3d/mapsquare';
 import { AnimationClip, AnimationMixer, BufferGeometry, Camera, Clock, Color, CubeCamera, Group, Material, Matrix4, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D, OrthographicCamera, PerspectiveCamera, SkinnedMesh, Texture, Vector3 } from "three";
 import { VR360Render } from "./vr360camera";
 import { UiCameraParams, updateItemCamera } from "./scenenodes";
 
 //TODO remove
-globalThis.THREE = THREE;
+(globalThis as typeof globalThis & { THREE: typeof THREE }).THREE = THREE;
 //console hooks
-globalThis.logclicks = false;
-globalThis.speed = 100;
+(globalThis as unknown as { logclicks: boolean }).logclicks = false;
+(globalThis as unknown as { speed: number }).speed = 100;
 
 //nodejs compatible animframe calls
 //should in theory be able to get rid of these completely by enforcing autoframes=false
@@ -86,7 +86,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 
 	constructor(canvas: HTMLCanvasElement, params?: THREE.WebGLRendererParameters) {
 		super();
-		globalThis.render = this;//TODO remove
+		Object.assign(globalThis, { render: this });//TODO remove
 		this.canvas = canvas;
 		this.renderer = new THREE.WebGLRenderer({
 			canvas,
@@ -373,7 +373,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 
 		// update animations
 		let delta = this.clock.getDelta();
-		delta *= (globalThis.speed ?? 100) / 100;//TODO remove
+		delta *= ((globalThis as { speed?: number }).speed ?? 100) / 100;//TODO remove
 		this.animationCallbacks.forEach(q => q(delta, this.clock.elapsedTime));
 
 		this.resizeRendererToDisplaySize();		
@@ -592,9 +592,9 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			let meshdata = obj.userData as ModelExtras;
 
 			if (firstloggable) {
-				globalThis.model = isct.object;
+				(globalThis as typeof globalThis & { model?: THREE.Object3D }).model = isct.object;
 				firstloggable = false;
-				if (globalThis.logclicks) {
+				if ((globalThis as typeof globalThis & { logclicks?: boolean }).logclicks) {
 					if (isct.object instanceof Mesh && isct.object.geometry instanceof BufferGeometry) {
 
 						let indices = [isct.face!.a, isct.face!.b, isct.face!.c];
@@ -741,7 +741,7 @@ export function disposeThreeTree(node: THREE.Object3D | null) {
 
 		// dispose textures
 		for (const key of Object.keys(material)) {
-			const value = material[key]
+			const value = (material as any)[key]
 			if (value && typeof value === 'object' && 'minFilter' in value) {
 				value.dispose();
 				count++;
@@ -814,7 +814,7 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 		}
 	});
 	let res = await new Promise<Buffer>((resolve, reject) => {
-		exporter.parse(node, gltf => resolve(gltf as any), reject, {
+		exporter.parse(node, (gltf: any) => resolve(gltf), reject, {
 			binary: true,
 			animations: anims
 		});

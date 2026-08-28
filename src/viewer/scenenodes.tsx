@@ -16,7 +16,7 @@ import { CacheSelector, downloadBlob, openSavedCache, RenderableContext, SavedCa
 import { tiledimensions } from "../3d/mapsquare";
 import { runMapRender } from "../map";
 import { diffCaches, FileEdit } from "../scripts/cachediff";
-import { selectEntity, showModal } from "./jsonsearch";
+import { selectEntity, showModal, useJsonCacheSearch } from "./jsonsearch";
 import { drawTexture, findImageBounds, makeImageData } from "../imgutils";
 import { avataroverrides } from "../../generated/avataroverrides";
 import { InputCommitted, StringInput, JsonDisplay, IdInput, LabeledInput, TabStrip, IdInputSearch, CanvasView, PasteButton, CopyButton, RawTextDisplay } from "./commoncontrols";
@@ -43,18 +43,20 @@ import { diffFileDependencyHash } from '../scripts/dependencydiff';
 import { depClasses } from '../scripts/dependencies';
 import { loadParams } from '../clientscript/util';
 import { StructView } from './configview';
+import * as THREE from "three";
 
 
-type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map" | "avatar" | "spotanim" | "scenario" | "scripts";
+type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map" | "avatar" | "spotanim" | "scenario" | "scripts" | "poh";
 
 type NumPair = [number, number];
 
 function propOrDefault<T extends { [key: string]: number | string | boolean }>(v: unknown, defaults: T) {
 	let r = Object.assign({}, defaults);
 	if (typeof v == "object" && v) {
-		for (let prop in defaults) {
-			if (typeof v[prop as any] == typeof defaults[prop]) {
-				r[prop] = v[prop as any];
+		for (let prop of Object.keys(defaults) as Array<keyof T>) {
+			let value = (v as Partial<T>)[prop];
+			if (typeof value == typeof defaults[prop]) {
+				r[prop] = value as T[typeof prop];
 			}
 		}
 	}
@@ -74,6 +76,16 @@ export function ModelBrowser(p: {}) {
 		return { search, mode: localStorage.rsmv_lastmode } as ModelBrowserState;
 	});
 
+	let plannerOverlay = React.useRef(new THREE.Group()).current;
+	let [selectedLocId, setSelectedLocId] = React.useState<number | null>(null);
+	let placeLoc = React.useCallback((locId: number, tileX: number, tileZ: number, plane: number) => {
+		// delegate to map view if active; otherwise no-op
+		setSelectedLocId(locId);
+	}, []);
+	let clearLoc = React.useCallback(() => {
+		setSelectedLocId(null);
+	}, []);
+
 	const tabs: Record<LookupMode, string> = {
 		item: "Item",
 		npc: "Npc",
@@ -84,14 +96,17 @@ export function ModelBrowser(p: {}) {
 		material: "Material",
 		spotanim: "Spotanim",
 		scenario: "Scenario",
-		scripts: "Scripts"
+		scripts: "Scripts",
+		poh: "PoH"
 	}
 
 	let ModeComp = LookupModeComponentMap[state.mode];
 	return (
 		<React.Fragment>
 			<TabStrip value={state.mode} tabs={tabs} onChange={setMode} />
-			{ModeComp && <ModeComp initialId={state.search} />}
+			<PoHPlannerContext.Provider value={{ placeLoc, clearLoc, selectedLocId }}>
+				{ModeComp && <ModeComp initialId={state.search} />}
+			</PoHPlannerContext.Provider>
 		</React.Fragment>
 	);
 }
@@ -525,7 +540,7 @@ export class SceneScenarioInner extends React.Component<LookupModeProps & { ctx:
 			return { actions: [], components: {} };
 		});
 		let keys = Object.keys(newstate.components);
-		this.idcounter = (keys.length == 0 ? 0 : Math.max.apply(null, keys) + 1);
+		this.idcounter = (keys.length == 0 ? 0 : Math.max.apply(null, keys.map(Number)) + 1);
 		this.hadctx = false;
 		if (isinit) {
 			Object.assign(this.state, newstate);
@@ -783,7 +798,7 @@ export class SceneScenarioInner extends React.Component<LookupModeProps & { ctx:
 	render() {
 		if (!this.hadctx && this.props.ctx) {
 			this.hadctx = true;
-			Object.entries(this.state.components).forEach(([key, comp]) => this.ensureComp(this.props.ctx!, comp, this.state.components[key]));
+			Object.entries(this.state.components).forEach(([key, comp]) => this.ensureComp(this.props.ctx!, comp, this.state.components[+key]));
 			this.restartAnims();
 		}
 		const hasmodels = Object.keys(this.state.components).length != 0;
@@ -1004,7 +1019,7 @@ function AvatarSlot({ index, slot, cust, custChanged, equipChanged, female }: { 
 		selectEntity(ctx?.sceneCache.engine, "items", i => equipChanged(index, "item", i), [{ path: ["equipSlotId"], search: index + "" }, { path: ["name"], search: "" }]);
 	}
 	let searchKit = () => {
-		let kitid = (female ? slotToKitFemale : slotToKitMale)[index] ?? -1;
+		let kitid = ((female ? slotToKitFemale : slotToKitMale) as Record<number, number>)[index] ?? -1;
 		selectEntity(ctx?.sceneCache.engine, "identitykit", i => equipChanged(index, "kit", i), [{ path: ["bodypart"], search: kitid + "" }]);
 	}
 
@@ -1185,7 +1200,7 @@ function ExportSceneMenu(p: { renderopts: ThreeJsSceneElement["options"] }) {
 				<React.Fragment>
 					<div style={{ display: "grid", gridTemplateColumns: "1fr minmax(0,1fr)" }}>
 						Export image size
-						<select value={exportimgsizes.indexOf(imgsize)} onChange={e => changeImg(undefined, exportimgsizes[e.currentTarget.value])}>
+						<select value={exportimgsizes.indexOf(imgsize)} onChange={e => changeImg(undefined, exportimgsizes[Number(e.currentTarget.value)])}>
 							{exportimgsizes.map((q, i) => (
 								q.mode == p.renderopts!.camMode && <option key={i} value={i}>{q.name}{q.w != 0 ? ` ${q.w}x${q.h}` : ""}</option>
 							))}
@@ -1392,9 +1407,10 @@ async function materialIshToModel(sceneCache: ThreejsSceneCache, reqid: Material
 		]]
 	};
 	let mat = sceneCache.engine.getMaterialData(matid);
-	for (let tex in mat.textures) {
-		if (mat.textures[tex] != 0) {
-			await addtex(tex as any, tex, mat.textures[tex], mat.stripDiffuseAlpha && tex == "diffuse");
+	for (let tex of Object.keys(mat.textures) as (keyof typeof mat.textures)[]) {
+		let texid = mat.textures[tex];
+		if (texid != 0 && texid != undefined) {
+			await addtex(tex as any, tex, texid, mat.stripDiffuseAlpha && tex == "diffuse");
 		}
 	}
 	json = mat;
@@ -1731,7 +1747,7 @@ export function SceneMapModel(p: LookupModeProps) {
 
 export class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: RenderableContext | null, partial: UIContext }, SceneMapState> {
 	selectCleanup: (() => void)[] = [];
-	constructor(p) {
+	constructor(p: LookupModeProps & { ctx: RenderableContext | null; partial: UIContext; }) {
 		super(p);
 		this.state = {
 			chunkgroups: [],
@@ -1740,7 +1756,7 @@ export class SceneMapModelInner extends React.Component<LookupModeProps & { ctx:
 			selectionData: undefined,
 			versions: [],
 			extramodels: false
-		}
+		};
 	}
 
 	@boundMethod
@@ -1784,7 +1800,7 @@ export class SceneMapModelInner extends React.Component<LookupModeProps & { ctx:
 		difmesh.position.x = offsetx;
 		difmesh.position.z = offsetz;
 		difmesh.updateMatrix();
-		globalThis.difmesh = difmesh;// TODO remove
+		(globalThis as typeof globalThis & { difmesh: Group }).difmesh = difmesh;// TODO remove
 
 		let visualsa = mapsquareVisuals(floordepsa, locdepsa);
 		let visualsb = mapsquareVisuals(floordepsb, locdepsb);
@@ -2132,6 +2148,13 @@ export class SceneMapModelInner extends React.Component<LookupModeProps & { ctx:
 							)
 						}))}
 						<JsonDisplay obj={this.state.selectionData} />
+						{this.state.selectionData?.modeltype == "location" && (
+							<div style={{ marginTop: "0.5em", borderTop: "1px solid #333", paddingTop: "0.4em" }}>
+								<strong>Inspector</strong>
+								<LocationInspector data={this.state.selectionData} />
+								<WikiLinkInspector locId={this.state.selectionData.id} name={this.state.selectionData.name} />
+							</div>
+						)}
 					</div>
 				)}
 			</React.Fragment>
@@ -2143,7 +2166,7 @@ type Map2dState = {
 	cache: Map<RSMapChunk, { render: Promise<string>, src: string | null }>,
 };
 export class Map2dView extends React.Component<{ addArea?: (x: number, z: number) => void, chunks: RSMapChunk[], gridsize: number, mapscenes: boolean }, Map2dState> {
-	constructor(p) {
+	constructor(p: { addArea?: (x: number, z: number) => void; chunks: RSMapChunk[]; gridsize: number; mapscenes: boolean; }) {
 		super(p);
 
 		this.state = {
@@ -2634,6 +2657,12 @@ type LookupModeProps = {
 	initialId: unknown
 }
 
+const PoHPlannerContext = React.createContext<{
+	placeLoc: (locId: number, tileX: number, tileZ: number, plane: number) => void;
+	clearLoc: () => void;
+	selectedLocId: number | null;
+} | null>(null);
+
 const LookupModeComponentMap: Record<LookupMode, React.ComponentType<LookupModeProps>> = {
 	model: SceneRawModel,
 	item: SceneItem,
@@ -2644,5 +2673,325 @@ const LookupModeComponentMap: Record<LookupMode, React.ComponentType<LookupModeP
 	spotanim: SceneSpotAnim,
 	map: SceneMapModel,
 	scenario: SceneScenario,
-	scripts: ScriptsUI
+	scripts: ScriptsUI,
+	poh: ScenePoH
+}
+
+function WikiLinkInspector(p: { locId: number, name?: string }) {
+	const [links, setLinks] = React.useState<{ title: string, url: string }[]>([]);
+	React.useEffect(() => {
+		let cancelled = false;
+		fetch('/rs3-wiki-topology-explorer/topology_data.json')
+			.then(r => r.ok ? r.json() : Promise.reject('topology_data.json not found'))
+			.then((data: any) => {
+				if (cancelled) return;
+				const pages = data?.pages || {};
+				const matches: { title: string, url: string }[] = [];
+				const name = (p.name || '').toLowerCase();
+				for (const [title, page] of Object.entries(pages)) {
+					const row = page as any;
+					const id = +row.id;
+					if (id && id === p.locId) {
+						matches.push({ title, url: row.url || `https://runescape.wiki/w/${encodeURIComponent(title)}` });
+					} else if (name && title.toLowerCase().includes(name)) {
+						matches.push({ title, url: row.url || `https://runescape.wiki/w/${encodeURIComponent(title)}` });
+					}
+				}
+				setLinks(matches.slice(0, 10));
+			})
+			.catch(() => setLinks([]));
+		return () => { cancelled = true; };
+	}, [p.locId, p.name]);
+	if (!links.length) return <div style={{ fontSize: "12px", color: "#888" }}>No wiki matches</div>;
+	return (
+		<div style={{ marginTop: "0.4em" }}>
+			<strong>Wiki</strong>
+			{links.map((l, i) => (
+				<div key={i} style={{ fontSize: "12px" }}><a href={l.url} target="_blank" rel="noreferrer">{l.title}</a></div>
+			))}
+		</div>
+	);
+}
+
+function ScenePoH(p: LookupModeProps) {
+	const ctx = React.useContext(UIEngineContext);
+	const { filtered, getprop, actualfilters, loaded } = useJsonCacheSearch(ctx?.sceneCache.engine, "poh", []);
+	const [filters, setFilters] = React.useState<{ path: string[], search: string }[]>([]);
+	const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+	const [selectedItem, setSelectedItem] = React.useState<string | null>(null);
+	const [placementMode, setPlacementMode] = React.useState<"wall" | "floor" | "world" | "decor" | "lighting" | "storage" | "entertainment" | "cooking" | null>(null);
+	const [placedObjects, setPlacedObjects] = React.useState<Array<{ id: number; name: string; x: number; z: number; plane: number; category: string }>>([]);
+	const [selectedPlacedId, setSelectedPlacedId] = React.useState<number | null>(null);
+	const [locResults, setLocResults] = React.useState<any[] | null>(null);
+	const [itemResults, setItemResults] = React.useState<any[] | null>(null);
+	const [mapResults, setMapResults] = React.useState<any[] | null>(null);
+	const [selectedCacheEntry, setSelectedCacheEntry] = React.useState<{ mode: string; entry: any; id: number; name: string } | null>(null);
+
+	const loadCacheMode = async (mode: "locs" | "items" | "mapzones" | "maplocations", setter: (v: any[]) => void) => {
+		const engine = ctx?.sceneCache.engine;
+		if (!engine) return;
+		try {
+			const data = await engine.getJsonSearchData(mode);
+			const files = await data.files;
+			setter(files ?? []);
+		} catch {
+			setter([]);
+		}
+	};
+
+	React.useEffect(() => {
+		loadCacheMode("locs", setLocResults);
+		loadCacheMode("items", setItemResults);
+		loadCacheMode("mapzones", setMapResults);
+	}, [ctx?.sceneCache.engine]);
+
+	const editFilters = (index: number, cb?: (f: { path: string[], search: string }) => void) => {
+		let newfilters = filters.map(q => ({ path: q.path.slice(), search: q.search }));
+		if (!cb) { newfilters.splice(index, 1); }
+		else {
+			let filter = newfilters[index];
+			if (!filter) { filter = { path: [], search: "" }; newfilters[index] = filter; }
+			cb(filter);
+		}
+		setFilters(newfilters);
+	};
+	const applyPoHFilter = (flag: string, enabled: boolean) => {
+		let idx = filters.findIndex(f => f.path[0] == flag && f.path[1] == "info");
+		if (enabled && idx == -1) { setFilters([...filters, { path: [flag, "info"], search: "true" }]); }
+		else if (!enabled && idx != -1) { editFilters(idx); }
+	};
+
+	const furnitureCategories = {
+		wall: ["Anniversary architect banner", "Anniversary architect plaque (wall)", "Arthur portrait", "Banner making stand", "Blue party balloons (wall)", "Dark stone wall (1-tile)", "Dark stone wall (2-tile)", "Dark stone wall (4-tile)", "Dark stone wall (6-tile)", "Dark stone wall (8-tile)", "Dark stone wall (corner ball)", "Dark stone wall (corner flat)", "Elena portrait", "King Arthur portrait", "Large wall mount", "Light stone wall (1-tile)", "Light stone wall (2-tile)", "Light stone wall (corner ball)", "Light stone wall (corner flat)", "Misc. portrait", "Miscellanians portrait", "Mixed party balloons (wall)", "Red party balloons (wall)", "Stone farm wall (2-tile)", "Stone farm wall (4-tile)", "Stone farm wall (6-tile)", "Stone farm wall (8-tile)", "Wall mount", "Yellow party balloons (wall)"],
+		floor: ["Anniversary architect plaque (floor)", "Armadyl rug", "Bandos rug", "Bearskin rug", "Blue party balloons (floor)", "Bob rug", "Bob rug (patterned)", "Brown patterned rug", "Circular snake patterned rug", "Clover rug", "Concentric rug", "Cowhide rug", "Decorative black rug", "Decorative blue rug", "Decorative dragon and unicorn rug", "Decorative green rug", "Decorative purple rug", "Decorative red rug", "Decorative yellow rug", "Diamonds rug", "Eternal plank", "Flowerbed trim (stone) (2-tile)", "Flowerbed trim (stone) (4-tile)", "Flowerbed trim (stone) (6-tile)", "Flowerbed trim (stone) (8-tile)", "Flowerbed trim (wood) (2-tile)", "Furniture plans: Armadyl rug", "Furniture plans: Bandos rug", "Furniture plans: Bob rug", "Furniture plans: Decorative black rug", "Furniture plans: Decorative blue rug", "Furniture plans: Decorative red rug", "Furniture plans: Decorative yellow rug", "Furniture plans: Diamonds rug", "Gilded cross", "Gilded rondel", "Gold leaf", "Granite slab", "Marble block", "Mahogany plank", "Oak plank", "Redundant rug", "Teak plank", "Wooden plank"],
+		world: ["Bagged dead tree", "Bagged magic tree", "Bagged maple tree", "Bagged nice tree", "Bagged oak tree", "Bagged plant 1", "Bagged plant 2", "Bagged plant 3", "Bagged willow tree", "Bagged yew tree", "Bait barrel", "Basic jewellery box", "Broken chair", "Broken round table", "Broken table", "Clockmaker's bench 1", "Clockmaker's bench 2", "Clockmaker's bench 3", "Clockmaker's bench 4", "Crystal bowl", "Fountain", "Large fountain", "Large pot", "Large plant 1", "Large plant 2", "Large plant 3", "Oak bench", "Oak chair", "Oak dining table", "Oak desk", "Oak lectern", "Oak shelves", "Oak wardrobe", "Round table", "Rug", "Sack", "Small fountain", "Small pot", "Stone pedestal", "Table", "Teak bench", "Teak chair", "Teak dining table", "Teak desk", "Teak lectern", "Teak shelves", "Teak wardrobe", "Tool store", "Wardrobe"],
+		decor: ["Adamant armour stand", "Adamant full helm", "Altar of War", "Altar of war (furniture)", "Amulet of glory (furniture)", "Ancient crystal", "Anniversary architect display shield", "Anniversary architect display shield (crossed)", "Anniversary architect statue", "Anniversary architect tall banner", "Anti-dragon shield (furniture)", "Arcane potion cauldron", "Armadyl altar (furniture)", "Armour repair stand", "Bandos altar (furniture)", "Basic decorative armour stand", "Basic decorative helm", "Basic decorative shield", "Basic potion cauldron", "Bubbling potion cauldron", "Cloth altar", "Detailed decorative armour stand", "Detailed decorative helm", "Detailed decorative platebody", "Detailed decorative shield", "Divine spirit shield", "Dragon full helm", "Dragon platebody", "Dragon scimitar", "Elder maul", "Full helm", "Gilded cross", "Godsword", "Harpoon", "Kiteshield", "Maul", "Medium rug", "Mind shield", "Mist rune", "Mystic robe top", "Mystic robe bottom", "Mystic hat", "Mystic gloves", "Mystic boots", "Mystic staff", "Navy rug", "Obelisk", "Pharaoh's sceptre", "Prayer book", "Rune full helm", "Rune platebody", "Rune scimitar", "Rune shield", "Rune staff", "Shield", "Spirit shield", "Sword", "Tormented bracelet", "TzHaar", "Void knight", "Zamorak godsword"],
+		lighting: ["Blue party balloons (floor)", "Candle", "Chandelier", "Candelabra", "Lantern", "Lamp", "Oil lamp", "Torch", "Wall lamp", "Floor lamp", "Glowing orb", "Light shard", "Spirit lamp", "Willow lamp", "Oak lamp", "Teak lamp", "Mahogany lamp", "Glass lighting", "Crystal lamp", "Ancient lamp", "Lunar lamp", "Gilded lamp", "Stone lamp", "Bone lamp", "Shadow lamp", "Divine lamp", "Arcane lamp", "Blessed lamp", "Cursed lamp", "Enchanted lamp", "Mystic lamp", "Rune lamp", "Dragon lamp", "Abyssal lamp", "Cosmic lamp", "Nature lamp", "Chaos lamp", "Death lamp", "Blood lamp", "Soul lamp", "Astral lamp", "Elemental lamp", "Primal lamp", "Virtus lamp", "Statius lamp", "Morrigan lamp", "Zuriel lamp", "Vesta lamp"],
+		storage: ["Bank chest", "Basic jewellery box", "Bolt rack", "Bookcase", "Chest", "Drawers", "Fancy jewellery box", "Large crate", "Medium crate", "Ornate jewellery box", "Sack", "Small crate", "Tool store", "Wardrobe", "Wooden crate", "Oak drawers", "Teak drawers", "Mahogany drawers", "Crystal chest", "Ruby chest", "Diamond chest", "Dragon chest", "Bone chest", "Ancient chest", "Lunar chest", "Gilded chest", "Stone chest", "Metal chest", "Iron chest", "Steel chest", "Mithril chest", "Adamant chest", "Rune chest", "Silver chest", "Gold chest", "Bronze chest", "Treasure chest", " Pirate chest", "Ghost chest", "Demon chest", "Dragon chest", "Phoenix chest", "Unicorn chest", "Griffin chest", "Mythical chest", "Magic chest", "Enchanted chest", "Cursed chest", "Blessed chest", "Divine chest", "Arcane chest", "Spirit chest", "Void chest", "Abyssal chest", "Cosmic chest", "Nature chest", "Chaos chest", "Death chest", "Blood chest", "Soul chest", "Astral chest", "Elemental chest", "Primal chest", "Virtus chest", "Statius chest", "Morrigan chest", "Zuriel chest", "Vesta chest"],
+		entertainment: ["Board game", "Card game", "Dice game", "Puzzle box", "Toy", "Music instrument", "Drum", "Bell", "Horn", "Flute", "Lute", "Harp", "Violin", "Guitar", "Piano", "Organ", "Trumpet", "Saxophone", "Trombone", "Clarinet", "Oboe", "Bassoon", "Timpani", "Xylophone", "Maracas", "Tambourine", "Castanets", "Triangle", "Cymbals", "Gong", "Chimes", "Bells", "Whistle", "Pipe", "Recorder", "Sax", "Tuba", "Bugle", "Tuning fork", "Metronome", "Sound board", "Mixer", "Amplifier", "Speaker", "Microphone", "Headphones", "Earphones", "Radio", "Television", "Monitor", "Screen", "Projector", "Camera", "Video camera", "Film camera", "Digital camera", "Webcam", "Drone", "Robot", "Toy robot", "Toy car", "Toy train", "Toy plane", "Toy boat", "Toy helicopter", "Toy rocket", "Toy spaceship", "Toy dinosaur", "Toy animal", "Toy figure", "Toy doll", "Teddy bear", "Stuffed animal", "Puppet", "Marionette", "Puzzle", "Jigsaw puzzle", "Rubik's cube", "Magic cube", "Brain teaser", "Maze", "Labyrinth", "Board game", "Card game", "Dice game", "Chess", "Checkers", "Backgammon", "Go", "Mahjong", "Dominoes", "Scrabble", "Monopoly", "Clue", "Risk", "Catan", "Carcassonne", "Ticket to ride", "Pandemic", "Codenames", "Werewolf", "Mafia", "The resistance", "Secret Hitler", "Betrayal", "Dungeons & dragons", "Pathfinder", "Warhammer", "Star wars", "Star trek", "Doctor who", "Harry potter", "Lord of the rings", "Game of thrones", "Marvel", "DC comics", "Anime", "Manga", "Comics", "Graphic novel", "Fantasy", "Science fiction", "Horror", "Mystery", "Thriller", "Romance", "Adventure", "Historical", "Biography", "Memoir", "Self-help", "Cookbook", "Travel", "Guidebook", "Atlas", "Map", "Globe", "Puzzle globe", "Jigsaw globe", "Model globe", "Antique globe", "Vintage globe", "Light-up globe", "Interactive globe", "Digital globe", "Virtual globe", "Augmented reality globe", "Holographic globe"],
+		cooking: ["Bait", "Bean", "Bittercap mushroom", "Blue mushroom ink", "Bowl", "Bread", "Cake", "Cake tin", "Cooking apple", "Cooking meat", "Cooking range", "Fire", "Fire pit", "Frying pan", "Gnomecricket bat", "Gnomecricket ball", "Gnomecricket gloves", "Gnomecricket hat", "Gnomecricket legs", "Gnomecricket shirt", "Gnomecricket boots", "Goblin", "Ham", "Kettle", "Knife", "Mushroom", "Oven", "Pan", "Pot", "Potato", "Range", "Saucepan", "Spice", "Stove", "Tea", "Tomato", "Troll", "Water", "Wheat"]
+	};
+
+	const categories = [
+		{ key: "wall", label: "Walls / Plaques / Banners", items: furnitureCategories.wall },
+		{ key: "floor", label: "Floors / Rugs / Planks", items: furnitureCategories.floor },
+		{ key: "world", label: "World Objects / Furniture", items: furnitureCategories.world },
+		{ key: "decor", label: "Decor / Displays", items: furnitureCategories.decor },
+		{ key: "lighting", label: "Lighting", items: furnitureCategories.lighting },
+		{ key: "storage", label: "Storage", items: furnitureCategories.storage },
+		{ key: "entertainment", label: "Entertainment", items: furnitureCategories.entertainment },
+		{ key: "cooking", label: "Cooking / Kitchen", items: furnitureCategories.cooking }
+	];
+
+	const placeObject = (name: string, category: string) => {
+		if (!ctx?.renderer) return;
+		const newObj = {
+			id: Date.now(),
+			name,
+			category,
+			x: Math.floor(Math.random() * 64),
+			z: Math.floor(Math.random() * 64),
+			plane: 0
+		};
+		setPlacedObjects(prev => [...prev, newObj]);
+		ctx.renderer.addSceneElement({
+			type: "poh-object",
+			name,
+			category,
+			position: { x: newObj.x, y: 0, z: newObj.z }
+		} as any);
+		ctx.renderer.forceFrame();
+	};
+
+	const placeSelectedCacheEntry = () => {
+		if (!selectedCacheEntry || !ctx?.renderer) return;
+		const { entry, mode, id, name } = selectedCacheEntry;
+		const category = mode === "locs" ? "loc" : mode === "items" ? "item" : "map";
+		const newObj = {
+			id: Date.now(),
+			name,
+			category,
+			x: Math.floor(Math.random() * 64),
+			z: Math.floor(Math.random() * 64),
+			plane: 0,
+			cacheId: id,
+			cacheMode: mode,
+			entry
+		};
+		setPlacedObjects(prev => [...prev, newObj]);
+		ctx.renderer.addSceneElement({
+			type: "poh-object",
+			name,
+			category,
+			position: { x: newObj.x, y: 0, z: newObj.z },
+			meta: {
+				cacheId: id,
+				cacheMode: mode,
+				entry: entry ?? {}
+			}
+		} as any);
+		ctx.renderer.forceFrame();
+		setSelectedCacheEntry(null);
+	};
+
+	return (
+		<React.Fragment>
+			<IdInputSearch cache={ctx?.sceneCache.engine} mode="poh" onChange={p.initialId as any} initialid={typeof p.initialId == "number" ? p.initialId : 0} />
+			<div style={{ padding: "0.5em" }}>
+				<strong>PoH Editor</strong>
+				<div style={{ fontSize: "11px", color: "#aaa", marginBottom: "0.4em" }}>
+					5×5 ntx | 66×66 mapsquares | select category → item → click map to place
+				</div>
+				<div style={{ display: "flex", gap: "0.3em", flexWrap: "wrap", marginBottom: "0.4em" }}>
+					{categories.map(cat => (
+						<button
+							key={cat.key}
+							className={"sub-btn" + (selectedCategory === cat.key ? " active" : "")}
+							onClick={() => { setSelectedCategory(cat.key); setSelectedItem(null); }}
+						>
+							{cat.label} ({cat.items.length})
+						</button>
+					))}
+				</div>
+				{selectedCategory && (
+					<div style={{ maxHeight: "30vh", overflowY: "auto", border: "1px solid #333", padding: "0.3em", marginBottom: "0.4em" }}>
+						<div style={{ fontSize: "11px", color: "#888", marginBottom: "0.2em" }}>
+							{categories.find(c => c.key === selectedCategory)?.label}
+						</div>
+						<div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.2em" }}>
+							{categories.find(c => c.key === selectedCategory)?.items.slice(0, 40).map((name, i) => (
+								<button
+									key={i}
+									className={"sub-btn" + (selectedItem === name ? " active" : "")}
+									onClick={() => setSelectedItem(name)}
+									title={name}
+								>
+									{name.length > 18 ? name.slice(0, 16) + "…" : name}
+								</button>
+							))}
+						</div>
+						{selectedItem && (
+							<div style={{ marginTop: "0.4em", padding: "0.3em", background: "#222", border: "1px solid #444" }}>
+								<strong>Selected:</strong> {selectedItem}
+								<div style={{ fontSize: "11px", color: "#aaa" }}>
+									Click on the 3D viewport to place at cursor position
+								</div>
+							</div>
+						)}
+						{selectedCacheEntry && (
+							<div style={{ marginTop: "0.4em", padding: "0.3em", background: "#1a1a1a", border: "1px solid #444" }}>
+								<strong>Cache entry selected:</strong> {selectedCacheEntry.name} <span style={{ color: "#777" }}>[{selectedCacheEntry.id}]</span>
+								<div style={{ fontSize: "11px", color: "#aaa", marginTop: "0.2em" }}>
+									mode={selectedCacheEntry.mode} | click place to insert into scene
+								</div>
+								<pre style={{ maxHeight: "20vh", overflowY: "auto", marginTop: "0.2em", fontSize: "10px", color: "#ccc" }}>
+									{JSON.stringify(selectedCacheEntry.entry, null, 2).slice(0, 2000)}
+								</pre>
+								<div style={{ display: "flex", gap: "0.3em", marginTop: "0.3em" }}>
+									<input type="button" className="sub-btn" value="Place in scene" onClick={placeSelectedCacheEntry} />
+									<input type="button" className="sub-btn" value="Cancel" onClick={() => setSelectedCacheEntry(null)} />
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+				<div style={{ borderTop: "1px solid #333", paddingTop: "0.4em", marginTop: "0.4em" }}>
+					<strong>Placed Objects ({placedObjects.length})</strong>
+					<div style={{ maxHeight: "20vh", overflowY: "auto", marginTop: "0.2em" }}>
+						{placedObjects.map(obj => (
+							<div key={obj.id} style={{ padding: "0.2em 0", borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+								<span>{obj.name} [{obj.category}] @ ({obj.x}, {obj.z})</span>
+								<input type="button" className="sub-btn" value="x" onClick={() => {
+									setPlacedObjects(prev => prev.filter(o => o.id !== obj.id));
+									ctx?.renderer?.removeSceneElement({ type: "poh-object", id: obj.id } as any);
+									ctx?.renderer?.forceFrame();
+								}} />
+							</div>
+						))}
+					</div>
+				</div>
+				<div style={{ borderTop: "1px solid #333", paddingTop: "0.4em", marginTop: "0.4em" }}>
+					<strong>Cache-backed House Portal Metadata</strong>
+					<div style={{ fontSize: "11px", color: "#aaa", marginBottom: "0.2em" }}>
+						Live loc/item/map data from Jagex cache via useJsonCacheSearch
+					</div>
+					{["locs", "items", "mapzones"].map(mode => {
+						const results = mode === "locs" ? locResults : mode === "items" ? itemResults : mapResults;
+						const label = mode === "mapzones" ? "Map Zones" : mode === "maplocations" ? "Map Locations" : mode === "locs" ? "Locations" : "Items";
+						return (
+							<div key={mode} style={{ marginBottom: "0.4em", border: "1px solid #333", padding: "0.3em" }}>
+								<strong>{label}</strong>
+								<div style={{ fontSize: "11px", color: "#888" }}>
+									{results === null ? "Loading..." : `${results.length} entries`}
+								</div>
+								<div style={{ maxHeight: "18vh", overflowY: "auto", marginTop: "0.2em" }}>
+									{(results ?? []).slice(0, 40).map((entry: any, i: number) => {
+										const name = entry?.name ?? entry?.assetName ?? `#${entry?.id ?? i}`;
+										const id = entry?.id ?? entry?.$fileid ?? i;
+										const actions = entry?.actions_0 ?? entry?.ground_actions_0 ?? "";
+										const category = mode === "locs" ? "loc" : mode === "items" ? "item" : "map";
+										const isPortal = /portal|house|homestead|poh|door|entrance/i.test(String(name));
+										return (
+											<div key={id + "-" + i} style={{ padding: "0.15em 0", borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between", gap: "0.4em", alignItems: "center" }}>
+												<span title={JSON.stringify(entry).slice(0, 200)}>
+													{isPortal ? "🚪" : ""} {name} <span style={{ color: "#777" }}>[{id}]</span>
+												</span>
+												<div style={{ display: "flex", gap: "0.2em" }}>
+													{actions ? <span style={{ fontSize: "10px", color: "#aaa" }}>{String(actions).slice(0, 40)}</span> : null}
+													<input type="button" className="sub-btn" value="place" onClick={() => setSelectedCacheEntry({ mode, entry, id, name })} />
+												</div>
+											</div>
+										);
+									})}
+								</div>
+							</div>
+						);
+					})}
+				</div>
+				<div style={{ borderTop: "1px solid #333", paddingTop: "0.4em", marginTop: "0.4em" }}>
+					<strong>PoH Flag Filter</strong>
+					{["unknown_6C", "unknown_6D", "unknown_6E", "floor_thickness"].map(flag => (
+						<label key={flag} style={{ display: "block" }}>
+							<input type="checkbox" onChange={e => applyPoHFilter(flag, e.currentTarget.checked)} />
+							{flag}
+						</label>
+					))}
+					<div>{loaded ? `${filtered.length} matches` : "Loading..."}</div>
+				</div>
+			</div>
+		</React.Fragment>
+	);
+}
+
+type LocationInspectorProps = { data: any };
+
+function LocationInspector(p: LocationInspectorProps) {
+	let d = p.data || {};
+	let [edits, setEdits] = React.useState<Record<string, any>>({});
+
+	let set = (k: string, v: any) => setEdits(prev => ({ ...prev, [k]: v }));
+	let value = (k: string, fallback: any = "") => edits[k] ?? d[k] ?? fallback;
+
+	return (
+		<div style={{ fontSize: "12px", color: "#ccc", display: "grid", gap: "0.3em", marginTop: "0.4em" }}>
+			<label>Name
+				<input value={value("name")} onChange={e => set("name", e.currentTarget.value)} />
+			</label>
+			<label>ID
+				<input type="number" value={value("id", 0)} onChange={e => set("id", +e.currentTarget.value)} />
+			</label>
+			<label>Model ID
+				<input type="number" value={value("modelid", 0)} onChange={e => set("modelid", +e.currentTarget.value)} />
+			</label>
+			<label>Category
+				<input value={value("category")} onChange={e => set("category", e.currentTarget.value)} />
+			</label>
+			<label>Actions
+				<input value={value("actions", "")} onChange={e => set("actions", e.currentTarget.value)} />
+			</label>
+			<div style={{ color: "#888", whiteSpace: "pre-wrap", marginTop: "0.2em" }}>
+				{JSON.stringify({ ...d, ...edits }, null, 2).slice(0, 4000)}
+			</div>
+		</div>
+	);
 }

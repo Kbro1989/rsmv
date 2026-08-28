@@ -36,10 +36,11 @@ export type Stream = {
 
 export function checkObject<T extends { [key: string]: "string" | "number" | "boolean" }>(obj: unknown, props: T) {
 	if (!obj || typeof obj != "object") { return null; }
+	const record = obj as Record<string, unknown>;
 	let res: { [key in keyof T]: T[key] extends "string" ? string : T[key] extends "number" ? T[key] extends "boolean" ? boolean : number : never } = {} as any;
 	for (let [key, type] of Object.entries(props)) {
-		if (!(key in obj) && typeof obj[key] != type) { return null; }
-		res[key as keyof T] = obj[key];
+		if (!(key in record) || typeof record[key] != type) { return null; }
+		res[key as keyof T] = record[key] as any;
 	}
 	return res;
 }
@@ -150,7 +151,7 @@ export function rsmarkupToSafeHtml(str: string) {
 			}
 		}
 	} catch (e) {
-		console.log(e.message);
+		console.log(e instanceof Error ? e.message : String(e));
 		res = escapeHTML(str);
 	}
 	return res;
@@ -172,7 +173,7 @@ export function constrainedMap<Q>() {
 	}
 }
 
-export const Stream: { new(buf: Buffer): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
+export const Stream: { new(buf: Buffer, scan?: number): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
 	// Double check the mime type
 	/*if (data[data.length - 4] != 0x4F) // O
 		return null;
@@ -195,7 +196,7 @@ export const Stream: { new(buf: Buffer): Stream, prototype: Stream } = function 
 		return res;
 	}
 	this.tee = function () {
-		return new Stream(data, scan);
+		return new (Stream as unknown as { new(buf: Buffer, scan?: number): Stream })(data, scan);
 	}
 	this.eof = function () {
 		if (scan > data.length) { throw new Error("reading past end of buffer"); }
@@ -571,7 +572,7 @@ export class IterableWeakMap<K extends WeakKey, V> {
 	refSet = new Set<WeakRef<K>>();
 	finalizationGroup = new FinalizationRegistry(IterableWeakMap.cleanup);
 
-	static cleanup({ set, ref }) {
+	static cleanup({ set, ref }: { set: Set<WeakRef<WeakKey>>, ref: WeakRef<WeakKey> }) {
 		set.delete(ref);
 	}
 

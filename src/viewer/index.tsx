@@ -45,7 +45,7 @@ function App(p: {}) {
 	let openCache = React.useCallback(async (source: SavedCacheSource) => {
 		let cache = await openSavedCache(source, true);
 		if (cache) {
-			globalThis.source = cache;
+			(globalThis as any).source = cache;
 			ctx.setCacheSource(cache);
 
 			try {
@@ -54,8 +54,8 @@ function App(p: {}) {
 				let scene = await ThreejsSceneCache.create(engine);
 				ctx.setSceneCache(scene);
 
-				globalThis.sceneCache = scene;
-				globalThis.engine = engine;
+				(globalThis as any).sceneCache = scene;
+				(globalThis as any).engine = engine;
 			} catch (e) {
 				console.log("failed to create scenecache");
 				console.error(e);

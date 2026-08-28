@@ -190,8 +190,8 @@ export function renderRsInterfaceDOM(ctx: UiRenderContext, data: Awaited<ReturnT
         let sub = comp.initDom();
         container.appendChild(sub);
     }
-    globalThis.comp = data.rootcomps;//TODO remove
-    globalThis.compctx = ctx;
+    (globalThis as any).comp = data.rootcomps;//TODO remove
+    (globalThis as any).compctx = ctx;
     let dispose = () => {
         data.rootcomps.forEach(q => q.dispose());
     }

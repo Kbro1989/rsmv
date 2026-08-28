@@ -29,7 +29,7 @@ async function buildFileTypes() {
 		} catch (e) {
 			//console.error(e);
 			typesfile += "any;\n";
-			typesfile += "// " + e.toString().replace(/\n/g, "\n//");
+			typesfile += "// " + String(e).replace(/\n/g, "\n//");
 		}
 		//I'm sorry, git made me do this
 		// typesfile = typesfile.replace(/(?<!\r)\n/g, "\r\n");

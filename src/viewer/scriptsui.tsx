@@ -8,6 +8,10 @@ import { CLIScriptFS, ScriptFS, ScriptOutput, ScriptState } from "../scriptrunne
 import path from "path";
 import { UIRootContext } from "./maincomponents";
 
+declare global {
+	var scriptfs: ScriptFS | null;
+}
+
 //see if we have access to a valid electron import
 let electron: typeof import("electron/renderer") | null = (() => {
 	try {
@@ -427,7 +431,7 @@ export function OutputUI(p: { output?: UIScriptOutput | null }) {
 
 	let fstabmatch = tab.match(/^fs-(.*)$/);
 	let selectedfs = fstabmatch && p.output && p.output.fs[fstabmatch[1]];
-	let tabs = { console: "Console" };
+	let tabs: Record<string, string> = { console: "Console" };
 	for (let fsname in p.output?.fs) { tabs["fs-" + fsname] = fsname; }
 
 	return (
@@ -534,7 +538,7 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null }) {
 
 	//expose the fs to script, but make sure we don't leak it after it's gone from ui
 	useEffect(() => {
-		globalThis.scriptfs = p.fs;
+		globalThis.scriptfs = p.fs ?? null;
 		return () => {
 			globalThis.scriptfs = null;
 		}
@@ -570,8 +574,8 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null }) {
 				if (dir.canceled || !dir.filePaths[0]) { return; }
 				subfs = new CLIScriptFS(dir.filePaths[0]);
 			} else {
-				let dir = await showDirectoryPicker({ mode: "readwrite", startIn: "downloads" });
-				await dir.requestPermission({ mode: "readwrite" });
+				let dir = await (showDirectoryPicker as unknown as (options: { mode: "readwrite", startIn: string }) => Promise<FileSystemDirectoryHandle>)({ mode: "readwrite", startIn: "downloads" });
+				await (dir as FileSystemDirectoryHandle & { requestPermission(options: { mode: "readwrite" }): Promise<PermissionState> }).requestPermission({ mode: "readwrite" });
 				subfs = new WebFsScriptFS(dir);
 			}
 			await p.fs.lateBindBackingFs(subfs);
@@ -624,4 +628,8 @@ export function UIScriptConsole(p: { output?: UIScriptOutput | null }) {
 	return (
 		<div ref={setEl} />
 	);
+}
+
+function showDirectoryPicker(arg0: { mode: string; startIn: string; }) {
+	throw new Error("Function not implemented.");
 }

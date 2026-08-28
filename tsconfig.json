@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"module": "ESNext",
 		"lib": [
 			"ESNext",
@@ -25,6 +25,9 @@
 	"exclude": [
 		"node_modules",
 		"./generated"
+	],
+	"include": [
+		"src/**/*"
 	],
 	"compileOnSave": false
 }

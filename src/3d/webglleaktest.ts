@@ -48,7 +48,7 @@ export function hookgltextures() {
 	let oldbindtexture = WebGL2RenderingContext.prototype.bindTexture;
 	let oldtexstorage2d = WebGL2RenderingContext.prototype.texStorage2D;
 	let oldbindbuffer = WebGL2RenderingContext.prototype.bindBuffer;
-	let oldbufferdata = WebGL2RenderingContext.prototype.bufferData;
+	let oldbufferdata = WebGL2RenderingContext.prototype.bufferData as (...args: any[]) => void;
 	let olddeletebuffer = WebGL2RenderingContext.prototype.deleteBuffer;
 	WebGL2RenderingContext.prototype.bindTexture = function (target, tex) {
 		oldbindtexture.call(this, target, tex);
@@ -109,11 +109,18 @@ export function hookgltextures() {
 	function dumptexx(tex: [WebGLTexture, Texmeta], width = tex[1].width, height = tex[1].height) {
 		return dumpTexture(readTextureToImageData(tex[1].ctx, tex[0], width, height));
 	}
-	globalThis.texlist = texlist;
-	globalThis.buflist = buflist;
-	globalThis.dumptexx = dumptexx;
-	globalThis.alltex = alltex;
-	globalThis.cleartex = cleartex;
+	const debugGlobal = globalThis as typeof globalThis & {
+		texlist: typeof texlist;
+		buflist: typeof buflist;
+		dumptexx: typeof dumptexx;
+		alltex: typeof alltex;
+		cleartex: typeof cleartex;
+	};
+	debugGlobal.texlist = texlist;
+	debugGlobal.buflist = buflist;
+	debugGlobal.dumptexx = dumptexx;
+	debugGlobal.alltex = alltex;
+	debugGlobal.cleartex = cleartex;
 
 	function readTextureToImageData(gl: WebGL2RenderingContext, texture: WebGLTexture, width: number, height: number) {
 		let boundFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
@@ -168,10 +175,11 @@ export function createGCTracker<T extends object>(changecb: () => void) {
 	}
 
 	let checkempty = async () => {
-		if (!globalThis.gc) {
+		const runtimeGlobal = globalThis as typeof globalThis & { gc?: () => void };
+		if (!runtimeGlobal.gc) {
 			console.warn("can't ensure that GC has ran since the last reference was lost since GC is not exposed in v8");
 		} else {
-			globalThis.gc?.();
+			runtimeGlobal.gc();
 			//ensure that we are on a new call stack
 			await delay(100);
 		}

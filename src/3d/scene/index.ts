@@ -168,8 +168,14 @@ export async function itemToModel(cache: ThreejsSceneCache, id: number) {
 	let item = await cache.engine.getObject("items", id);
 	let assetName = await cache.engine.rawsource.getInternalName(internalNameFiles.obj, id);
 	let modelitem = item;
-	if (!item.baseModel && item.noteTemplate) {
-		modelitem = await cache.engine.getObject("items", item.noteTemplate);
+	// PoH/Construction items use noteData to point at the placed Loc version.
+	// When the inventory wrapper has no own models, follow noteData → noteTemplate chain.
+	if (!item.baseModel && !item.baseModelList) {
+		if (item.noteData) {
+			modelitem = await cache.engine.getObject("items", item.noteData);
+		} else if (item.noteTemplate) {
+			modelitem = await cache.engine.getObject("items", item.noteTemplate);
+		}
 	}
 	let mods: ModelModifications = {};
 	if (modelitem.color_replacements) { mods.replaceColors = modelitem.color_replacements; }

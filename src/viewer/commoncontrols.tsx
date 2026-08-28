@@ -115,7 +115,8 @@ export function IdInputSearch(p: { cache: EngineCache | undefined, mode: keyof t
 
 	const submitid = (v: number) => {
 		setidstate(v);
-		p.onChange(v);
+		setSearchText(v + "");
+		if (p.onChange) p.onChange(v);
 	}
 
 	let incr = () => { submitid(id + 1); setSearchText(id + 1 + "") }

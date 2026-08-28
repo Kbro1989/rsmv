@@ -16,12 +16,17 @@
 	"0x0E": { "name":                             "equipId", "read": "unsigned byte" },
 	"0x0F": { "name":                          "unknown_0F", "read": "true" },
 	"0x10": { "name":                             "members", "read": "true" },
+	"0x11": { "name":                          "ground_actions_6", "read": "string" },
 	"0x12": { "name":                      "multiStackSize", "read": "unsigned short" },
+	"0x13": { "name":                          "unknown_13", "read": "unsigned short" },
+	"0x15": { "name":                          "quest_ids", "read": [ "array", "varushort", "unsigned tribyte", "quest" ] },
+	"0x16": { "name":                          "unknown_16", "read": "unsigned short" },//seen on portal items - likely build/tier variant of multiStackSize
 	"0x17": { "name":                        "maleModels_0", "read": ["struct",["id","item_modelid","model"],["type",["match","buildnr",{">=502":0,"other":"ubyte"}]]] },
 	"0x18": { "name":                        "maleModels_1", "read": "item_modelid", "type":"model"},
 	"0x19": { "name":                      "femaleModels_0", "read": ["struct",["id","item_modelid","model"],["type",["match","buildnr",{">=502":0,"other":"ubyte"}]]] },
 	"0x1A": { "name":                      "femaleModels_1", "read": "item_modelid", "type":"model"},
 	"0x1B": { "name":                          "unknown_1B", "read": "unsigned byte" },
+	"0x1C": { "name":                          "unknown_1C", "read": "unsigned short" },
 	"0x1E": { "name":                    "ground_actions_0", "read": "string" },
 	"0x1F": { "name":                    "ground_actions_1", "read": "string" },
 	"0x20": { "name":                    "ground_actions_2", "read": "string" },
@@ -38,6 +43,11 @@
 	"0x2B": { "name":                           "nameColor", "read": "int" },
 	"0x2C": { "name":                   "recolorDstIndices", "read": "unsigned short" },
 	"0x2D": { "name":                 "retextureDstIndices", "read": "unsigned short" },
+	"0x32": { "name":                          "unknown_32", "read": "ubyte" },
+	"0x33": { "name":                          "unknown_33", "read": "ubyte" },
+	"0x34": { "name":                          "unknown_34", "read": "ubyte" },
+	"0x36": { "name":                          "unknown_36", "read": "ubyte" },
+	"0x3C": { "name":                   "stack_info_old_3C", "read": "unsigned short" },
 	"0x41": { "name":                           "tradeable", "read": "true" },
 	"0x45": { "name":                           "buy_limit", "read": "int" },
 	"0x4E": { "name":                        "maleModels_2", "read": "item_modelid", "type": "model" },
@@ -119,5 +129,10 @@
 	"0xCE": { "name":                        "bindTemplate", "read": "unsigned tribyte", "type": "obj" },
 	"0xCF": { "name":                        "combine_info", "read": "unsigned tribyte", "type": "obj" },
 	"0xD0": { "name":                    "combine_template", "read": "unsigned tribyte", "type": "obj" },
-	"0xF9": { "name":                               "extra", "read": "extrasmap", "type": "params" }
+	"0xF1": { "name":                          "unknown_F1", "read": "true" },//seen on 61884-61886 - flag alongside noteData chain
+	"0xF4": { "name":                          "subops_array", "read": [ "array", "ubyte", "unsigned tribyte" ] },//seen on 62472-62475 - wraps noteTemplate entries (tribyte obj refs)
+	"0xF6": { "name":                          "unknown_F6", "read": [ "array", "ubyte", [ "tuple", "unsigned tribyte", "unsigned byte" ] ] },//seen on 61883, 62472, 62473 - tier room/hotspot object list (tribyte obj ref + ubyte slot)
+	"0xF8": { "name":                          "unknown_F8", "read": "unsigned short" },//seen on 61883 - rare flag
+	"0xF9": { "name":                               "extra", "read": "extrasmap", "type": "params" },
+	"0xFA": { "name":                          "unknown_FA", "read": "varuint" }//seen on 61885, 61886 - likely portal destination slot count
 }

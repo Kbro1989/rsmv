@@ -97,8 +97,9 @@ export function buildParser(parent: ChunkParentCallback | null, chunkdef: unknow
 			} else {
 				if (chunkdef.length < 1) throw new Error(`'read' variables must either be a valid type-defining string, an array of type-defining strings / objects, or a valid type-defining object: ${JSON.stringify(chunkdef)}`);
 				let args = chunkdef.slice(1);
-				if (parserFunctions[chunkdef[0]]) {
-					return parserFunctions[chunkdef[0]](args, parent, typedef);
+				const parserFunctionName = chunkdef[0];
+				if (typeof parserFunctionName === "string" && Object.hasOwn(parserFunctions, parserFunctionName)) {
+					return parserFunctions[parserFunctionName as keyof typeof parserFunctions](args, parent, typedef);
 				}
 			}
 		default:
@@ -145,7 +146,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 				let opt = opts[key];
 				if (!opt) { throw new Error("unknown property " + key); }
 				opcodetype.write(state, opt.op);
-				opt.parser.write(state, value[key]);
+				opt.parser.write(state, (value as Record<string, any>)[key]);
 			}
 			if (!hasexplicitnull) {
 				opcodetype.write(state, 0);
@@ -167,7 +168,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			for (let prop of map.values()) {
 				if (prop.key.startsWith("$")) { continue; }
 				propschema[prop.key] = { oneOf: [prop.parser.getJsonSchema(), { type: "null" }] };
-				propschema[prop.key]["x-rsmv-type"] = prop.rstype;
+				(propschema[prop.key] as jsonschema.JSONSchema6Definition & Record<string, unknown>)["x-rsmv-type"] = prop.rstype;
 			}
 
 			return {
@@ -183,7 +184,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as Record<string, unknown>)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -196,24 +197,25 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 		}
 	}
 	let refs: Record<string, ResolvedReference[] | undefined> = {};
-	let opcodetype = buildParser(null, (chunkdef["$opcode"] ?? "unsigned byte"), typedef);
+	let opcodetype = buildParser(null, ((chunkdef as Record<string, unknown>)["$opcode"] ?? "unsigned byte"), typedef);
 	let opts: Record<string, { op: number, parser: ChunkParser, rstype: string }> = {};
 	let roottype = "";
 	for (let key in chunkdef) {
 		if (key.startsWith("$")) {
-			if (key == "$type") { roottype = chunkdef[key]; }
+			if (key == "$type") { roottype = (chunkdef as Record<string, string>)[key]; }
 			continue;
 		}
-		let op = chunkdef[key];
+		let op = (chunkdef as Record<string, unknown>)[key];
 		if (typeof op != "object" || !op) { throw new Error("op name expected"); }
-		let opname = op["name"];
+		let opRecord = op as Record<string, unknown>;
+		let opname = opRecord["name"];
 		if (typeof opname != "string") { throw new Error("op name expected"); }
-		let optype = op["type"] ?? "";
+		let optype = opRecord["type"] ?? "";
 		if (typeof optype != "string") { throw new Error("op type expected"); }
 		if (opts[opname]) { throw new Error("duplicate opcode key " + opname); }
 		opts[opname] = {
 			op: parseInt(key),
-			parser: buildParser(resolveReference.bind(null, key), op["read"], typedef),
+			parser: buildParser(resolveReference.bind(null, key), opRecord["read"], typedef),
 			rstype: optype
 		};
 	}
@@ -256,7 +258,9 @@ function tupleParserFactory(istyped: boolean) {
 			getJsonSchema() {
 				let items = props.map((prop, i) => {
 					let res = prop.getJsonSchema();
-					res["x-rsmv-type"] = proptypes[i];
+					if (typeof res == "object" && res != null) {
+						Object.assign(res, { "x-rsmv-type": proptypes[i] });
+					}
 					return res;
 				});
 				return {
@@ -307,12 +311,12 @@ function refgetter(refparent: ChunkParentCallback | null, propname: string, reso
 	return {
 		read(state: SharedEncoderState) {
 			let stack = (hidden ? state.hiddenstack : state.stack);
-			return stack[stack.length - depth][propname];
+			return (stack[stack.length - depth] as Record<string, unknown>)[propname];
 		},
 		write(state: SharedEncoderState, newvalue: number) {
 			if (state.isWrite && !hidden) { throw new Error(`can update ref values in write mode when they are hidden (prefixed with $) in ${propname}`); }
 			let stack = (hidden ? state.hiddenstack : state.stack);
-			stack[stack.length - depth][propname] = newvalue;
+			(stack[stack.length - depth] as Record<string, unknown>)[propname] = newvalue;
 		}
 	}
 }
@@ -321,8 +325,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 	let refs: Record<string, ResolvedReference[] | undefined> = {};
 	let r: ChunkParser = {
 		read(state) {
-			let r = {};
-			let hidden = {};
+			let r: Record<string, unknown> = {};
+			let hidden: Record<string, unknown> = {};
 			state.stack.push(r);
 			state.hiddenstack.push(hidden);
 			if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
@@ -343,11 +347,11 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 		},
 		write(state, value) {
 			if (typeof value != "object" || !value) { throw new Error("object expected"); }
-			let hiddenvalue = {};
+			let hiddenvalue: Record<string, unknown> = {};
 			state.stack.push(value);
 			state.hiddenstack.push(hiddenvalue);
 			for (let key of keys) {
-				let propvalue = value[key as string];
+				let propvalue = (value as Record<string, unknown>)[key as string];
 				let prop = props[key];
 
 				if (key.startsWith("$")) {
@@ -358,7 +362,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 						if (!refarray) { throw new Error("cannot write hidden values if they are not constant or not referenced"); }
 						propvalue ??= 0;
 						for (let ref of refarray) {
-							propvalue = ref.resolve(value, propvalue);
+							propvalue = ref.resolve(value, propvalue as number);
 						}
 					}
 					hiddenvalue[key] = propvalue;
@@ -385,7 +389,9 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 				propschema[prop] = (props[prop] as ChunkParser).getJsonSchema();
 				let proptype = proptypes[prop];
 				if (proptype) {
-					propschema[prop]["x-rsmv-type"] = proptype;
+					if (typeof propschema[prop] === "object" && propschema[prop] !== null) {
+						(propschema[prop] as jsonschema.JSONSchema6 & { "x-rsmv-type"?: string })["x-rsmv-type"] = proptype;
+					}
 				}
 			}
 			return {
@@ -401,7 +407,7 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as Record<string, unknown>)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -414,8 +420,8 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 		}
 	}
 
-	let props = {};
-	let proptypes = {};
+	let props: Record<string, ChunkParser> = {};
+	let proptypes: Record<string, string> = {};
 	for (let propdef of args) {
 		if (!Array.isArray(propdef) || (propdef.length != 2 && propdef.length != 3)) { throw new Error("each struct args should be a [name,type] pair"); }
 		if (typeof propdef[0] != "string") { throw new Error("prop name should be string"); }
@@ -512,15 +518,15 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 		read(state) {
 			let len = lengthtype.read(state);
 			let r: object[] = [];
-			let hiddenprops: object[] = [];
+			let hiddenprops: Record<string, unknown>[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
 				let proptype = chunktypes[chunkindex];
 				if (debugdata) {
 					debugdata.opcodes.push({ op: Object.keys(proptype).join(), index: state.scan, stacksize: state.stack.length });
 				}
 				for (let i = 0; i < len; i++) {
-					let hidden: object;
-					let obj: object;
+					let hidden: { [key: string]: any };
+					let obj: { [key: string]: any };
 					if (chunkindex == 0) {
 						obj = {};
 						r.push(obj);
@@ -551,7 +557,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			if (!Array.isArray(v)) { throw new Error("array expected"); }
 			lengthtype.write(state, v.length);
 
-			let hiddenprops: object[] = [];
+			let hiddenprops: Record<string, unknown>[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
 				let proptype = chunktypes[chunkindex];
 				for (let i = 0; i < v.length; i++) {
@@ -600,7 +606,9 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 				propschema[prop] = fullobj[prop].getJsonSchema();
 				let proptype = proptypes[prop];
 				if (proptype) {
-					propschema[prop]["x-rsmv-type"] = proptype;
+					if (typeof propschema[prop] === "object" && propschema[prop] !== null) {
+						Object.assign(propschema[prop], { "x-rsmv-type": proptype });
+					}
 				}
 			}
 			return {
@@ -631,7 +639,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as Record<string, unknown>)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -816,7 +824,7 @@ function arrayParser(args: unknown[], parent: ChunkParentCallback, typedef: Type
 		},
 		getJsonSchema() {
 			let itemtype = subtype.getJsonSchema();
-			itemtype["x-rsmv-type"] = displaytype;
+			(itemtype as any)["x-rsmv-type"] = displaytype;
 			return {
 				type: "array",
 				items: itemtype
@@ -957,13 +965,16 @@ function referenceValueParser(args: unknown[], parent: ChunkParentCallback, type
 	let read = (state: SharedEncoderState) => {
 		let value = ref.read(state);
 		if (indexgetter) {
+			if (!Array.isArray(value)) throw new Error("array expected");
 			let index = indexgetter.read(state);
+			if (typeof index != "number") throw new Error("number index expected");
 			value = value[index];
 		}
+		if (typeof value != "number") throw new Error("number expected");
 		if (minbit != -1) {
 			value = (value >> minbit) & ~((~0) << bitlength);
 		}
-		return value + offset;
+		return (value as number) + (offset as number);
 	}
 	let r: ChunkParser = {
 		read,
@@ -1039,7 +1050,7 @@ function intAccumolatorParser(args: unknown[], parent: ChunkParentCallback, type
 			//TODO fix the context situation
 			let increment = value.read(state);
 			let newvalue: number;
-			let refvalue = ref.read(state) ?? 0;
+			let refvalue: number = typeof ref.read(state) == "number" ? ref.read(state) as number : 0;
 			if (mode == "add" || mode == "add-1" || mode == "postadd") {
 				newvalue = refvalue + (increment ?? 0) + (mode == "add-1" ? -1 : 0);
 			} else if (mode == "hold") {
@@ -1053,7 +1064,7 @@ function intAccumolatorParser(args: unknown[], parent: ChunkParentCallback, type
 		write(state, v) {
 			if (typeof v != "number") { throw new Error("number expected"); }
 
-			let refvalue = ref.read(state) ?? 0;
+			let refvalue: number = typeof ref.read(state) == "number" ? ref.read(state) as number : 0;
 
 			let increment: number;
 			if (mode == "add" || mode == "add-1") {
@@ -1209,13 +1220,13 @@ function conditionParser(parent: ChunkParentCallback, optionstrings: string[], w
 				switch (cond.op) {
 					case "=": matched = value == cond.value; break;
 					case "!=": matched = value != cond.value; break;
-					case "<": matched = value < cond.value; break;
-					case "<=": matched = value <= cond.value; break;
-					case ">": matched = value > cond.value; break;
-					case ">=": matched = value >= cond.value; break;
-					case "&": matched = (value & cond.value) != 0; break;
-					case "!&": matched = (value & cond.value) == 0; break;
-					case "&=": matched = (value & cond.value) == cond.value; break;
+					case "<": matched = Number(value) < cond.value; break;
+					case "<=": matched = Number(value) <= cond.value; break;
+					case ">": matched = Number(value) > cond.value; break;
+					case ">=": matched = Number(value) >= cond.value; break;
+					case "&": matched = (Number(value) & cond.value) != 0; break;
+					case "!&": matched = (Number(value) & cond.value) == 0; break;
+					case "&=": matched = (Number(value) & cond.value) == cond.value; break;
 					default: throw new Error("unknown op" + cond.op);
 				}
 				if (!matched) {

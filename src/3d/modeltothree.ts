@@ -394,8 +394,8 @@ export async function detectTextureMode(source: CacheFileSource) {
 		let lastfile = -1;
 		try {
 			let indexfile = await source.getCacheIndex(major);
-			let last = indexfile[indexfile.length - 1];
-			await source.getFile(last.major, last.minor, last.crc);
+			let last = [...indexfile].reverse().find(q => q != undefined);
+			if (!last) { return lastfile; }
 			lastfile = last.minor;
 		} catch (e) { }
 		return lastfile;
@@ -414,12 +414,12 @@ export async function detectTextureMode(source: CacheFileSource) {
 	} else {
 		let numbmp = await detectmajor(cacheMajors.texturesBmp);
 		let numdds = await detectmajor(cacheMajors.texturesDds);
-		if (numbmp > 0 || numdds > 0) {
+		if (numbmp >= 0 || numdds >= 0) {
 			textureMode = (numbmp > numdds ? "bmp" : "dds");
 		} else {
 			let numpng2014 = await detectmajor(cacheMajors.textures2015Png);
 			let numdds2014 = await detectmajor(cacheMajors.textures2015Dds);
-			if (numpng2014 > 0 || numdds2014 >= 0) {
+			if (numpng2014 >= 0 || numdds2014 >= 0) {
 				textureMode = (numdds2014 > numpng2014 ? "dds2014" : "png2014");
 			} else if (await detectmajor(cacheMajors.texturesOldPng) > 0) {
 				textureMode = "oldpng";
@@ -597,6 +597,9 @@ export class ThreejsSceneCache {
 	}
 
 	getTextureFile(type: TextureTypes, texid: number, stripAlpha: boolean) {
+		if (this.textureType == "none") {
+			throw new Error("cannot load a texture when texture mode is none");
+		}
 		let cacheindex = ThreejsSceneCache.textureIndices[type][this.textureType];
 		let cachekey = ((cacheindex | 0xff) << 23) | texid;
 		let texmode = this.textureType;

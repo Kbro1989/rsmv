@@ -147,7 +147,9 @@ async function deepLinkJson(ctx: DeepLinkContext, nameorindex: string | number, 
             } else if (rsmvtype == "stat") {
                 valuename = skillNames[data];
             }
-            let namegroup = internalNameFiles[rsmvtype];
+            let namegroup = rsmvtype in internalNameFiles
+                ? internalNameFiles[rsmvtype as keyof typeof internalNameFiles]
+                : undefined;
             valuename ??= (namegroup != undefined ? await ctx.source.getInternalName(namegroup, data) : undefined);
 
             return { name, rsmvtype, valuename, primitive: data };
@@ -191,7 +193,9 @@ async function deepLinkJson(ctx: DeepLinkContext, nameorindex: string | number, 
 
 
 function getRSType(meta: JSONSchema6Definition | null | undefined): PropTypes {
-    return meta?.["x-rsmv-type"] ?? "unknown";
+    return meta && typeof meta === "object"
+        ? (meta as { [key: string]: unknown })["x-rsmv-type"] as PropTypes ?? "unknown"
+        : "unknown";
 }
 
 function SpriteView(p: { id: number }) {
@@ -233,7 +237,7 @@ function SoundView(p: { id: number }) {
     let soundblob = useAwaited(async () => {
         if (!enginectx) { return; }
         let sound = await parseMusic(enginectx.source, cacheMajors.sounds, p.id, null, true);
-        return URL.createObjectURL(new Blob([sound], { type: "audio/ogg" }));
+        return URL.createObjectURL(new Blob([Uint8Array.from(sound)], { type: "audio/ogg" }));
     }, [p.id, enginectx]);
 
     // cleanup

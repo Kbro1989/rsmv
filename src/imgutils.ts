@@ -12,9 +12,9 @@ export function makeImageData(data: Uint8ClampedArray | Uint8Array | null, width
 		data = new Uint8ClampedArray(data.buffer, data.byteOffset, data.length);
 	}
 	if (typeof ImageData != "undefined") {
-		return new ImageData(data, width, height);
+		return new ImageData(new Uint8ClampedArray(data), width, height);
 	} else {
-		return { data, width, height, colorSpace: "srgb" };
+		return { data: data as ImageData["data"], width, height, colorSpace: "srgb" };
 	}
 }
 
@@ -75,7 +75,9 @@ export async function fileToImageData(file: Uint8Array, mimetype: "image/png" | 
 			console.warn("can not strip alpha in browser context that does not support ImageDecoder");
 		}
 		let img = new Image();
-		let blob = new Blob([file], { type: mimetype });
+		let blobData = new ArrayBuffer(file.byteLength);
+		new Uint8Array(blobData).set(file);
+		let blob = new Blob([blobData], { type: mimetype });
 		let url = URL.createObjectURL(blob);
 		img.src = url;
 		await img.decode();

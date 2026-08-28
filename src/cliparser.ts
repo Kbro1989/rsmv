@@ -42,7 +42,7 @@ function cacheSourceFromString(str: string) {
 			case "extracted":
 				return new RawFileLoader(arg, 0);
 			case "global":
-				let fn = globalThis[arg];
+				let fn = (globalThis as Record<string, any>)[arg];
 				if (typeof fn != "function") {
 					throw new Error("the 'global' cache source requires a callback function with name <arg> to be exposed on the global scope");
 				}

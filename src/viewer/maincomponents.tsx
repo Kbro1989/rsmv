@@ -180,7 +180,7 @@ function OpenRs2IdSelector(p: { initialid: number, onSelect: (id: number) => voi
 }
 
 export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSource) => void, noReopen?: boolean }, { lastFolderOpen: FileSystemDirectoryHandle | null }> {
-	constructor(p) {
+	constructor(p: { onOpen: (c: SavedCacheSource) => void; noReopen?: boolean; }) {
 		super(p);
 		this.state = {
 			lastFolderOpen: null
@@ -210,7 +210,7 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 
 	@boundMethod
 	async clickOpen() {
-		let dir = await showDirectoryPicker();
+		let dir = await (showDirectoryPicker as unknown as () => Promise<FileSystemDirectoryHandle>)();
 		this.props.onOpen({ type: "autohandle", handle: dir });
 	}
 
@@ -219,7 +219,7 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 		if (!electron) { return; }
 		let dir: import("electron").OpenDialogReturnValue = await electron.ipcRenderer.invoke("openfolder", path.resolve(process.env.ProgramData!, "jagex/runescape"));
 		if (!dir.canceled) {
-			this.props.onOpen({ type: "autofs", location: dir.filePaths[0], writable: !!globalThis.writecache });//TODO propper ui for this
+			this.props.onOpen({ type: "autofs", location: dir.filePaths[0], writable: !!(globalThis as typeof globalThis & { writecache?: unknown }).writecache });//TODO propper ui for this
 		}
 	}
 
@@ -231,7 +231,10 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 	@boundMethod
 	async clickReopen() {
 		if (!this.state.lastFolderOpen) { return; }
-		if (await this.state.lastFolderOpen.requestPermission() == "granted") {
+		let handle = this.state.lastFolderOpen as FileSystemDirectoryHandle & {
+			requestPermission: () => Promise<PermissionState>
+		};
+		if (await handle.requestPermission() == "granted") {
 			this.props.onOpen({ type: "autohandle", handle: this.state.lastFolderOpen });
 		}
 	}
@@ -247,8 +250,9 @@ export class CacheSelector extends React.Component<{ onOpen: (c: SavedCacheSourc
 			for (let i = 0; i < e.dataTransfer.items.length; i++) { items.push(e.dataTransfer.items[i]); }
 			//needs to start synchronously as the list is cleared after the event stack
 			await Promise.all(items.map(async item => {
-				if (item.getAsFileSystemHandle) {
-					let filehandle = (await item.getAsFileSystemHandle())!;
+				let filesystemitem = item as DataTransferItem & { getAsFileSystemHandle?: () => Promise<FileSystemHandle | null> };
+				if (filesystemitem.getAsFileSystemHandle) {
+					let filehandle = (await filesystemitem.getAsFileSystemHandle())!;
 					if (filehandle.kind == "file") {
 						let file = filehandle as FileSystemFileHandle;
 						filehandles.push(file);
@@ -422,7 +426,9 @@ export async function openSavedCache(source: SavedCacheSource, remember: boolean
 	let cache: CacheFileSource | null = null;
 	if (source.type == "sqliteblobs" || source.type == "autohandle") {
 		if (source.type == "autohandle") {
-			let perm = await source.handle.queryPermission({ mode: "read" });
+			let perm = await (source.handle as FileSystemDirectoryHandle & {
+				queryPermission(options?: { mode?: "read" | "readwrite" }): Promise<PermissionState>;
+			}).queryPermission({ mode: "read" });
 			if (perm == "granted") {
 				let wasmcache = new WasmGameCacheLoader();
 				// let fs = new UIScriptFS(null);
@@ -615,8 +621,8 @@ function JsonViewer(p: { data: string, file: UIOpenedFile }) {
 	}, [p.data, p.file, rawjson]);
 
 	React.useEffect(() => {
-		globalThis.filejson = parsed?.obj;
-		return () => { globalThis.filejson = null; }
+		(globalThis as any).filejson = parsed?.obj;
+		return () => { (globalThis as any).filejson = null; }
 	}, [parsed?.obj]);
 
 	return (
@@ -784,7 +790,7 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
 			<div className="mv-modal-head">
 				<span>{p.file.name}</span>
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([p.file.data]))}>download</span>
+				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new Blob([typeof p.file.data === "string" ? p.file.data : (() => { const bytes = new Uint8Array(p.file.data); const copy = new Uint8Array(bytes.length); copy.set(bytes); return copy.buffer; })()]))}>download</span>
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
@@ -792,5 +798,9 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 			</div>
 		</div>
 	);
+}
+
+function showDirectoryPicker() {
+	throw new Error("Function not implemented.");
 }
 

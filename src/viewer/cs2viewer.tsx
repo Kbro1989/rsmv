@@ -11,7 +11,7 @@ export function ClientScriptViewer(p: { data: string }) {
     let redraw = useForceUpdate();
     let [resetcounter, reset] = React.useReducer(c => c + 1, 0);
     let [calli, setcalli] = React.useState<ClientscriptObfuscation | null>(null);
-    let scene: ThreejsSceneCache = globalThis.sceneCache;//TODO pass this properly using args
+    let scene: ThreejsSceneCache = (globalThis as typeof globalThis & { sceneCache: ThreejsSceneCache }).sceneCache;//TODO pass this properly using args
     React.useEffect(() => {
         let current = true;
         prepareClientScript(scene.engine).then(calli => current && setcalli(calli));
@@ -32,7 +32,7 @@ export function ClientScriptViewer(p: { data: string }) {
     if (!calli || !inter) {
         return (<div>Callibrating...</div>);
     }
-    globalThis.inter = inter;
+    (globalThis as typeof globalThis & { inter: ClientScriptInterpreter }).inter = inter;
 
     let index = inter.scope?.index ?? 0
     let offset = Math.max(0, index - 10);

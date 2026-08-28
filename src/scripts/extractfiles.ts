@@ -47,7 +47,7 @@ export async function extractCacheFiles(output: ScriptOutput, outdir: ScriptFS, 
 				try {
 					arch = await source.getFileArchive(fileid.index);
 				} catch (e) {
-					err = e;
+					err = e instanceof Error ? e : new Error(String(e));
 					arch = [];
 				}
 				lastarchive = { index: fileid.index, subfiles: arch, error: err };
@@ -68,9 +68,9 @@ export async function extractCacheFiles(output: ScriptOutput, outdir: ScriptFS, 
 			}
 			if (batchSubfile || batchMaxFiles != -1) {
 				let maxedbatchsize = currentBatch && batchMaxFiles != -1 && currentBatch.outputs.length >= batchMaxFiles;
-				let newarch = currentBatch && currentBatch.arch != arch
+				let newarch: boolean = !!currentBatch && currentBatch.arch != arch
 				if (!currentBatch || maxedbatchsize || (batchSubfile && newarch)) {
-					let nextbatchchunknr = (newarch || !maxedbatchsize || !currentBatch ? 0 : currentBatch.batchchunknr + 1);
+					let nextbatchchunknr: number = (newarch || !maxedbatchsize || !currentBatch ? 0 : currentBatch.batchchunknr + 1);
 					let p = flushbatch();
 					if (p) { await p; }
 					currentBatch = {

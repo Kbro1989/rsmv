@@ -123,7 +123,7 @@ export function useJsonCacheSearch(cache: EngineCache | undefined, mode: keyof t
 	React.useEffect(() => { !files && searchmeta?.files.then(setFiles) }, [searchmeta?.files]);
 
 	const hasprop = (o: object, p: string) => o && Object.prototype.hasOwnProperty.call(o, p);
-	const getprop = function* (prop: any, path: string[], depth: number) {
+	const getprop = function* (prop: any, path: string[], depth: number): Generator<any, boolean, unknown> {
 		if (Array.isArray(prop)) {
 			for (let sub of prop) {
 				yield* getprop(sub, path, depth);
@@ -135,7 +135,9 @@ export function useJsonCacheSearch(cache: EngineCache | undefined, mode: keyof t
 			yield* getprop(prop[part], path, depth + 1);
 		} else {
 			yield prop;
+			return true;
 		}
+		return false;
 	}
 
 	let filtered = files ?? [];
@@ -169,7 +171,7 @@ export function useJsonCacheSearch(cache: EngineCache | undefined, mode: keyof t
 						if (Array.isArray(def.items)) {
 							optsthree.push(Object.keys(def.items));
 							if (part) {
-								def = def.items[part];
+								def = def.items[+part];
 								partindex++;
 							}
 						} else {
