@@ -1,7 +1,6 @@
 //structure similar to ImageData, but without prototype chain or clamped constraint, easy to consume with sharp
 
 import type { Texture } from "three";
-import { BlobTS } from "./utils";
 
 export type CanvasImage = Exclude<CanvasImageSource, SVGImageElement | VideoFrame>;
 
@@ -13,9 +12,9 @@ export function makeImageData(data: Uint8ClampedArray | Uint8Array | null, width
 		data = new Uint8ClampedArray(data.buffer, data.byteOffset, data.length);
 	}
 	if (typeof ImageData != "undefined") {
-		return new ImageData(data as Uint8ClampedArray<ArrayBuffer>, width, height);
+		return new ImageData(new Uint8ClampedArray(data), width, height);
 	} else {
-		return { data: data as Uint8ClampedArray<ArrayBuffer>, width, height, colorSpace: "srgb" };
+		return { data: data as ImageData["data"], width, height, colorSpace: "srgb" };
 	}
 }
 
@@ -76,7 +75,9 @@ export async function fileToImageData(file: Uint8Array, mimetype: "image/png" | 
 			console.warn("can not strip alpha in browser context that does not support ImageDecoder");
 		}
 		let img = new Image();
-		let blob = new BlobTS([file], { type: mimetype });
+		let blobData = new ArrayBuffer(file.byteLength);
+		new Uint8Array(blobData).set(file);
+		let blob = new Blob([blobData], { type: mimetype });
 		let url = URL.createObjectURL(blob);
 		img.src = url;
 		await img.decode();
@@ -241,11 +242,10 @@ export function drawTexture(ctx: CanvasRenderingContext2D, img: ImageData | Text
 		cnv.width = img.width;
 		cnv.height = img.height;
 		ctx.putImageData(img, 0, 0);
-	} else if ("isTexture" in img) {
-		let src = img.source as unknown as ImageBitmap | HTMLCanvasElement | HTMLVideoElement;
-		cnv.width = src.width;
-		cnv.height = src.height;
-		ctx.drawImage(src, 0, 0);
+	} else if ("source" in img) {
+		cnv.width = img.source.data.width;
+		cnv.height = img.source.data.height;
+		ctx.drawImage(img.source.data, 0, 0);
 	} else {
 		cnv.width = img.width;
 		cnv.height = img.height

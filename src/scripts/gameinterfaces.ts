@@ -80,9 +80,9 @@ export async function getGameInterfaces(output: ScriptOutput, outdir: ScriptFS, 
     }
 
     let panelstructsenum = await source.getObject("enums", 7716);
-    let panelmeta: Record<number, PanelMeta> = {};
+    let panelmeta: Record<string, PanelMeta> = {};
     for (let panelid of panelids) {
-        let def = rootdefault?.[panelid];
+        let def = rootdefault?.[+panelid];
         let structid = getEnumInt(panelstructsenum, +panelid);
         if (structid == -1) { continue; }
         let struct: structs | null = await source.getObject("structs", structid);

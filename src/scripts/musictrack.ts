@@ -43,7 +43,7 @@ export async function parseMusic(source: CacheFileSource, major: number, id: num
 
             //do the prototype thing here since Buffer doesn't copy, buf UInt8Array does
             let newheader = Buffer.from(chunk.subarray(headerindex, scan));
-            let datachunk = Buffer.from(chunk.subarray(scan, scan + datalen));
+            let datachunk = chunk.slice(scan, scan + datalen);
             scan += datalen;
             let isfirst = headerindex == 0 && chunkindex == 0;
             let islast = chunkindex == chunkdatas.length - 1 && scan == chunk.length;

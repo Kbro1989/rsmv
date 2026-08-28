@@ -34,33 +34,13 @@ export type Stream = {
 	tee(): Stream
 }
 
-// fix typings conflict between nodejs Buffer typings and browser arraybuffer typings
-export const BlobTS = Blob as unknown as {
-	new(data: (BlobPart | Uint8Array<ArrayBufferLike>)[], options?: BlobPropertyBag): Blob,
-	prototype: Blob
-};
-
-export function checkObject<T extends { [key: string]: "string" | "number" | "boolean" | "numberarray" }>(obj: unknown, props: T) {
+export function checkObject<T extends { [key: string]: "string" | "number" | "boolean" }>(obj: unknown, props: T) {
 	if (!obj || typeof obj != "object") { return null; }
-	let res: {
-		[key in keyof T]:
-		T[key] extends "string" ? string :
-		T[key] extends "number" ? number :
-		T[key] extends "boolean" ? boolean :
-		T[key] extends "numberarray" ? number[] :
-		never
-	} = {} as any;
+	const record = obj as Record<string, unknown>;
+	let res: { [key in keyof T]: T[key] extends "string" ? string : T[key] extends "number" ? T[key] extends "boolean" ? boolean : number : never } = {} as any;
 	for (let [key, type] of Object.entries(props)) {
-		if (!(key in obj)) { return null; }
-		let prop = obj[key];
-		if (type == "numberarray") {
-			if (!Array.isArray(prop)) { return null; }
-			if (prop.some(v => typeof v != "number")) { return null; }
-			res[key as keyof T] = prop.slice() as any;
-		} else {
-			if (typeof prop != type) { return null; }
-			res[key as keyof T] = prop;
-		}
+		if (!(key in record) || typeof record[key] != type) { return null; }
+		res[key as keyof T] = record[key] as any;
 	}
 	return res;
 }
@@ -113,7 +93,7 @@ export function getOrInsert<K, V>(map: Map<K, V>, key: K, fallback: () => (V ext
 }
 
 export function delay(ms: number) {
-	return new Promise<void>(d => { setTimeout(d, ms) });
+	return new Promise(d => setTimeout(d, ms))
 }
 
 export function posmod(x: number, n: number) {
@@ -171,7 +151,7 @@ export function rsmarkupToSafeHtml(str: string) {
 			}
 		}
 	} catch (e) {
-		console.log(e.message);
+		console.log(e instanceof Error ? e.message : String(e));
 		res = escapeHTML(str);
 	}
 	return res;
@@ -193,7 +173,7 @@ export function constrainedMap<Q>() {
 	}
 }
 
-export const Stream: { new(buf: Buffer): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
+export const Stream: { new(buf: Buffer, scan?: number): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
 	// Double check the mime type
 	/*if (data[data.length - 4] != 0x4F) // O
 		return null;
@@ -216,7 +196,7 @@ export const Stream: { new(buf: Buffer): Stream, prototype: Stream } = function 
 		return res;
 	}
 	this.tee = function () {
-		return new Stream(data, scan);
+		return new (Stream as unknown as { new(buf: Buffer, scan?: number): Stream })(data, scan);
 	}
 	this.eof = function () {
 		if (scan > data.length) { throw new Error("reading past end of buffer"); }
@@ -439,16 +419,6 @@ export function packedHSL2HSL(hsl: number) {
 	return [h, s, l];
 }
 
-export function hsl2hex(hsl: number) {
-	let rgb = HSL2RGB(packedHSL2HSL(hsl));
-	return `#${((rgb[0] << 16) | (rgb[1] << 8) | (rgb[2] << 0)).toString(16).padStart(6, "0")}`;
-}
-
-export function hex2hsl(hex: string) {
-	let n = parseInt(hex.replace(/^#/, ""), 16);
-	return HSL2packHSL(...RGB2HSL((n >> 16) & 0xff, (n >> 8) & 0xff, (n >> 0) & 0xff));
-}
-
 export type Coord = {
 	x: number,
 	z: number,
@@ -460,48 +430,6 @@ export function unpackCoordgrid(coord: number) {
 	let x = (coord >> 14) & 0x3FFF;
 	let z = coord & 0x3FFF;
 	return { level, x, z };
-}
-
-export function packCoordgrid(level: number, x: number, z: number) {
-	return ((level & 0x3) << 28) | ((x & 0x3FFF) << 14) | (z & 0x3FFF);
-}
-
-export function unpackDBTableField(tablefield: number) {
-	let dbtable = (tablefield >> 12) & 0xffff;
-	let columnid = (tablefield >> 4) & 0xff;
-	let subfield = tablefield & 0xf;
-	return { dbtable, columnid, subfield };
-}
-
-export function unpackComponent(comp: number) {
-	let intf = (comp >>> 16) & 0xFFFF;
-	let sub = comp & 0xFFFF;
-	return { intf, sub };
-}
-
-export function packFrameid(file: number, index: number) {
-	return (file << 16) | index;
-}
-export function unpackFrameid(value: number) {
-	let file = (value >>> 16) & 0xFFFF;
-	let index = value & 0xFFFF;
-	return { file, index };
-}
-
-export function packComponent(intf: number, sub: number) {
-	return (intf << 16) | sub;
-}
-
-export function packMapsquare(x: number, z: number) {
-	const worldStride = 128;
-	return (z * worldStride) + x;
-}
-
-export function unpackMapsquare(mapsquare: number) {
-	const worldStride = 128;
-	let x = mapsquare % worldStride;
-	let z = Math.floor(mapsquare / worldStride);
-	return { x, z };
 }
 
 export class TypedEmitter<T extends Record<string, any>> {
@@ -596,18 +524,6 @@ export async function trickleTasksTwoStep<T>(parallel: number, tasks: () => Iter
 	}
 }
 
-export function taskTrickler(maxparallel = 1, delaytime = 1) {
-	let stallindex = 0;
-	let stall = new Array<Promise<any>>(maxparallel).fill(Promise.resolve());
-	return function gate<T>(task: () => Promise<T>) {
-		let res = stall[stallindex].then(() => task());
-		stall[stallindex] = res
-			.finally(() => { delaytime != 0 && delay(delaytime) });
-		stallindex = (stallindex + 1) % maxparallel;
-		return res;
-	}
-}
-
 export class FetchThrottler {
 	private reqQueue: (() => void)[] = [];
 	private activeReqs = 0;
@@ -656,7 +572,7 @@ export class IterableWeakMap<K extends WeakKey, V> {
 	refSet = new Set<WeakRef<K>>();
 	finalizationGroup = new FinalizationRegistry(IterableWeakMap.cleanup);
 
-	static cleanup({ set, ref }) {
+	static cleanup({ set, ref }: { set: Set<WeakRef<WeakKey>>, ref: WeakRef<WeakKey> }) {
 		set.delete(ref);
 	}
 
@@ -779,11 +695,4 @@ export function findParentElement(el: HTMLElement | null, cond: (el: HTMLElement
 		el = el.parentElement;
 	}
 	return fallback;
-}
-
-export function prettyFileSize(size: number) {
-	if (size < 1024) { return size + " B"; }
-	if (size < 1024 * 1024) { return (size / 1024).toFixed(2) + " KB"; }
-	if (size < 1024 * 1024 * 1024) { return (size / (1024 * 1024)).toFixed(2) + " MB"; }
-	return (size / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }

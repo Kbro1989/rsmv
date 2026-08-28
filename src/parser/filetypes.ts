@@ -1,6 +1,6 @@
 
-import { cacheConfigPages, cacheMajors, internalNameFiles, JsonFieldTypes } from "../constants";
-import { parse, FileParser, JsonBasedFile, cacheFileJsonModes, cacheFileExperimentalModes } from "./jsondecoders";
+import { cacheConfigPages, cacheMajors, internalNameFiles } from "../constants";
+import { parse, FileParser, JsonBasedFile, cacheFileJsonModes } from "./jsondecoders";
 import { CacheFileSource } from "../cache";
 import { constrainedMap } from "../utils";
 import prettyJson from "json-stringify-pretty-compact";
@@ -14,7 +14,7 @@ import { parseMusic } from "../scripts/musictrack";
 import { legacyGroups, legacyMajors } from "../cache/legacycache";
 import { renderCutscene } from "../scripts/rendercutscene";
 import { UiRenderContext, renderRsInterfaceHTML } from "../scripts/renderrsinterface";
-import { ClientScriptDeobLoader, compileClientScript, renderClientScript, writeClientVarFile, writeOpcodeFile } from "../clientscript";
+import { compileClientScript, prepareClientScript, renderClientScript, writeClientVarFile, writeOpcodeFile } from "../clientscript";
 import { loadFontMetrics } from "../scripts/fontmetrics";
 import { anyFileIndex, CacheFileId, chunkedIndex, DecodeLookup, LogicalIndex, noArchiveIndex, singleMinorIndex, standardIndex } from "./filelookup";
 import { crc32 } from "../libs/crc32util";
@@ -26,7 +26,6 @@ export type DecodeModeFactory<T = Buffer | string, CTX = any> = (flags: Record<s
 export type DecodeMode<T = Buffer | string, CTX = void> = {
 	ext: string,
 	parser?: FileParser<any>,
-	rstype?: JsonFieldTypes,
 	read(buf: Buffer, fileid: LogicalIndex, source: CacheFileSource, ctx: CTX | undefined): T | Promise<T>,
 	prepareDump(output: ScriptFS, source: CacheFileSource): Promise<CTX> | CTX,
 	prepareWrite(source: CacheFileSource): Promise<void> | void,
@@ -39,12 +38,12 @@ export type DecodeMode<T = Buffer | string, CTX = void> = {
 const throwOnNonSimple = {
 	prepareDump() { },
 	prepareWrite() { },
-	write() { throw new Error("write not supported"); },
+	write(b: any) { throw new Error("write not supported"); },
 	combineSubs(b: Buffer[]) { throw new Error("batch output mode not supported"); }
 }
 
 
-function standardFile(mode: JsonBasedFile<any>, decodername: string, rstype?: JsonFieldTypes): DecodeModeFactory {
+function standardFile(mode: JsonBasedFile<any>, decodername: string): DecodeModeFactory {
 	let constr = ((args: Record<string, string>) => {
 		let singleschemaurl = "";
 		let batchschemaurl = "";
@@ -52,8 +51,9 @@ function standardFile(mode: JsonBasedFile<any>, decodername: string, rstype?: Js
 			ext: "json",
 			...mode.lookup,
 			parser: mode.parser,
-			rstype: rstype,
 			async prepareDump(output, source) {
+				await mode.prepareParser?.(source);
+				await mode.prepareDump?.(source);
 				let name = Object.entries(cacheFileDecodeModes).find(q => q[1] == constr);
 				if (!name) { throw new Error(); }
 				let schema = mode.parser.parser.getJsonSchema();
@@ -76,7 +76,7 @@ function standardFile(mode: JsonBasedFile<any>, decodername: string, rstype?: Js
 				return (typeof mode.lookup.internalNamefile == "number" ? source.getInternalNameList(mode.lookup.internalNamefile) : undefined);
 			},
 			async prepareWrite(source) {
-				// nop
+				await mode.prepareParser?.(source);
 			},
 			read(b, id, source, ctx) {
 				let obj = mode.parser.read(b, source, { keepbuffers: args.keepbuffers });
@@ -127,29 +127,17 @@ const decodeMusic: DecodeModeFactory = () => {
 		minor: undefined,
 		logicalDimensions: 1,
 		usesArchieves: false,
-		internalNamefile: internalNameFiles.midi,
+		internalNamefile: undefined,
 		fileToLogical(source, major, minor, subfile) { return [minor]; },
 		logicalToFile(source, id) { return { major: cacheMajors.music, minor: id[0], subid: 0 }; },
 		async logicalRangeToFiles(source, start, end) {
-			// the music index contains ~10sec music fragments, only a small fraction of those are header fragments
-			// only these header fragments contain a list of fragment ids that make up the music track
-			// brute force searching for these tracks is not feasible.
-			// use the cs2 internal name file to find the header ids if it exists
-			// otherwise fall back to using the enum 1351 which contains a music tracks shown in-game (but excludes hidden tracks)
+			let enumdata = await source.getObject("enums", 1351);
 			let indexfile = await source.getCacheIndex(cacheMajors.music);
-			let namefile = await source.getInternalNameList(internalNameFiles.midi);
-			if (namefile.size != 0) {
-				return [...namefile.keys()]
-					.filter(q => q >= start[0] && q <= end[0])
-					.map<CacheFileId>(q => ({ index: indexfile[q], subid: 0 }));
-			} else {
-				let enumdata = await source.getObject("enums", 1351);
-				return enumdata.intArrayValue2!.values
-					.filter(q => q[1] >= start[0] && q[1] <= end[0])
-					.sort((a, b) => a[1] - b[1])
-					.filter((q, i, arr) => i == 0 || arr[i - 1][1] != q[1])//filter duplicates
-					.map<CacheFileId>(q => ({ index: indexfile[q[1]], subid: 0 }))
-			}
+			return enumdata.intArrayValue2!.values
+				.filter(q => q[1] >= start[0] && q[1] <= end[0])
+				.sort((a, b) => a[1] - b[1])
+				.filter((q, i, arr) => i == 0 || arr[i - 1][1] != q[1])//filter duplicates
+				.map<CacheFileId>(q => ({ index: indexfile[q[1]], subindex: 0 }))
 		},
 		...throwOnNonSimple,
 		read(buf, fileid, source) {
@@ -189,7 +177,7 @@ const decodeSlideshow: DecodeModeFactory = () => {
 				let dbrow = parse.dbrows.read(subfile.buffer, source);
 				if (dbrow.table == 40) { ids.push(subfile.fileid); }
 			}
-			return ids.map(q => ({ index: indexfile[cacheConfigPages.dbrows], subid: q }));
+			return ids.map(q => ({ index: indexfile[cacheConfigPages.dbrows], subindex: q }));
 		},
 		...throwOnNonSimple,
 		async read(buf, fileid, source) {
@@ -217,16 +205,16 @@ const decodeCutscene: DecodeModeFactory = () => {
 const decodeInterface: DecodeModeFactory = () => {
 	return {
 		ext: "html",
-		major: cacheMajors.components,
+		major: cacheMajors.interfaces,
 		minor: undefined,
 		logicalDimensions: 1,
 		usesArchieves: true,
 		internalNamefile: internalNameFiles.interface,
 		fileToLogical(source, major, minor, subfile) { if (subfile != 0) { throw new Error("subfile 0 expected") } return [minor]; },
-		logicalToFile(source, id) { return { major: cacheMajors.components, minor: id[0], subid: 0 }; },
+		logicalToFile(source, id) { return { major: cacheMajors.interfaces, minor: id[0], subid: 0 }; },
 		async logicalRangeToFiles(source, start, end) {
-			let indexfile = await source.getCacheIndex(cacheMajors.components);
-			return indexfile.filter(q => q && q.minor >= start[0] && q.minor <= end[0]).map(q => ({ index: q, subid: 0 }));
+			let indexfile = await source.getCacheIndex(cacheMajors.interfaces);
+			return indexfile.filter(q => q && q.minor >= start[0] && q.minor <= end[0]).map(q => ({ index: q, subindex: 0 }));
 		},
 		...throwOnNonSimple,
 		async read(buf, fileid, source) {
@@ -239,16 +227,16 @@ const decodeInterface: DecodeModeFactory = () => {
 const decodeInterface2: DecodeModeFactory = () => {
 	return {
 		ext: "ui.json",
-		major: cacheMajors.components,
+		major: cacheMajors.interfaces,
 		minor: undefined,
 		logicalDimensions: 1,
 		usesArchieves: true,
 		internalNamefile: internalNameFiles.interface,
 		fileToLogical(source, major, minor, subfile) { if (subfile != 0) { throw new Error("subfile 0 expected") } return [minor]; },
-		logicalToFile(source, id) { return { major: cacheMajors.components, minor: id[0], subid: 0 }; },
+		logicalToFile(source, id) { return { major: cacheMajors.interfaces, minor: id[0], subid: 0 }; },
 		async logicalRangeToFiles(source, start, end) {
-			let indexfile = await source.getCacheIndex(cacheMajors.components);
-			return indexfile.filter(q => q && q.minor >= start[0] && q.minor <= end[0]).map(q => ({ index: q, subid: 0 }));
+			let indexfile = await source.getCacheIndex(cacheMajors.interfaces);
+			return indexfile.filter(q => q && q.minor >= start[0] && q.minor <= end[0]).map(q => ({ index: q, subindex: 0 }));
 		},
 		...throwOnNonSimple,
 		async read(buf, fileid, source) {
@@ -261,7 +249,7 @@ const decodeInterface2: DecodeModeFactory = () => {
 const fontViewer: DecodeModeFactory = () => {
 	return {
 		ext: "font.json",
-		...noArchiveIndex(cacheMajors.fontmetrics, internalNameFiles.fontmetrics),
+		...standardIndex(cacheMajors.fontmetrics, internalNameFiles.fontmetrics),
 		...throwOnNonSimple,
 		async read(buf, fileid, source) {
 			return JSON.stringify(await loadFontMetrics(source, buf, fileid[0], true));
@@ -276,14 +264,13 @@ const decodeClientScript: DecodeModeFactory = (ops) => {
 		...noArchiveIndex(cacheMajors.clientscript),
 		...throwOnNonSimple,
 		async prepareDump(out, source) {
-			let calli = await ClientScriptDeobLoader.forCache(source).loadOrGenerate(source);
+			let calli = await prepareClientScript(source);
 			out.writeFile("tsconfig.json", JSON.stringify({ "compilerOptions": { "lib": [], "target": "ESNext" } }, undefined, "\t"));//tsconfig to make the folder a project
 			out.writeFile("opcodes.d.ts", writeOpcodeFile(calli));
 			out.writeFile("clientvars.d.ts", writeClientVarFile(calli));
 		},
-		async read(buf, fileid, source) {
-			let { writer, rootfunc } = await renderClientScript(source, buf, fileid[0], ops.cs2relativecomps == "true", ops.cs2notypes == "true", ops.cs2intcasts == "true");
-			return writer.getCodeString(rootfunc);
+		read(buf, fileid, source) {
+			return renderClientScript(source, buf, fileid[0], ops.cs2relativecomps == "true", ops.cs2notypes == "true", ops.cs2intcasts == "true");
 		},
 		async write(file, fileid, source) {
 			let obj = await compileClientScript(source, file.toString("utf8"));
@@ -306,7 +293,7 @@ const decodeClientScriptViewer: DecodeModeFactory = () => {
 		...noArchiveIndex(cacheMajors.clientscript),
 		...throwOnNonSimple,
 		async prepareDump(fs, source) {
-			await ClientScriptDeobLoader.forCache(source).loadOrGenerate(source);
+			await prepareClientScript(source);
 		},
 		read(buf, fileid, source) {
 			return JSON.stringify(parse.clientscript.read(buf, source));
@@ -492,10 +479,7 @@ const cacheFileDecodersOther = constrainedMap<DecodeModeFactory>()({
 });
 
 const cacheFileDecodersJson = (Object.fromEntries(Object.entries(cacheFileJsonModes)
-	.map(([k, v]) => [k, standardFile(v as JsonBasedFile<any>, k, v.proptype)])) as Record<keyof typeof cacheFileJsonModes, DecodeModeFactory>)
-
-const cacheFileDecodersExperimentalJson = (Object.fromEntries(Object.entries(cacheFileExperimentalModes)
-	.map(([k, v]) => [k, standardFile(v as JsonBasedFile<any>, k, v.proptype)])) as Record<keyof typeof cacheFileExperimentalModes, DecodeModeFactory>)
+	.map(([k, v]) => [k, standardFile(v as JsonBasedFile<any>, k)])) as Record<keyof typeof cacheFileJsonModes, DecodeModeFactory>)
 
 export const cacheFileDecodeGroups = {
 	image: cacheFileDecodersImage,
@@ -504,7 +488,6 @@ export const cacheFileDecodeGroups = {
 	sound: cacheFileDecodersSound,
 	other: cacheFileDecodersOther,
 	json: cacheFileDecodersJson,
-	experimental: cacheFileDecodersExperimentalJson,
 }
 
 export const cacheFileDecodeModes = Object.fromEntries(Object.values(cacheFileDecodeGroups).flatMap(q => Object.entries(q)))

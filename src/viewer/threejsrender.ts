@@ -2,21 +2,20 @@ import * as THREE from "three";
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { delay, TypedEmitter } from '../utils';
-import { flipImage, makeImageData } from '../imgutils';
+import { dumpTexture, flipImage, makeImageData } from '../imgutils';
 import { boundMethod } from 'autobind-decorator';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
-import { ModelExtras, ClickableMesh } from '../3d/mapsquare';
-import { CubeCamera, AnimationClip, BufferGeometry, Camera, DoubleSide, Group, LinearFilter, Material, Matrix4, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, RawShaderMaterial, RGBAFormat, Texture, Vector3, WebGLCubeRenderTarget, WebGLRenderer, PlaneGeometry, Timer, Box3 } from "three";
-import { UiCameraParams, updateItemCamera } from "./tabs/simplemodes";
-import { RSModel } from "../3d/scene/model";
-import { getModelBoundingBox } from "../3d/modeltothree";
+import { ModelExtras, MeshTileInfo, ClickableMesh } from '../3d/mapsquare';
+import { AnimationClip, AnimationMixer, BufferGeometry, Camera, Clock, Color, CubeCamera, Group, Material, Matrix4, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D, OrthographicCamera, PerspectiveCamera, SkinnedMesh, Texture, Vector3 } from "three";
+import { VR360Render } from "./vr360camera";
+import { UiCameraParams, updateItemCamera } from "./scenenodes";
 
 //TODO remove
-globalThis.THREE = THREE;
+(globalThis as typeof globalThis & { THREE: typeof THREE }).THREE = THREE;
 //console hooks
-globalThis.logclicks = false;
-globalThis.speed = 100;
+(globalThis as unknown as { logclicks: boolean }).logclicks = false;
+(globalThis as unknown as { speed: number }).speed = 100;
 
 //nodejs compatible animframe calls
 //should in theory be able to get rid of these completely by enforcing autoframes=false
@@ -57,8 +56,8 @@ type AutoFrameMode = "forced" | "continuous" | "never";
 export type RenderCameraMode = "standard" | "vr360" | "item" | "topdown";
 
 export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
-	canvas: HTMLCanvasElement;
 	private renderer: THREE.WebGLRenderer;
+	private canvas: HTMLCanvasElement;
 	private skybox: { scene: THREE.Scene, camera: THREE.Camera } | null = null;
 	private scene: THREE.Scene;
 	private modelnode: THREE.Group;
@@ -67,7 +66,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private autoFrameMode: AutoFrameMode = "forced";
 	private contextLossCount = 0;
 	private contextLossCountLastRender = 0;
-	private clock = new Timer();
+	private clock = new Clock(true);
 
 	private sceneElements = new Set<ThreeJsSceneElementSource>();
 	private animationCallbacks = new Set<NonNullable<ThreeJsSceneElement["updateAnimation"]>>();
@@ -87,7 +86,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 
 	constructor(canvas: HTMLCanvasElement, params?: THREE.WebGLRendererParameters) {
 		super();
-		globalThis.render = this;//TODO remove
+		Object.assign(globalThis, { render: this });//TODO remove
 		this.canvas = canvas;
 		this.renderer = new THREE.WebGLRenderer({
 			canvas,
@@ -307,8 +306,8 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	resizeRendererToDisplaySize() {
 		const canvas = this.renderer.domElement;
 		if (!canvas.isConnected) { return; }
-		let width = canvas.parentElement!.clientWidth;
-		let height = canvas.parentElement!.clientHeight;
+		let width = canvas.clientWidth;
+		let height = canvas.clientHeight;
 		if (this.forceAspectRatio) {
 			height = Math.min(height, Math.floor(width / this.forceAspectRatio));
 			width = Math.min(width, Math.floor(height * this.forceAspectRatio));
@@ -373,12 +372,11 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.queuedFrameId = 0;
 
 		// update animations
-		this.clock.update();
 		let delta = this.clock.getDelta();
-		delta *= (globalThis.speed ?? 100) / 100;//TODO remove
-		this.animationCallbacks.forEach(q => q(delta, this.clock.getElapsed()));
+		delta *= ((globalThis as { speed?: number }).speed ?? 100) / 100;//TODO remove
+		this.animationCallbacks.forEach(q => q(delta, this.clock.elapsedTime));
 
-		this.resizeRendererToDisplaySize();
+		this.resizeRendererToDisplaySize();		
 		let cam2d = (cam ?? this.getCurrent2dCamera());
 		if (cam2d) {
 			this.renderScene(cam2d);
@@ -459,7 +457,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 				minFilter: THREE.LinearFilter,
 				magFilter: THREE.LinearFilter,
 				format: THREE.RGBAFormat,
-				colorSpace: (this.camMode != "vr360" ? this.renderer.outputColorSpace as THREE.ColorSpace : THREE.LinearSRGBColorSpace),
+				colorSpace: (this.camMode != "vr360" ? this.renderer.outputColorSpace : THREE.LinearSRGBColorSpace),
 				samples: gl.getParameter(gl.SAMPLES)
 			});
 			// (rendertarget as any).isXRRenderTarget = true;
@@ -492,7 +490,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		let height = rendertarget?.height ?? this.canvas.height;
 		let buf = new Uint8Array(width * height * 4);//node-gl doesn't accept clamped
 		if (rendertarget) {
-			this.renderer.readRenderTargetPixels(rendertarget, 0, 0, width, height, buf);
+			this.renderer.readRenderTargetPixels(rendertarget as any, 0, 0, width, height, buf);
 			rendertarget.dispose();
 		} else {
 			let gl = this.renderer.getContext()
@@ -542,8 +540,11 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	}
 
 	setCameraLimits(target?: Vector3) {
+		// compute the box that contains all the stuff
+		// from root and below
 		if (!target) {
-			const box = new THREE.Box3().setFromObject(this.modelnode, true);
+			const box = new THREE.Box3().setFromObject(this.modelnode);
+			const boxSize = box.getSize(new THREE.Vector3()).length();
 			target = box.getCenter(new THREE.Vector3());
 		}
 
@@ -591,9 +592,9 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			let meshdata = obj.userData as ModelExtras;
 
 			if (firstloggable) {
-				globalThis.model = isct.object;
+				(globalThis as typeof globalThis & { model?: THREE.Object3D }).model = isct.object;
 				firstloggable = false;
-				if (globalThis.logclicks) {
+				if ((globalThis as typeof globalThis & { logclicks?: boolean }).logclicks) {
 					if (isct.object instanceof Mesh && isct.object.geometry instanceof BufferGeometry) {
 
 						let indices = [isct.face!.a, isct.face!.b, isct.face!.c];
@@ -622,7 +623,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			let endindex: number = obj.geometry.index?.count ?? obj.geometry.attributes.position.count;
 			let startindex = 0;
 			let clickindex = isct.faceIndex;
-			if (clickindex == null) { throw new Error("???") }
+			if (typeof clickindex == "undefined") { throw new Error("???") }
 			for (let i = 0; i < meshdata.subranges.length; i++) {
 				if (clickindex * 3 < meshdata.subranges[i]) {
 					endindex = meshdata.subranges[i];
@@ -675,22 +676,21 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		scene.add(dirLight);
 		scene.add(hemilight);
 		scene.add(modelnode);
-		let clock = new THREE.Timer();
+		let clock = new THREE.Clock();
 		let rendertarget: THREE.WebGLRenderTarget | null = null;
 
-		let currentnode: RSModel | null = null;
-		let currentbox: Box3 | null = null;
-		let setmodel = (model: RSModel | null) => {
-			if (currentnode) {
-				modelnode.remove(currentnode.rootnode);
+		let currentnode: ThreeJsSceneElement | null = null;
+		let currentcentery = 0;
+		let setmodel = (model: ThreeJsSceneElement | null, centery: number) => {
+			if (currentnode?.modelnode) {
+				modelnode.remove(currentnode.modelnode);
 				currentnode = null;
 			}
-			if (model) {
-				modelnode.add(model.rootnode);
+			if (model?.modelnode) {
+				modelnode.add(model.modelnode);
 				currentnode = model;
-				currentbox = getModelBoundingBox(model.loaded?.modeldata);
-				model.model.then(loaded => { if (currentnode == model) { currentbox = getModelBoundingBox(loaded.modeldata) } })
 			}
+			currentcentery = centery
 		}
 
 		let takePicture = (width: number, height: number, params: UiCameraParams) => {
@@ -701,18 +701,17 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 					minFilter: THREE.LinearFilter,
 					magFilter: THREE.LinearFilter,
 					format: THREE.RGBAFormat,
-					colorSpace: this.renderer.outputColorSpace as THREE.ColorSpace,
+					colorSpace: this.renderer.outputColorSpace,
 					samples: gl.getParameter(gl.SAMPLES)
 				});
 			}
-			clock.update();
 			let delta = clock.getDelta();
-			currentnode?.updateAnimation?.(delta, clock.getElapsed());
+			currentnode?.updateAnimation?.(delta, clock.elapsedTime);
 
 			let oldtarget = this.renderer.getRenderTarget();
 			this.renderer.setRenderTarget(rendertarget);
 			let itemcam = new THREE.PerspectiveCamera();
-			updateItemCamera(itemcam, width, height, currentbox, params);
+			updateItemCamera(itemcam, width, height, currentcentery, params);
 
 			this.renderer.clearColor();
 			this.renderer.clearDepth();
@@ -742,7 +741,7 @@ export function disposeThreeTree(node: THREE.Object3D | null) {
 
 		// dispose textures
 		for (const key of Object.keys(material)) {
-			const value = material[key]
+			const value = (material as any)[key]
 			if (value && typeof value === 'object' && 'minFilter' in value) {
 				value.dispose();
 				count++;
@@ -751,7 +750,7 @@ export function disposeThreeTree(node: THREE.Object3D | null) {
 	}
 
 	let count = 0;
-	node.traverse((object: any) => {
+	(node as any).traverse((object: any) => {
 		if (!object.isMesh) return
 
 		count++;
@@ -781,7 +780,6 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 		"RA_skinWeight_skin"
 	];
 	//there doesn't seem to be any good way to hook the exporter, so just temporarily edit the scene
-	let proms: Promise<void>[] = [];
 	node.traverseVisible(node => {
 		if (node.animations) {
 			anims.push(...node.animations.filter(q => q.duration != 0));
@@ -804,22 +802,6 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 				undolist.push(() => attributes.normal = oldnormal);
 				node.geometry.attributes.normal = cloned;
 			}
-			let mat = node.material as THREE.MeshStandardMaterial;
-			if (mat.normalMap instanceof THREE.DataTexture) {
-				// threejs gltf converter doesn't know about data textures
-				// it tries to repack the normals, so we need to give it a gpu texture
-				let oldmap = mat.normalMap;
-				undolist.push(() => mat.normalMap = oldmap);
-				let threedata = mat.normalMap.image!;
-				let imgdata = makeImageData(new Uint8ClampedArray(threedata.data!.buffer, threedata.data!.byteOffset, threedata.data!.byteLength), threedata.width, threedata.height);
-				proms.push(createImageBitmap(imgdata, { imageOrientation: "flipY" }).then(bitmap => {
-					mat.normalMap = new THREE.Texture(bitmap);
-					mat.normalMap.needsUpdate = true;
-					mat.normalMap.wrapS = oldmap.wrapS;
-					mat.normalMap.wrapT = oldmap.wrapT;
-					mat.normalMap.magFilter = THREE.LinearFilter;
-				}));
-			}
 			//for some reason blender chokes on these
 			for (let attr of hiddenattributes) {
 				if (attributes[attr]) {
@@ -831,9 +813,8 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 			}
 		}
 	});
-	await Promise.all(proms);
 	let res = await new Promise<Buffer>((resolve, reject) => {
-		exporter.parse(node, gltf => resolve(gltf as any), reject, {
+		exporter.parse(node, (gltf: any) => resolve(gltf), reject, {
 			binary: true,
 			animations: anims
 		});
@@ -844,7 +825,7 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 
 export function exportThreeJsStl(node: THREE.Object3D) {
 	let exporter = new STLExporter();
-	let res = exporter.parse(node, { binary: true });
+	let res = exporter.parse(node, { binary: true }) as any as DataView;
 	return Promise.resolve(new Uint8Array(res.buffer, res.byteOffset, res.byteLength));
 }
 
@@ -924,77 +905,3 @@ export class SkewOrthographicCamera extends OrthographicCamera {
 		}
 	}
 }
-
-class EquirectangularMaterial extends RawShaderMaterial {
-	transparent = true;
-	constructor() {
-		super({
-			//TODO check if typings are wrong here
-			//@ts-ignore
-			uniforms: { map: { type: 't', value: null } },
-			vertexShader: `
-				attribute vec3 position;
-				varying vec2 vUv;
-				void main()  {
-					vUv = vec2(position.x,position.y);
-					gl_Position = vec4(position, 1.0);
-				}`,
-			fragmentShader: `
-				precision mediump float;
-				uniform samplerCube map;
-				varying vec2 vUv;
-				#define M_PI 3.1415926535897932384626433832795
-				void main() {
-					float longitude = vUv.x * M_PI;
-					float latitude = vUv.y * 0.5 * M_PI;
-					vec3 dir = vec3(sin(longitude) * cos(latitude), sin(latitude), -cos(longitude) * cos(latitude));
-					normalize(dir);
-					gl_FragColor = textureCube(map, dir);
-				}`,
-			side: DoubleSide,
-			transparent: true
-		})
-	}
-}
-
-export class VR360Render {
-	cubeRenderTarget: WebGLCubeRenderTarget;
-	cubeCamera: CubeCamera;
-	skyCubeCamera: CubeCamera;
-	quad: Mesh<BufferGeometry, EquirectangularMaterial>;
-	projectCamera: Camera;
-	size: number;
-
-	constructor(parent: WebGLRenderer, size: number, near: number, far: number) {
-		this.size = size;
-		let gl = parent.getContext();
-		this.cubeRenderTarget = new WebGLCubeRenderTarget(size, {
-			minFilter: LinearFilter,
-			magFilter: LinearFilter,
-			format: RGBAFormat,
-			colorSpace: parent.outputColorSpace as THREE.ColorSpace,
-			samples: 0//gl.getParameter(gl.SAMPLES)//three.js crashes if using multisampled here
-		});
-		//threejs always renders non-default render targets in linear, however they programmed in a 
-		//special case for webxr render targets to still render in srgb
-		//i'm guessing you would normally want your cubemaps to be linear for correct light calcs in reflection
-		//but in this case the cube is the output
-		//i could do this without hack by doing srgb in the fragment shader but that would result in big loss
-		//of quality since we're in 8bit colors already
-		(this.cubeRenderTarget as any).isXRRenderTarget = true;
-
-
-		this.cubeCamera = new CubeCamera(near, far, this.cubeRenderTarget);
-		this.skyCubeCamera = new CubeCamera(near, far, this.cubeRenderTarget);
-		this.quad = new Mesh(new PlaneGeometry(2, 2), new EquirectangularMaterial());
-		this.quad.frustumCulled = false;
-		this.projectCamera = new Camera();
-	}
-
-	render(renderer: WebGLRenderer) {
-		this.quad.material.uniforms.map.value = this.cubeCamera.renderTarget.texture;
-		// renderer.setSize(this.size * 2, this.size);
-		renderer.render(this.quad, this.projectCamera);
-	}
-}
-

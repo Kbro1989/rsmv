@@ -129,7 +129,7 @@ export async function jsonCacheSearch(engine: EngineCache, mode: keyof typeof ca
 	let files = await searchdata.files;
 
 	const hasprop = (o: object, p: string) => o && Object.prototype.hasOwnProperty.call(o, p);
-	const getprop = function* (prop: any, path: string[], depth: number) {
+	const getprop = function* (prop: any, path: string[], depth: number): Generator<any, boolean, unknown> {
 		if (Array.isArray(prop)) {
 			for (let sub of prop) {
 				yield* getprop(sub, path, depth);
@@ -141,7 +141,9 @@ export async function jsonCacheSearch(engine: EngineCache, mode: keyof typeof ca
 			yield* getprop(prop[part], path, depth + 1);
 		} else {
 			yield prop;
+			return true;
 		}
+		return false;
 	}
 
 	let calculateFilters = (filters: JsonSearchFilter[]) => {
@@ -175,7 +177,7 @@ export async function jsonCacheSearch(engine: EngineCache, mode: keyof typeof ca
 						if (Array.isArray(def.items)) {
 							optsthree.push(Object.keys(def.items));
 							if (part) {
-								def = def.items[part];
+								def = def.items[+part];
 								partindex++;
 							}
 						} else {

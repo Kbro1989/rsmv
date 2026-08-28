@@ -40,11 +40,11 @@ async function* iterateConfigFiles(cache: EngineCache, major: number) {
 		if (!files) { throw new Error(`cache major ${major} can not be iterated`); }
 		yield* files.map((file, id) => ({ id, file }));
 	} else if (cache.getBuildNr() <= 488) {
-		let arch = await cache.getArchiveById(cacheMajors.config, oldConfigMaps[major]);
+		let arch = await cache.getArchiveById(cacheMajors.config, oldConfigMaps[major as keyof typeof oldConfigMaps]);
 		yield* arch.map(q => ({ id: q.fileid, file: q.buffer }));
 	} else {
 		let locindices = await cache.getCacheIndex(major);
-		let stride = mappedFileIds[major];
+		let stride = mappedFileIds[major as keyof typeof mappedFileIds];
 		for (let index of locindices) {
 			if (!index) { continue; }
 			let arch = await cache.getFileArchive(index);
@@ -439,7 +439,7 @@ export class DependencyGraph {
 		this.hashes.set(depname, hash);
 	}
 
-	async runDependencyGroup(run: DepCollector, args) {
+	async runDependencyGroup(run: DepCollector, args: DepArgs) {
 		try {
 			console.log(`starting ${run.name}`);
 			let t = Date.now();

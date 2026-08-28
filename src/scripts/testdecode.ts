@@ -101,7 +101,7 @@ export async function testDecodeHistoric(output: ScriptOutput, outdir: ScriptFS,
 						if (!res.success) {
 							errorcount++;
 							if (errorcount < maxerrs) {
-								let errlocation = change.action.getFileName(change.major, change.minor, change.subfileid);
+								let errlocation = change.action.getFileName(change.major, change.minor, change.subfile);
 								let filename = `${currentcache.source.getCacheMeta().name.replace(/\W/g, "_")}_${errlocation}`;
 								output.log(`error in ${change.action.name} ${errlocation}`);
 
@@ -141,6 +141,7 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 
 	let fileiter: () => AsyncGenerator<DecodeEntry>;
 
+	await mode.prepareDump?.(source);
 	let files = (await Promise.all(ranges.map(q => mode.lookup.logicalRangeToFiles(source, q.start, q.end)))).flat();
 
 	//pre-sort to get more small file under mem limit
@@ -158,26 +159,27 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 					subfiles = await source.getFileArchive(index);
 				} catch (e) {
 					subfiles = [];
-					error = e;
+					error = e instanceof Error ? e : new Error(String(e));
 				}
 				currentarch = { index, subfiles, error };
 				memuse += subfiles.reduce((a, v) => a + v.size, 0);
 			}
 
-			let subindex = currentarch.index.subindices.findIndex(q => q == file.subid);
-			if (subindex == -1) { throw new Error("subindex not found in archive subindices"); }
-			let subfile = currentarch.subfiles[subindex];
+			let subfile = currentarch.subfiles[file.subindex];
 			if (!subfile) {
 				if (currentarch.error) {
-					let id = mode.lookup.fileToLogical(source, file.index.major, file.index.minor, file.subid);
+					let id = mode.lookup.fileToLogical(source, file.index.major, file.index.minor, file.subindex);
 					output.log(`skipped ${id.join(".")} due to error: ${currentarch.error}`);
 				} else {
 					output.log("subfile not found");
 				}
 				continue;
 			}
-			let entry: DecodeEntry = { major: index.major, minor: index.minor, subfile: file.subid, file: subfile.buffer };
-			if (globalThis.testDecodeFilter && !globalThis.testDecodeFilter(entry)) {
+			let entry: DecodeEntry = { major: index.major, minor: index.minor, subfile: file.subindex, file: subfile.buffer };
+			const testDecodeFilter = (globalThis as typeof globalThis & {
+				testDecodeFilter?: (entry: DecodeEntry) => boolean
+			}).testDecodeFilter;
+			if (testDecodeFilter && !testDecodeFilter(entry)) {
 				continue;
 			}
 			if (orderBySize) {
@@ -209,7 +211,10 @@ export async function testDecode(output: ScriptOutput, outdir: ScriptFS, source:
 		let res = testDecodeFile(mode.parser, file.file, source);
 
 		if (output.state == "running") {
-			if (!globalThis.testDecodeOutputFilter || globalThis.testDecodeOutputFilter(res.state, res.debugdata.rootstate)) {
+			const testDecodeOutputFilter = (globalThis as typeof globalThis & {
+				testDecodeOutputFilter?: (state: any, rootstate: any) => boolean
+			}).testDecodeOutputFilter;
+			if (!testDecodeOutputFilter || testDecodeOutputFilter(res.state, res.debugdata.rootstate)) {
 				if (res.success) {
 					nsuccess++;
 				} else {
@@ -267,7 +272,7 @@ export function testDecodeFile(decoder: FileParser<any>, buffer: Buffer, source:
 		res = decoder.readInternal(state);
 		success = true;
 	} catch (e) {
-		error = e;
+		error = e instanceof Error ? e : new Error(String(e));
 	}
 	let debugdata = getDebug(false)!;
 

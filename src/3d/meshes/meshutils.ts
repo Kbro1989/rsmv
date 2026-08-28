@@ -168,7 +168,18 @@ export class MeshBuilder {
     }
 }
 
-export function getAttributeBackingStore(attr: BufferAttribute | InterleavedBufferAttribute): [data: ArrayBufferView, offset: number, stride: number] {
+export type NumericArray =
+    | Int8Array
+    | Uint8Array
+    | Uint8ClampedArray
+    | Int16Array
+    | Uint16Array
+    | Int32Array
+    | Uint32Array
+    | Float32Array
+    | Float64Array;
+
+export function getAttributeBackingStore(attr: BufferAttribute | InterleavedBufferAttribute): [data: NumericArray, offset: number, stride: number] {
     if (attr instanceof InterleavedBufferAttribute) {
         let data = attr.data.array;
         if (!ArrayBuffer.isView(data)) { throw new Error("typed array backing store expected"); }

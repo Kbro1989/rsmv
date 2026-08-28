@@ -1,6 +1,6 @@
 import { lastLegacyBuildnr } from "../constants";
 import type * as jsonschema from "json-schema";
-import type { ClientScriptDeobLoader } from "../clientscript";
+import type { ClientscriptObfuscation } from "../clientscript/callibrator";
 
 export type TypeDef = { [name: string]: unknown };
 
@@ -97,8 +97,9 @@ export function buildParser(parent: ChunkParentCallback | null, chunkdef: unknow
 			} else {
 				if (chunkdef.length < 1) throw new Error(`'read' variables must either be a valid type-defining string, an array of type-defining strings / objects, or a valid type-defining object: ${JSON.stringify(chunkdef)}`);
 				let args = chunkdef.slice(1);
-				if (parserFunctions[chunkdef[0]]) {
-					return parserFunctions[chunkdef[0]](args, parent, typedef);
+				const parserFunctionName = chunkdef[0];
+				if (typeof parserFunctionName === "string" && Object.hasOwn(parserFunctions, parserFunctionName)) {
+					return parserFunctions[parserFunctionName as keyof typeof parserFunctions](args, parent, typedef);
 				}
 			}
 		default:
@@ -145,7 +146,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 				let opt = opts[key];
 				if (!opt) { throw new Error("unknown property " + key); }
 				opcodetype.write(state, opt.op);
-				opt.parser.write(state, value[key]);
+				opt.parser.write(state, (value as Record<string, any>)[key]);
 			}
 			if (!hasexplicitnull) {
 				opcodetype.write(state, 0);
@@ -167,7 +168,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			for (let prop of map.values()) {
 				if (prop.key.startsWith("$")) { continue; }
 				propschema[prop.key] = { oneOf: [prop.parser.getJsonSchema(), { type: "null" }] };
-				propschema[prop.key]["x-rsmv-type"] = prop.rstype;
+				(propschema[prop.key] as jsonschema.JSONSchema6Definition & Record<string, unknown>)["x-rsmv-type"] = prop.rstype;
 			}
 
 			return {
@@ -183,7 +184,7 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as Record<string, unknown>)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -196,24 +197,25 @@ function opcodesParser(chunkdef: {}, parent: ChunkParentCallback, typedef: TypeD
 		}
 	}
 	let refs: Record<string, ResolvedReference[] | undefined> = {};
-	let opcodetype = buildParser(null, (chunkdef["$opcode"] ?? "unsigned byte"), typedef);
+	let opcodetype = buildParser(null, ((chunkdef as Record<string, unknown>)["$opcode"] ?? "unsigned byte"), typedef);
 	let opts: Record<string, { op: number, parser: ChunkParser, rstype: string }> = {};
 	let roottype = "";
 	for (let key in chunkdef) {
 		if (key.startsWith("$")) {
-			if (key == "$type") { roottype = chunkdef[key]; }
+			if (key == "$type") { roottype = (chunkdef as Record<string, string>)[key]; }
 			continue;
 		}
-		let op = chunkdef[key];
+		let op = (chunkdef as Record<string, unknown>)[key];
 		if (typeof op != "object" || !op) { throw new Error("op name expected"); }
-		let opname = op["name"];
+		let opRecord = op as Record<string, unknown>;
+		let opname = opRecord["name"];
 		if (typeof opname != "string") { throw new Error("op name expected"); }
-		let optype = op["type"] ?? "";
+		let optype = opRecord["type"] ?? "";
 		if (typeof optype != "string") { throw new Error("op type expected"); }
 		if (opts[opname]) { throw new Error("duplicate opcode key " + opname); }
 		opts[opname] = {
 			op: parseInt(key),
-			parser: buildParser(resolveReference.bind(null, key), op["read"], typedef),
+			parser: buildParser(resolveReference.bind(null, key), opRecord["read"], typedef),
 			rstype: optype
 		};
 	}
@@ -256,8 +258,8 @@ function tupleParserFactory(istyped: boolean) {
 			getJsonSchema() {
 				let items = props.map((prop, i) => {
 					let res = prop.getJsonSchema();
-					if (istyped) {
-						res["x-rsmv-type"] = proptypes[i];
+					if (typeof res == "object" && res != null) {
+						Object.assign(res, { "x-rsmv-type": proptypes[i] });
 					}
 					return res;
 				});
@@ -309,127 +311,126 @@ function refgetter(refparent: ChunkParentCallback | null, propname: string, reso
 	return {
 		read(state: SharedEncoderState) {
 			let stack = (hidden ? state.hiddenstack : state.stack);
-			return stack[stack.length - depth][propname];
+			return (stack[stack.length - depth] as Record<string, unknown>)[propname];
 		},
 		write(state: SharedEncoderState, newvalue: number) {
 			if (state.isWrite && !hidden) { throw new Error(`can update ref values in write mode when they are hidden (prefixed with $) in ${propname}`); }
 			let stack = (hidden ? state.hiddenstack : state.stack);
-			stack[stack.length - depth][propname] = newvalue;
+			(stack[stack.length - depth] as Record<string, unknown>)[propname] = newvalue;
 		}
 	}
 }
 
-function structParserFactory(ismini: boolean) {
-	return function structParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) {
-		let refs: Record<string, ResolvedReference[] | undefined> = {};
-		let r: ChunkParser = {
-			read(state) {
-				let r = {};
-				let hidden = {};
-				state.stack.push(r);
-				state.hiddenstack.push(hidden);
-				if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
-				if (debugdata && ismini) { debugdata.opcodes.push({ op: "struct", index: state.scan, stacksize: state.stack.length }); }
-				for (let key of keys) {
-					if (debugdata && !ismini) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
-					let v = props[key].read(state);
-					if (v !== undefined) {
-						if (key[0] == "$") {
-							hidden[key] = v;
-						} else {
-							r[key] = v;
-						}
+function structParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) {
+	let refs: Record<string, ResolvedReference[] | undefined> = {};
+	let r: ChunkParser = {
+		read(state) {
+			let r: Record<string, unknown> = {};
+			let hidden: Record<string, unknown> = {};
+			state.stack.push(r);
+			state.hiddenstack.push(hidden);
+			if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
+			for (let key of keys) {
+				if (debugdata) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
+				let v = props[key].read(state);
+				if (v !== undefined) {
+					if (key[0] == "$") {
+						hidden[key] = v;
+					} else {
+						r[key] = v;
 					}
-				}
-				state.stack.pop();
-				state.hiddenstack.pop();
-				return r;
-			},
-			write(state, value) {
-				if (typeof value != "object" || !value) { throw new Error("object expected"); }
-				let hiddenvalue = {};
-				state.stack.push(value);
-				state.hiddenstack.push(hiddenvalue);
-				for (let key of keys) {
-					let propvalue = value[key as string];
-					let prop = props[key];
-
-					if (key.startsWith("$")) {
-						if (prop.readConst != undefined) {
-							propvalue = prop.readConst(state);
-						} else {
-							let refarray = refs[key];
-							if (!refarray) { throw new Error("cannot write hidden values if they are not constant or not referenced"); }
-							propvalue ??= 0;
-							for (let ref of refarray) {
-								propvalue = ref.resolve(value, propvalue);
-							}
-						}
-						hiddenvalue[key] = propvalue;
-					}
-					prop.write(state, propvalue);
-				}
-				state.stack.pop();
-				state.hiddenstack.pop();
-			},
-			getTypescriptType(indent) {
-				let r = "{\n";
-				let newindent = indent + "\t";
-				for (let key of keys) {
-					if (key[0] == "$") { continue; }
-					r += newindent + key + ": " + props[key].getTypescriptType(newindent) + ",\n";
-				}
-				r += indent + "}";
-				return r;
-			},
-			getJsonSchema() {
-				let propschema: Record<string, jsonschema.JSONSchema6Definition> = {};
-				for (let prop in props) {
-					if (prop.startsWith("$")) { continue; }
-					propschema[prop] = (props[prop] as ChunkParser).getJsonSchema();
-					let proptype = proptypes[prop];
-					if (proptype) {
-						propschema[prop]["x-rsmv-type"] = proptype;
-					}
-				}
-				return {
-					type: "object",
-					properties: propschema,
-					required: Object.keys(propschema)
 				}
 			}
-		}
+			state.stack.pop();
+			state.hiddenstack.pop();
+			return r;
+		},
+		write(state, value) {
+			if (typeof value != "object" || !value) { throw new Error("object expected"); }
+			let hiddenvalue: Record<string, unknown> = {};
+			state.stack.push(value);
+			state.hiddenstack.push(hiddenvalue);
+			for (let key of keys) {
+				let propvalue = (value as Record<string, unknown>)[key as string];
+				let prop = props[key];
 
-		let resolveReference = function (targetprop: string, name: string, childresolve: ResolvedReference) {
-			let result: ResolvedReference = {
-				stackdepth: childresolve.stackdepth + 1,
-				resolve(v, oldvalue) {
-					if (typeof v != "object" || !v) { throw new Error("object expected"); }
-					let res = v[targetprop!];
-					return childresolve.resolve(res, oldvalue);
+				if (key.startsWith("$")) {
+					if (prop.readConst != undefined) {
+						propvalue = prop.readConst(state);
+					} else {
+						let refarray = refs[key];
+						if (!refarray) { throw new Error("cannot write hidden values if they are not constant or not referenced"); }
+						propvalue ??= 0;
+						for (let ref of refarray) {
+							propvalue = ref.resolve(value, propvalue as number);
+						}
+					}
+					hiddenvalue[key] = propvalue;
 				}
-			};
-			if (Object.prototype.hasOwnProperty.call(props, name)) {
-				refs[name] ??= [];
-				refs[name]!.push(result);
-				return result;
-			} else {
-				return buildReference(name, parent, result);
+				prop.write(state, propvalue);
+			}
+			state.stack.pop();
+			state.hiddenstack.pop();
+		},
+		getTypescriptType(indent) {
+			let r = "{\n";
+			let newindent = indent + "\t";
+			for (let key of keys) {
+				if (key[0] == "$") { continue; }
+				r += newindent + key + ": " + props[key].getTypescriptType(newindent) + ",\n";
+			}
+			r += indent + "}";
+			return r;
+		},
+		getJsonSchema() {
+			let propschema: Record<string, jsonschema.JSONSchema6Definition> = {};
+			for (let prop in props) {
+				if (prop.startsWith("$")) { continue; }
+				propschema[prop] = (props[prop] as ChunkParser).getJsonSchema();
+				let proptype = proptypes[prop];
+				if (proptype) {
+					if (typeof propschema[prop] === "object" && propschema[prop] !== null) {
+						(propschema[prop] as jsonschema.JSONSchema6 & { "x-rsmv-type"?: string })["x-rsmv-type"] = proptype;
+					}
+				}
+			}
+			return {
+				type: "object",
+				properties: propschema,
+				required: Object.keys(propschema)
 			}
 		}
-
-		let props = {};
-		let proptypes = {};
-		for (let propdef of args) {
-			if (!Array.isArray(propdef) || (propdef.length != 2 && propdef.length != 3)) { throw new Error("each struct args should be a [name,type] pair"); }
-			if (typeof propdef[0] != "string") { throw new Error("prop name should be string"); }
-			if (props[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
-			props[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
-			proptypes[propdef[0]] = propdef[2] ?? "";
-		}
-		let keys = Object.keys(props);
-		return r;
 	}
+
+	let resolveReference = function (targetprop: string, name: string, childresolve: ResolvedReference) {
+		let result: ResolvedReference = {
+			stackdepth: childresolve.stackdepth + 1,
+			resolve(v, oldvalue) {
+				if (typeof v != "object" || !v) { throw new Error("object expected"); }
+				let res = (v as Record<string, unknown>)[targetprop!];
+				return childresolve.resolve(res, oldvalue);
+			}
+		};
+		if (Object.prototype.hasOwnProperty.call(props, name)) {
+			refs[name] ??= [];
+			refs[name]!.push(result);
+			return result;
+		} else {
+			return buildReference(name, parent, result);
+		}
+	}
+
+	let props: Record<string, ChunkParser> = {};
+	let proptypes: Record<string, string> = {};
+	for (let propdef of args) {
+		if (!Array.isArray(propdef) || (propdef.length != 2 && propdef.length != 3)) { throw new Error("each struct args should be a [name,type] pair"); }
+		if (typeof propdef[0] != "string") { throw new Error("prop name should be string"); }
+		if (props[propdef[0]]) { throw new Error("duplicate struct prop " + propdef[0]); }
+		props[propdef[0]] = buildParser(resolveReference.bind(null, propdef[0]), propdef[1], typedef);
+		proptypes[propdef[0]] = propdef[2] ?? "";
+	}
+	let keys = Object.keys(props);
+	return r;
 }
 
 function optParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) {
@@ -517,15 +518,15 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 		read(state) {
 			let len = lengthtype.read(state);
 			let r: object[] = [];
-			let hiddenprops: object[] = [];
+			let hiddenprops: Record<string, unknown>[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
 				let proptype = chunktypes[chunkindex];
 				if (debugdata) {
 					debugdata.opcodes.push({ op: Object.keys(proptype).join(), index: state.scan, stacksize: state.stack.length });
 				}
 				for (let i = 0; i < len; i++) {
-					let hidden: object;
-					let obj: object;
+					let hidden: { [key: string]: any };
+					let obj: { [key: string]: any };
 					if (chunkindex == 0) {
 						obj = {};
 						r.push(obj);
@@ -556,7 +557,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			if (!Array.isArray(v)) { throw new Error("array expected"); }
 			lengthtype.write(state, v.length);
 
-			let hiddenprops: object[] = [];
+			let hiddenprops: Record<string, unknown>[] = [];
 			for (let chunkindex = 0; chunkindex < chunktypes.length; chunkindex++) {
 				let proptype = chunktypes[chunkindex];
 				for (let i = 0; i < v.length; i++) {
@@ -605,7 +606,9 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 				propschema[prop] = fullobj[prop].getJsonSchema();
 				let proptype = proptypes[prop];
 				if (proptype) {
-					propschema[prop]["x-rsmv-type"] = proptype;
+					if (typeof propschema[prop] === "object" && propschema[prop] !== null) {
+						Object.assign(propschema[prop], { "x-rsmv-type": proptype });
+					}
 				}
 			}
 			return {
@@ -636,7 +639,7 @@ function chunkedArrayParser(args: unknown[], parent: ChunkParentCallback, typede
 			stackdepth: childresolve.stackdepth + 1,
 			resolve(v, oldvalue) {
 				if (typeof v != "object" || !v) { throw new Error("object expected"); }
-				let res = v[targetprop!];
+				let res = (v as Record<string, unknown>)[targetprop!];
 				return childresolve.resolve(res, oldvalue);
 			}
 		};
@@ -821,7 +824,7 @@ function arrayParser(args: unknown[], parent: ChunkParentCallback, typedef: Type
 		},
 		getJsonSchema() {
 			let itemtype = subtype.getJsonSchema();
-			itemtype["x-rsmv-type"] = displaytype;
+			(itemtype as any)["x-rsmv-type"] = displaytype;
 			return {
 				type: "array",
 				items: itemtype
@@ -962,13 +965,16 @@ function referenceValueParser(args: unknown[], parent: ChunkParentCallback, type
 	let read = (state: SharedEncoderState) => {
 		let value = ref.read(state);
 		if (indexgetter) {
+			if (!Array.isArray(value)) throw new Error("array expected");
 			let index = indexgetter.read(state);
+			if (typeof index != "number") throw new Error("number index expected");
 			value = value[index];
 		}
+		if (typeof value != "number") throw new Error("number expected");
 		if (minbit != -1) {
 			value = (value >> minbit) & ~((~0) << bitlength);
 		}
-		return value + offset;
+		return (value as number) + (offset as number);
 	}
 	let r: ChunkParser = {
 		read,
@@ -1044,7 +1050,7 @@ function intAccumolatorParser(args: unknown[], parent: ChunkParentCallback, type
 			//TODO fix the context situation
 			let increment = value.read(state);
 			let newvalue: number;
-			let refvalue = ref.read(state) ?? 0;
+			let refvalue: number = typeof ref.read(state) == "number" ? ref.read(state) as number : 0;
 			if (mode == "add" || mode == "add-1" || mode == "postadd") {
 				newvalue = refvalue + (increment ?? 0) + (mode == "add-1" ? -1 : 0);
 			} else if (mode == "hold") {
@@ -1058,7 +1064,7 @@ function intAccumolatorParser(args: unknown[], parent: ChunkParentCallback, type
 		write(state, v) {
 			if (typeof v != "number") { throw new Error("number expected"); }
 
-			let refvalue = ref.read(state) ?? 0;
+			let refvalue: number = typeof ref.read(state) == "number" ? ref.read(state) as number : 0;
 
 			let increment: number;
 			if (mode == "add" || mode == "add-1") {
@@ -1134,21 +1140,6 @@ function stringParser(prebytes: number[]): ChunkParser {
 		},
 		getJsonSchema() {
 			return { type: "string" };
-		}
-	}
-}
-
-function typedParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef): ChunkParser {
-	let sub = buildParser(parent, args[0], typedef);
-	let type = args[1];
-	if (typeof type != "string") { throw new Error("typed parser second argument should be a type string"); }
-
-	return {
-		...sub,
-		getJsonSchema() {
-			let schema = sub.getJsonSchema();
-			schema["x-rsmv-type"] = type;
-			return schema;
 		}
 	}
 }
@@ -1229,13 +1220,13 @@ function conditionParser(parent: ChunkParentCallback, optionstrings: string[], w
 				switch (cond.op) {
 					case "=": matched = value == cond.value; break;
 					case "!=": matched = value != cond.value; break;
-					case "<": matched = value < cond.value; break;
-					case "<=": matched = value <= cond.value; break;
-					case ">": matched = value > cond.value; break;
-					case ">=": matched = value >= cond.value; break;
-					case "&": matched = (value & cond.value) != 0; break;
-					case "!&": matched = (value & cond.value) == 0; break;
-					case "&=": matched = (value & cond.value) == cond.value; break;
+					case "<": matched = Number(value) < cond.value; break;
+					case "<=": matched = Number(value) <= cond.value; break;
+					case ">": matched = Number(value) > cond.value; break;
+					case ">=": matched = Number(value) >= cond.value; break;
+					case "&": matched = (Number(value) & cond.value) != 0; break;
+					case "!&": matched = (Number(value) & cond.value) == 0; break;
+					case "&=": matched = (Number(value) & cond.value) == cond.value; break;
 					default: throw new Error("unknown op" + cond.op);
 				}
 				if (!matched) {
@@ -1422,24 +1413,26 @@ const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, t
 			},
 		}
 	},
-	varushortbias: function () {
+	"flipped varushort": function (args, parent, typedef) {
+		// same as varushort, but flips bytes for some reason
+		// idk why this exists, but its used by dbrows table id field
+		// TODO i remember this existing in skeletal anims as well, merge implementations
 		return {
-			read(s) {
-				let firstByte = s.buffer.readUInt8(s.scan++);
-				if ((firstByte & 0x80) == 0) {
-					return firstByte - 0x40;
+			read(state) {
+				let byte0 = state.buffer.readUint8(state.scan++);
+				if ((byte0 & 0x80) == 0) {
+					return byte0;
 				}
-				let secondByte = s.buffer.readUInt8(s.scan++);
-				return (((firstByte & 0x7f) << 8) | secondByte) - 0x4000;
+				let byte1 = state.buffer.readUint8(state.scan++);
+				return (byte0 | (byte1 << 8)) - 0x100;
 			},
-			write(s, v) {
+			write(state, v) {
 				if (typeof v != "number") { throw new Error("number expected"); }
-				if (v < 0x40 && v >= -0x40) {
-					s.buffer.writeUInt8(v + 0x40, s.scan);
-					s.scan += 1;
+				if (v < 0x80) {
+					state.buffer.writeUint8(v, state.scan++);
 				} else {
-					s.buffer.writeInt16BE((v | 0x8000) + 0x4000, s.scan);
-					s.scan += 2;
+					state.buffer.writeUint8((v & 0x7f) | 0x80, state.scan++);
+					state.buffer.writeUint8((v + 0x100) >> 8, state.scan++);
 				}
 			},
 			getTypescriptType(indent) {
@@ -1448,7 +1441,7 @@ const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, t
 			getJsonSchema() {
 				return { type: "number" };
 			}
-		};
+		}
 	},
 	"tailed varushort": function (args, parent, typedef) {
 		const overflowchunk = 0x7fff;
@@ -1545,17 +1538,23 @@ const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, t
 	scriptopt: function (args, parent, typedef) {
 		return {
 			read(state) {
+				let cali = state.args.clientScriptDeob as ClientscriptObfuscation | undefined;
+				//don't explicitly check prototype here as we would have to import the constructor
+				if (!cali) {
+					throw new Error("opcode callibration not set for clientscript with obfuscated opcodes");
+				}
 				if (debugdata) {
 					debugdata.opcodes.push({ op: "opcode", index: state.scan, stacksize: state.stack.length + 1 });
 				}
-				let deob = state.args.clientScriptDeob as ClientScriptDeobLoader | undefined;
-				if (!deob || !deob.loaded) { throw new Error("clientScriptDeob not set in args"); }
-				return deob.loaded.readOpcode(state);
+				let res = (cali as ClientscriptObfuscation).readOpcode(state);
+				return res;
 			},
 			write(state, v) {
-				let deob = state.args.clientScriptDeob as ClientScriptDeobLoader | undefined;
-				if (!deob || !deob.loaded) { throw new Error("clientScriptDeob not set in args"); }
-				deob.loaded.writeOpCode(state, v);
+				let cali = state.args.clientScriptDeob as ClientscriptObfuscation | undefined;;
+				if (!cali) {
+					throw new Error("opcode callibration not set for clientscript with obfuscated opcodes");
+				}
+				cali.writeOpCode(state, v);
 			},
 			getJsonSchema() {
 				return {
@@ -1702,6 +1701,35 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 		},
 		min: 0, max: 2 ** 31 - 1
 	},
+	varnullint: {
+		read(s) {
+			let firstWord = s.buffer.readUInt16BE(s.scan);
+			s.scan += 2;
+			if (firstWord == 0x7fff) {
+				return -1;
+			} else if ((firstWord & 0x8000) == 0) {
+				return firstWord;
+			} else {
+				let secondWord = s.buffer.readUInt16BE(s.scan);
+				s.scan += 2;
+				return ((firstWord & 0x7fff) << 16) | secondWord;
+			}
+		},
+		write(s, v) {
+			if (v == -1) {
+				s.buffer.writeUint16BE(0x7fff, s.scan);
+				s.scan += 2;
+			} else if (v < 0x8000) {
+				s.buffer.writeUInt16BE(v, s.scan);
+				s.scan += 2;
+			} else {
+				//unsigned right shift to cast to uint32 again
+				s.buffer.writeUint32BE((v | 0x80000000) >>> 0, s.scan);
+				s.scan += 4;
+			}
+		},
+		min: -1, max: 2 ** 31 - 1
+	},
 	varint: {
 		read(s) {
 			let firstWord = s.buffer.readUInt16BE(s.scan);
@@ -1725,35 +1753,6 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 			}
 		},
 		min: -(2 ** 30), max: 2 ** 30 - 1
-	},
-	// newer encoding that can fit any uint and stores it in 1-5 bytes
-	denseuint: {
-		read(state) {
-			let value = 0;
-			let bitcount = 0;
-			while (true) {
-				let byte = state.buffer.readUint8(state.scan++);
-				value |= (byte & 0x7f) << bitcount;
-				bitcount += 7;
-				if ((byte & 0x80) == 0) {
-					break;
-				}
-			}
-			return value;
-		},
-		write(state, v) {
-			if (typeof v != "number") { throw new Error("number expected"); }
-			let value = v;
-			while (value) {
-				let byte = value & 0x7f;
-				value >>= 7;
-				if (value) {
-					byte |= 0x80;
-				}
-				state.buffer.writeUint8(byte, state.scan++);
-			}
-		},
-		min: 0, max: 2 ** 32 - 1
 	}
 }
 
@@ -1801,11 +1800,9 @@ const parserFunctions = {
 	buffer: bufferParser,
 	nullarray: arrayNullTerminatedParser,
 	array: arrayParser,
-	struct: structParserFactory(false),
-	ministruct: structParserFactory(true),
+	struct: structParser,
 	tuple: tupleParserFactory(false),
 	typedtuple: tupleParserFactory(true),
-	typed: typedParser,
 
 	...hardcodes,
 	...parserPrimitives

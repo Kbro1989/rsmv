@@ -6,38 +6,28 @@
 			"ESNext",
 			"DOM"
 		],
-		"target": "esnext",
+		"target": "ES2020",
 		"sourceMap": false,
 		"alwaysStrict": true,
 		"jsx": "react",
 		"allowJs": false,
+		"strictNullChecks": true,
+		"baseUrl": "./src",
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"esModuleInterop": true,
 		"experimentalDecorators": true,
 		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"erasableSyntaxOnly": true,
-		"strictNullChecks": true,
 		"noImplicitThis": true,
 		"strictFunctionTypes": true,
-		"strictPropertyInitialization": true,
-		"noImplicitAny": false,
-		"useUnknownInCatchVariables": false,
-		"skipLibCheck": true,
-		"noEmit": true
-	},
-	"watchOptions": {
-		"excludeDirectories": [
-			"dist",
-			"cache",
-			"node_modules"
-		]
+		"strictPropertyInitialization":true
 	},
 	"exclude": [
 		"node_modules",
-		"./cache",
 		"./generated"
+	],
+	"include": [
+		"src/**/*"
 	],
 	"compileOnSave": false
 }
