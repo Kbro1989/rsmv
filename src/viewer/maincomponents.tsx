@@ -353,7 +353,7 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 	sourceIdentifier: string | null = null;
 	sceneCache: ThreejsSceneCache | null = null;
 	openedTabs: UIOpenedTab[] = [];
-	activeTabIndex = -1;
+	visibleTab: UIOpenedTab | null = null;
 	renderable: RenderableContext | null = null;
 	rootElement: HTMLElement;
 	renderer: ThreeJsRenderer;
@@ -481,7 +481,8 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 			// return { type: "file", name: params.get("file")!, fs: null! };//data and fs will be filled in later
 		}
 		console.log(`history triggered to ${target?.type} ${(target as any)?.id}`);
-		this.openFile(target, false, true);
+		let existing = target && this.openedTabs.find(t => t.type == target.type && t.id == target.id);
+		this.openFile(existing ?? target, false, true);
 		return target;
 	}
 
@@ -499,7 +500,7 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 
 	isNavigating = false;
 	fixUrl() {
-		let tab = (this.activeTabIndex != -1 ? this.openedTabs[this.activeTabIndex] : null);
+		let tab = this.visibleTab;
 		let now = Date.now();
 		let navigatable = true;
 		let url = new URL(document.location.href);
@@ -539,24 +540,39 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		e.preventDefault();
 		let fileid = (e.currentTarget as HTMLElement).dataset.objectid;
 		if (!fileid) { return; }
-		this.openFile({ type: "browse", id: fileid });
+		let isnewtab = e.ctrlKey || e.metaKey || e.button === 1;
+		this.openFile({ type: "browse", id: fileid }, isnewtab);
 	}
 
 	@boundMethod
 	openFile(tab: UIOpenedTab | null, newtab = false, isHistoryNavigation = false) {
-		let tabindex = this.activeTabIndex;
-		if (tabindex == -1) {
-			tabindex = 0;
+		let visibleindex = this.visibleTab ? this.openedTabs.indexOf(this.visibleTab) : -1;
+		let tabindex = tab ? this.openedTabs.indexOf(tab) : -1;
+		if (visibleindex == -1) {
 			newtab = true;
+		}
+		if (newtab) { 
+			tabindex = visibleindex + 1;
 		}
 		if (tab) {
 			this.openedTabs.splice(tabindex, (newtab ? 0 : 1), tab);
 		} else {
 			this.openedTabs.splice(tabindex, 1);
 		}
-		this.activeTabIndex = tabindex;
+		this.visibleTab = tab;
 		this.emit("showTab", tab);
 		if (!isHistoryNavigation) {
+			this.fixUrl();
+		}
+	}
+
+	@boundMethod
+	closeFile(tab: UIOpenedTab) {
+		let tabindex = this.visibleTab ? this.openedTabs.indexOf(tab) : -1;
+		if (tabindex != -1) {
+			this.openedTabs.splice(tabindex, 1);
+			this.visibleTab = this.openedTabs[tabindex] ?? this.openedTabs[tabindex - 1] ?? null;
+			this.emit("showTab", this.visibleTab);
 			this.fixUrl();
 		}
 	}

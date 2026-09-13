@@ -440,7 +440,7 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null }) {
 			setbacking(true);
 		}
 
-		let visibleuitab = ctx.openedTabs[ctx.activeTabIndex];
+		let visibleuitab = ctx.visibleTab;
 		let openedfile = (visibleuitab?.type == "file" && visibleuitab.fs == p.fs) ? visibleuitab.name : null;
 
 		//TODO file dowload counter

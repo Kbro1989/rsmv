@@ -4,7 +4,7 @@ import { Euler, PerspectiveCamera, Quaternion, Vector3 } from "three";
 import { internalNameFiles } from "../../constants";
 import * as React from "react";
 import { ThreeJsSceneElementSource } from "../threejsrender";
-import { RenderableContext, UIEngineContext } from "../maincomponents";
+import { UIEngineContext } from "../maincomponents";
 import { showModal } from "../jsonsearch";
 import { JsonDisplay, IdInput, LabeledInput, IdInputSearch, RawTextDisplay, useForceUpdate, TextureView, DomWrap } from "../commoncontrols";
 import { items } from "../../../generated/items";
@@ -17,7 +17,6 @@ import { debugProcTexture } from '../../3d/materials/proceduraltexture';
 import { RSModel } from '../../3d/scene/model';
 import { StructView } from '../viewers/configview';
 import { LookupModeProps } from '../scenenodes';
-import { useEffect } from 'react';
 
 
 type AsyncModelData<ID, T> = [
@@ -27,7 +26,9 @@ type AsyncModelData<ID, T> = [
     setter: (id: ID) => void
 ];
 
-export function useAsyncModelData<ID, T>(ctx: RenderableContext | null, getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID>>) {
+
+export function useAsyncModelData<ID, T>(getter: (cache: ThreejsSceneCache, id: ID) => Promise<SimpleModelInfo<T, ID>>, hide: boolean) {
+    let ctx = React.useContext(UIEngineContext);
     let pendingId = React.useRef<ID | null>(null);
     let [loadedModel, setLoadedModel] = React.useState<RSModel | null>(null);
     let [visible, setVisible] = React.useState<SimpleModelInfo<T, ID> | null>(null);
@@ -52,7 +53,7 @@ export function useAsyncModelData<ID, T>(ctx: RenderableContext | null, getter: 
         }
     }, [ctx]);
     React.useLayoutEffect(() => {
-        if (visible && ctx) {
+        if (visible && ctx && !hide) {
             let model = new RSModel(ctx.sceneCache, visible.models, visible.name);
             if (visible.anims.default) {
                 model.setAnimation(visible.anims.default);
@@ -67,7 +68,7 @@ export function useAsyncModelData<ID, T>(ctx: RenderableContext | null, getter: 
                 model.cleanup();
             }
         }
-    }, [visible, ctx]);
+    }, [visible, ctx, hide]);
     return [
         visible,
         loadedModel,
@@ -77,8 +78,7 @@ export function useAsyncModelData<ID, T>(ctx: RenderableContext | null, getter: 
 }
 
 export function SceneRawModel(p: LookupModeProps) {
-    let ctx = React.useContext(UIEngineContext);
-    let [data, model, id, setId] = useAsyncModelData(ctx, modelToModel);
+    let [data, model, id, setId] = useAsyncModelData(modelToModel, !p.canrender);
     let initid = (typeof p.initialId == "number" ? p.initialId : 0);
     return (
         <React.Fragment>
@@ -102,7 +102,7 @@ export function SceneRawModel(p: LookupModeProps) {
 
 export function SceneLocation(p: LookupModeProps) {
     const ctx = React.useContext(UIEngineContext);
-    const [data, model, id, setId] = useAsyncModelData(ctx, locToModel);
+    const [data, model, id, setId] = useAsyncModelData(locToModel, !p.canrender);
     const forceUpdate = useForceUpdate();
     let initid = id ?? (typeof p.initialId == "number" ? p.initialId : 0);
     return (
@@ -215,7 +215,7 @@ function ItemCameraMode({ meta, centery }: { meta?: items, centery: number }) {
                 return {
                     options: {
                         camMode: "item",
-                        // aspect: imgwidth / imgheight
+                        aspect: imgwidth / imgheight
                     }
                 };
             },
@@ -241,7 +241,7 @@ function ItemCameraMode({ meta, centery }: { meta?: items, centery: number }) {
 
 export function SceneItem(p: LookupModeProps) {
     let ctx = React.useContext(UIEngineContext);
-    let [data, model, id, setId] = useAsyncModelData(ctx, itemToModel);
+    let [data, model, id, setId] = useAsyncModelData(itemToModel, !p.canrender);
     let initid = id ?? (typeof p.initialId == "number" ? p.initialId : 0);
     let [enablecam, setenablecam] = React.useState(false);
     // let [histfs, sethistfs] = React.useState<UIScriptFS | null>(null);
@@ -278,7 +278,7 @@ export function SceneItem(p: LookupModeProps) {
 
 export function SceneNpc(p: LookupModeProps) {
     const ctx = React.useContext(UIEngineContext);
-    const [data, model, id, setId] = useAsyncModelData(ctx, npcToModel);
+    const [data, model, id, setId] = useAsyncModelData(npcToModel, !p.canrender);
     // useEffect(() => {
     //     if (ctx && id?.head) {
     //         let el = {
@@ -315,8 +315,7 @@ export function SceneNpc(p: LookupModeProps) {
 }
 
 export function SceneSpotAnim(p: LookupModeProps) {
-    let ctx = React.useContext(UIEngineContext);
-    let [data, model, id, setId] = useAsyncModelData(ctx, spotAnimToModel);
+    let [data, model, id, setId] = useAsyncModelData(spotAnimToModel, !p.canrender);
     let initid = id ?? (typeof p.initialId == "number" ? p.initialId : 0);
     return (
         <React.Fragment>
@@ -398,7 +397,7 @@ async function materialIshToModel(sceneCache: ThreejsSceneCache, reqid: Material
 
 export function SceneMaterialIsh(p: LookupModeProps) {
     let ctx = React.useContext(UIEngineContext);
-    let [data, model, id, setId] = useAsyncModelData(ctx, materialIshToModel);
+    let [data, model, id, setId] = useAsyncModelData(materialIshToModel, !p.canrender);
 
     let initid = id ?? checkObject(p.initialId, { mode: "string", id: "number" }) as MaterialIshId ?? { mode: "material", id: 0 };
     let modechange = (v: React.FormEvent<HTMLInputElement>) => setId({ mode: v.currentTarget.value as any, id: initid.id });

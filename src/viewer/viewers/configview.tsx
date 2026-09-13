@@ -462,7 +462,7 @@ export function ObjectLink(p: { prop?: DeepLinkElement, rsmvtype?: ExtendedJsonF
     let fileid = makeFileId(rsmvtype, index);
 
     return <span className="mv-objectentry" title={valuename}>
-        <span className={match && "mv-filelink"} data-objectid={fileid} onClick={ctx.objectClick}>{fileid}</span>
+        <span className={match && "mv-filelink"} data-objectid={fileid} onClick={ctx.objectClick} onAuxClick={ctx.objectClick}>{fileid}</span>
         {valuename ? ` (${valuename})` : null}
     </span>
 }

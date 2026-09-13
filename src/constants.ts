@@ -127,7 +127,7 @@ export const cacheConfigPages = {
 	inventories: 5,
 	// 7: 350 empty files
 	params: 11,
-	// 18: 2888 empty files
+	// 18: 2888 empty files, file count seem to correspond to "area" vars
 	skyboxes: 29,
 	// 31: 37 small files which seem to have color and some other data
 	animgroups: 32,

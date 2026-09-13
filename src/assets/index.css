@@ -135,9 +135,6 @@
 	justify-content: center;
 }
 
-.mv-canvas>canvas {
-}
-
 .mv-sidebar {
 	background-color: var(--secondary-bg-colour);
 	min-width: 220px;
@@ -265,6 +262,25 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.mv-tabbed-head {
+	font-size: 1.2em;
+	display: flex;
+	flex-direction: row;
+	padding: 8px;
+	background: var(--secondary-bg-colour);
+}
+
+.mv-tabbed-tab {
+	padding: 0px 4px;
+	margin: 0px 2px;
+	background: #fff3;
+}
+
+.mv-tabbed-tab--active {
+	font-weight: bold;
+	background: #fff5;
 }
 
 .mv-searchbar {

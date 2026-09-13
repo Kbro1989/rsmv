@@ -58,7 +58,7 @@ function AdvancedIdInputSearch(p: { modename: BrowseModes, initialValue: string,
     let ctx = useContext(UIRootContext);
     let engine = useContext(UIEngineContext)?.sceneCache.engine;
 
-    let activetab = useEmitterProperty(ctx, "showTab", e => e.openedTabs[e.activeTabIndex]);
+    let activetab = useEmitterProperty(ctx, "showTab", e => e.visibleTab);
     let selectedfile = (activetab?.type == "browse" ? activetab.id : null);
 
     let [searchtext, setSearchText] = React.useState(p.initialValue);

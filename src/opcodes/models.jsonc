@@ -97,9 +97,9 @@
 			["hasSkin",["ref","$groupFlags",[5,1]]],
 			
 			["unkint","uint"],
-			// bit awkward, material is stored with an offset of 1
-			["$materialoffset",-1],
-			["material",["accum","$materialoffset","ushort le"],"material"],
+			// material is stored with 1 offset
+			["$materialraw","ushort le"],
+			["material",["ref","$materialraw",null,-1],"material"],
 			
 			["unkbyte2","ubyte"],
 			//this might be groupflags&0x80 for uint indexbuffer

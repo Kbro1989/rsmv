@@ -56,7 +56,7 @@ export function GraphSearchView(p: {}) {
         ctx.openFile({ type: "browse", id: objid });
     };
 
-    let activetab = useEmitterProperty(ctx, "showTab", e => e.openedTabs[e.activeTabIndex]);
+    let activetab = useEmitterProperty(ctx, "showTab", e => e.visibleTab);
     let selectedfile = (activetab?.type == "browse" ? activetab.id : null);
 
     return <>

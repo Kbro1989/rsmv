@@ -3,7 +3,7 @@ import { ThreeJsRenderer } from "./threejsrender";
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 import { ModelBrowser, RendererControls } from "./scenenodes";
-import { UIContext, CacheSelector, UIOpenedFile, UIRootContext, UIEngineContext, downloadBlob, BrowsePageId } from "./maincomponents";
+import { UIContext, CacheSelector, UIOpenedFile, UIRootContext, UIEngineContext, downloadBlob, BrowsePageId, UIOpenedTab } from "./maincomponents";
 import classNames from "classnames";
 import { exposeDebugToolsInGlobal } from "../consoletools";
 import { DomWrap, useAwaited, useDisposableMemo, useForceUpdate } from "./commoncontrols";
@@ -66,15 +66,12 @@ function App(p: {}) {
 	let width = ctx.rootElement.clientWidth;
 	let vertical = width < 550;
 
-	let visibletab = (ctx.source && ctx.activeTabIndex != -1 ? ctx.openedTabs[ctx.activeTabIndex] : null);
-
 	let cachemeta = ctx.source?.getCacheMeta();
 	return (
 		<UIEngineContext.Provider value={ctx.renderable}>
 			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })}>
-				{visibletab ? null : <DomWrap containerref={ctx.renderer.forceFrame} className="mv-canvas" el={ctx.renderer.canvas} />}
-				{visibletab?.type == "file" && <FileViewer file={visibletab} onSelectFile={ctx.openFile} />}
-				{visibletab?.type == "browse" && <BrowseViewer browse={visibletab} onSelectFile={ctx.openFile} />}
+				{ctx.visibleTab ? null : <DomWrap containerref={ctx.renderer.forceFrame} className="mv-canvas" el={ctx.renderer.canvas} />}
+				{ctx.visibleTab && <ModalTabViewer />}
 				<div className="mv-sidebar">
 					{!ctx.source && (
 						<React.Fragment>
@@ -98,6 +95,36 @@ function App(p: {}) {
 	);
 }
 
+export function FileTabStrip() {
+	let ctx = React.useContext(UIRootContext);
+
+	return (
+		<div className="mv-tabbed-head">
+			{ctx.openedTabs.map((tab, index) => (
+				<div key={index} className={classNames("mv-tabbed-tab", { "mv-tabbed-tab--active": ctx.visibleTab === tab })} onClick={() => ctx.openFile(tab)} onAuxClick={() => ctx.closeFile(tab)}>
+					{tab.type == "browse" && `Browse: ${tab.id}`}
+					{tab.type == "view3d" && `3D View: ${tab.id}`}
+					{tab.type == "file" && `File: ${tab.name}`}
+					<span style={{ float: "right", marginLeft: "10px" }} onClick={() => ctx.closeFile(tab)}>x</span>
+				</div>
+			))}
+		</div>
+	)
+}
+
+export function ModalTabViewer() {
+	let ctx = React.useContext(UIRootContext);
+
+	return (
+		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
+			<FileTabStrip />
+			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
+				{ctx.visibleTab?.type == "file" && <FileDisplay file={ctx.visibleTab} />}
+				{ctx.visibleTab?.type == "browse" && <BrowseDisplay browse={ctx.visibleTab} />}
+			</div>
+		</div>
+	);
+}
 
 export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFile | null) => void }) {
 	return (

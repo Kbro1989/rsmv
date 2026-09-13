@@ -12,7 +12,7 @@ import { useAsyncModelData } from "./simplemodes";
 
 export function ScenePlayer(p: LookupModeProps) {
     const ctx = React.useContext(UIEngineContext);
-    const [data, model, id, setId] = useAsyncModelData(ctx, playerDataToModel);
+    const [data, model, id, setId] = useAsyncModelData(playerDataToModel, !p.canrender);
     const [errtext, seterrtext] = React.useState("");
     const forceUpdate = useForceUpdate();
 
