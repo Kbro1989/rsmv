@@ -305,8 +305,8 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	resizeRendererToDisplaySize() {
 		const canvas = this.renderer.domElement;
 		if (!canvas.isConnected) { return; }
-		let width = canvas.clientWidth;
-		let height = canvas.clientHeight;
+		let width = canvas.parentElement!.clientWidth;
+		let height = canvas.parentElement!.clientHeight;
 		if (this.forceAspectRatio) {
 			height = Math.min(height, Math.floor(width / this.forceAspectRatio));
 			width = Math.min(width, Math.floor(height * this.forceAspectRatio));
