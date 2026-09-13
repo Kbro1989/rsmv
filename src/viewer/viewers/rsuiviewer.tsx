@@ -1,19 +1,25 @@
 import * as React from "react";
 import { MAGIC_CONST_CURRENTCOMP, MAGIC_CONST_IF_AS_CC, MAGIC_CONST_MOUSE_X, MAGIC_CONST_MOUSE_Y, MAGIC_CONST_OPNR, MAGIC_CONST_MOUSE_DRAG_ICON, RsInterfaceComponent, RsInterfaceDomTree, UiRenderContext, componentTypeNames, loadRsInterfaceData, renderRsInterfaceDOM } from "../../scripts/renderrsinterface";
-import { DomWrap, useAwaited } from "../commoncontrols";
+import { DomWrap, useAwaited, useEmitterProperty } from "../commoncontrols";
 import { packComponent, unpackComponent } from "../../utils";
 import { UIEngineContext, UIRootContext } from "../maincomponents";
 import { ClientScriptDeobLoader } from "../../clientscript";
 import { internalNameFiles, vartypeReverseMap } from "../../constants";
-import { makeFileId } from "../tabs/browse";
+import { clientScriptDeobPopup, makeFileId } from "../tabs/browse";
 import { packedIntToLogical, traverseJsonSchema, vartypeToDecoder } from "../../scripts/jsonindexer";
 import { ObjectLink, ReferencesView, renderPrimitive, StructDataView, StructView } from "./configview";
 import { parse } from "../../parser/jsondecoders";
 
 export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
+	let rootctx = React.useContext(UIRootContext);
+	let rendercontext = React.useContext(UIEngineContext);
 	let [ui, setui] = React.useState<RsInterfaceDomTree | null>(null);
 	let [refreshcount, refresh] = React.useReducer((v: number) => v + 1, 0);
-	let rendercontext = React.useContext(UIEngineContext);
+	let [explicitscript, setExplicitscript] = React.useState(false);
+
+	let wantsscripts = useEmitterProperty(rootctx, "preferencesChanged", e => rootctx.preferences.runinterfacescripts);
+	let deobloader = rootctx.source && ClientScriptDeobLoader.forCache(rootctx.source);
+
 	let ctx = React.useMemo(() => {
 		if (!rendercontext) { throw new Error("UIEngineContext is not available"); }
 		let res = new UiRenderContext(rendercontext.sceneCache.engine);
@@ -22,20 +28,40 @@ export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
 		return res;
 	}, [rendercontext]);
 
+	let deob = useAwaited(() => {
+		if (!wantsscripts || !deobloader || !rootctx.source) { return null; }
+		// synchronous fastpath
+		if (deobloader.loaded) { return deobloader.loaded; }
+		return (async () => {
+			if (explicitscript) {
+				// only show the generate popup if use explicitly clicked load scripts (not when still on from earlier use)
+				await clientScriptDeobPopup(ctx.source);
+			} else {
+				await deobloader.tryLoadStored(rootctx.source!);
+			}
+			return deobloader.loaded;
+		})();
+	}, [wantsscripts, deobloader, rootctx.source, explicitscript])
+
 	React.useEffect(() => {
 		let needed = true;
-		let cleanup = () => { };
-		loadRsInterfaceData(ctx, p.interfaceid).then(ui => {
+		let prom = loadRsInterfaceData(ctx, p.interfaceid);
+		console.log("loading", !!ctx, p.interfaceid, refreshcount, !!deob);
+		let rsui = prom.then(ui => {
 			if (!needed) { return; }
+			ctx.scriptdeob = (wantsscripts ? deob ?? null : null);
 			let res = renderRsInterfaceDOM(ctx, ui);
-			cleanup = res.dispose;
 			setui(res);
+			return res;
 		});
 		return () => {
 			needed = false;
-			cleanup();
-		}
-	}, [ctx, p.interfaceid, refreshcount, ctx.runOnloadScripts]);
+			rsui.then(res => {
+				console.log("disposing", !!ctx, p.interfaceid, refreshcount, !!deob);
+				res?.dispose();
+			});
+		};
+	}, [ctx, p.interfaceid, refreshcount, deob]);
 
 	React.useEffect(() => {
 		if (p.subcomponent !== undefined && ui?.interfaceid == p.interfaceid) {
@@ -90,6 +116,11 @@ export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
 		}
 	}, [ctx, ui]);
 
+	let toggleOnloadScripts = (e: React.ChangeEvent<HTMLInputElement>) => {
+		let checked = e.currentTarget.checked;
+		rootctx.setPreferences({ runinterfacescripts: checked });
+		setExplicitscript(checked);
+	}
 
 	return (
 		<div style={{ position: "absolute", inset: "0px", display: "grid", gridTemplate: '"a" 1fr "b" auto "c" 1fr / 1fr' }}>
@@ -99,7 +130,7 @@ export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
 			<div>
 				<input type="button" className="sub-btn" onClick={refresh} value="reload" />
 				<label>
-					<input type="checkbox" checked={ctx.runOnloadScripts} onChange={e => { ctx.runOnloadScripts = e.currentTarget.checked; refresh(); }} />
+					<input type="checkbox" checked={rootctx.preferences.runinterfacescripts} onChange={toggleOnloadScripts} />
 					Run load scripts
 				</label>
 			</div>
@@ -150,12 +181,8 @@ function RsInterfaceDebugger(p: { ctx: UiRenderContext, comp: RsInterfaceCompone
 			{data.textdata && (
 				<div>{data.textdata.text}</div>
 			)}
-			{data.spritedata && (
-				<span className="mv-filelink" data-objectid={`graphic_${data.spritedata.spriteid}`} onClick={rootctx.objectClick}>graphic_{data.spritedata.spriteid}</span>
-			)}
-			{data.modeldata && (
-				<span className="mv-filelink" data-objectid={`model_${data.modeldata.modelid}`} onClick={rootctx.objectClick}>model_{data.modeldata.modelid}</span>
-			)}
+			{data.spritedata && <ObjectLink rsmvtype="graphic" value={data.spritedata.spriteid} />}
+			{data.modeldata && <ObjectLink rsmvtype="model" value={data.modeldata.modelid} />}
 			<CallbackDebugger ctx={p.ctx} comp={p.comp} />
 			<ReferencesView browsemode="components" id={[id.intf, id.sub]} />
 			<hr />
@@ -181,6 +208,7 @@ const componentschema = parse.components.parser.getJsonSchema();
 function CallbackDebugger(p: { ctx: UiRenderContext, comp: RsInterfaceComponent }) {
 	let ctx = React.useContext(UIRootContext);
 	let deob = ctx.source && ClientScriptDeobLoader.forCache(ctx.source).loaded;
+	let preventmiddledrag = (e: React.MouseEvent) => { e.button == 1 && e.preventDefault(); };
 	return (
 		<div>
 			{Object.entries(p.comp.data.scripts).filter(q => q[1] && q[1].length != 0).map(([key, v]) => {
@@ -204,7 +232,7 @@ function CallbackDebugger(p: { ctx: UiRenderContext, comp: RsInterfaceComponent 
 							if (browsemode) {
 								let index = packedIntToLogical(arg, typename);
 								let fileid = makeFileId(typename, index);
-								callbackargs.push(<span key={i} className="mv-code__link mv-code__global" data-objectid={fileid} onClick={ctx.objectClick}>{fileid}</span>)
+								callbackargs.push(<span key={i} className="mv-code__link mv-code__global" data-objectid={fileid} onClick={ctx.objectClick} onAuxClick={ctx.objectClick} onMouseDown={preventmiddledrag}>{fileid}</span>)
 							} else {
 								callbackargs.push(<span key={i} className="mv-code__literalint">{arg}</span>);
 							}
@@ -216,9 +244,9 @@ function CallbackDebugger(p: { ctx: UiRenderContext, comp: RsInterfaceComponent 
 				}
 				return (
 					<div key={key}>
-						<span onClick={e => p.ctx.runClientScriptCallback(p.comp.compid, v)}>{key}</span>:
+						<span onClick={e => deob && p.ctx.runClientScriptCallback(deob, p.comp.compid, v)}>{key}</span>:
 						<span className="mv-codeview" style={{ background: "#0004" }}>
-							<span className="mv-code__link mv-code__scriptname" data-objectid={`clientscript_${callbackid}`} onClick={ctx.objectClick}>
+							<span className="mv-code__link mv-code__scriptname" data-objectid={`clientscript_${callbackid}`} onClick={ctx.objectClick} onAuxClick={ctx.objectClick} onMouseDown={preventmiddledrag}>
 								script_{callbackid}
 							</span>
 							({callbackargs})

@@ -57,7 +57,6 @@ export class ClientScriptInterpreter {
         return comp;
     }
     getComponent(compid: number) {
-        if ((compid | 0) == MAGIC_CONST_CURRENTCOMP) { compid = this.activecompid; }
         let comp = this.uictx?.comps.get(compid);
         if (!comp) { return new CS2Api(null); }
         return comp.api;
@@ -93,7 +92,7 @@ export class ClientScriptInterpreter {
     }
 
     log(text: string) {
-        console.log(`CS2: ${"  ".repeat(this.scopeStack.length)} ${text}`);
+        // console.log(`CS2: ${"  ".repeat(this.scopeStack.length)} ${text}`);
     }
     pushStackdiff(diff: StackDiff) {
         if (diff.vararg != 0) { throw new Error("cannot push vararg"); }
@@ -170,17 +169,8 @@ export class ClientScriptInterpreter {
             throw new Error("jumped out of bounds");
         }
         let op = this.scope.ops[this.scope.index++];
-        let implemented = implementedops.get(op.opcode);
-        if (!implemented) {
-            //TODO create a proper way to deal with "not-quite-named" ops
-            //try find raw op name
-            for (let [id, name] of Object.entries(rs3opnames)) {
-                if (+id == op.opcode) {
-                    implemented = namedimplementations.get(name);
-                    break;
-                }
-            }
-        }
+        let implemented = implementedops.get(op.opcode) ?? getnamedimplementation(op.opcode);
+        
         let res: Promise<void> | void = undefined;
         if (op.opcode == namedClientScriptOps.return) {
             this.scopeStack.pop();
@@ -384,6 +374,9 @@ implementedops.set(namedClientScriptOps.poplocalstring, (inter, op) => {
     if (op.imm >= inter.scope.localstrings.length) { throw new Error("invalid poplocalstring"); }
     inter.scope.localstrings[op.imm] = inter.popstring();
 });
+implementedops.set(namedClientScriptOps.popdiscardint, inter => { inter.popint(); });
+implementedops.set(namedClientScriptOps.popdiscardlong, inter => { inter.poplong(); });
+implementedops.set(namedClientScriptOps.popdiscardstring, inter => { inter.popstring(); });
 implementedops.set(namedClientScriptOps.printmessage, inter => inter.log(`>> ${inter.popstring()}`));
 implementedops.set(namedClientScriptOps.inttostring, inter => inter.pushstring(inter.popdeep(1).toString(inter.popdeep(0))));
 implementedops.set(namedClientScriptOps.strcmp, inter => {
@@ -511,3 +504,19 @@ namedimplementations.set("CC_GETTILING", (inter, op) => inter.pushint(inter.getC
 // namedimplementations.set("xxxxx", inter => xxxx)
 // namedimplementations.set("xxxxx", inter => xxxx)
 // namedimplementations.set("xxxxx", inter => xxxx)
+
+
+let namedimplementationreverse: Map<number, OpImplementation> | null = null;
+function getnamedimplementation(id: number) {
+    if (!namedimplementationreverse) {
+        //non-negligible initialization of the reverse mapping, done lazily on first access
+        namedimplementationreverse = new Map<number, OpImplementation>();
+        for (let [id, name] of Object.entries(rs3opnames)) {
+            if (namedimplementations.has(name)) {
+                namedimplementationreverse.set(Number(id), namedimplementations.get(name)!);
+            }
+        }
+    }
+    return namedimplementationreverse.get(id) ?? null;
+}
+

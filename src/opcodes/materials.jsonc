@@ -53,7 +53,7 @@
 			["unk0a_bool","bool"],
 			["specular","ubyte"],
 			["baseColorFraction","ubyte"],//indicates the mix ratio with colorint and vertex colors
-			["baseColor","ushort"]
+			["baseColor","ushort","color"]
 		]]]
 	]]],
 	["v1_or_v2",["opt",["version",0,"eqnot"],["struct",

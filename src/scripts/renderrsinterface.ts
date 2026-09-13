@@ -1,17 +1,16 @@
 import { interfaces } from "../../generated/interfaces";
-import { EngineCache, ThreejsSceneCache } from "../3d/modeltothree";
+import { ThreejsSceneCache } from "../3d/modeltothree";
 import { RSModel } from "../3d/scene/model";
 import { expandSprite, parseSprite } from "../3d/materials/sprite";
 import { CacheFileSource } from "../cache";
-import { ClientScriptDeobLoader } from "../clientscript";
 import { ClientScriptInterpreter } from "../clientscript/interpreter";
 import { cacheMajors } from "../constants";
-import { makeImageData, pixelsToDataUrl } from "../imgutils";
+import { pixelsToDataUrl } from "../imgutils";
 import { parse } from "../parser/jsondecoders";
 import { escapeHTML, packComponent, rsmarkupToSafeHtml, TypedEmitter } from "../utils";
 import { ThreeJsRenderer } from "../viewer/threejsrender";
 import { UiCameraParams } from "../viewer/tabs/simplemodes";
-import { clientScriptDeobPopup } from "../viewer/tabs/browse";
+import { ClientscriptObfuscation } from "../clientscript/callibration/callibrator";
 
 
 export const MAGIC_CONST_MOUSE_X = 0x80000001 | 0;
@@ -115,7 +114,7 @@ export class UiRenderContext extends TypedEmitter<{ hover: RsInterfaceComponent 
     highlightstack: HTMLElement[] = [];
     interpreter: ClientScriptInterpreter | null = null;
     touchedComps = new Set<RsInterfaceComponent>();
-    runOnloadScripts = false;
+    scriptdeob: ClientscriptObfuscation | null = null;
     constructor(source: CacheFileSource) {
         super();
         this.source = source;
@@ -140,13 +139,21 @@ export class UiRenderContext extends TypedEmitter<{ hover: RsInterfaceComponent 
             }
         }
     }
-    async runClientScriptCallback(compid: number, cbdata: (number | string)[]) {
+    async runClientScriptCallback(deob: ClientscriptObfuscation, compid: number, cbdata: (number | string)[]) {
         if (cbdata.length == 0) { return; }
-        this.interpreter ??= new ClientScriptInterpreter(ClientScriptDeobLoader.forCache(this.source).getOrThrow(), this);
+        this.interpreter ??= new ClientScriptInterpreter(deob, this);
         if (typeof cbdata[0] != "number") { throw new Error("expected callback script id but got string"); }
 
         this.interpreter.reset();//TODO warn if this actually does anything?
-        this.interpreter.pushlist(cbdata.slice(1));
+        this.interpreter.pushlist(cbdata.slice(1).map(v => {
+            if (typeof v == "number" && v == MAGIC_CONST_CURRENTCOMP) { return compid; }
+            if (typeof v == "number" && v == MAGIC_CONST_OPNR) { return 0; }
+            if (typeof v == "number" && v == MAGIC_CONST_MOUSE_X) { return 0; }
+            if (typeof v == "number" && v == MAGIC_CONST_MOUSE_Y) { return 0; }
+            // if (typeof v == "number" && v == MAGIC_CONST_IF_AS_CC) { return 0; }
+            //there are more magics, but no obvious way to implement them here
+            return v;
+        }));
         this.interpreter.activecompid = compid;
         await this.interpreter.callscriptid(cbdata[0]);
         await this.interpreter.runToEnd();
@@ -274,12 +281,11 @@ export function renderRsInterfaceDOM(ctx: UiRenderContext, data: Awaited<ReturnT
     }
 
     let loadprom: Promise<void>
-    if (ctx.runOnloadScripts) {
+    if (ctx.scriptdeob) {
         loadprom = (async () => {
-            await clientScriptDeobPopup(ctx.source);
             for (let comp of data.comps.values()) {
                 if (comp.data.scripts.load.length != 0) {
-                    await ctx.runClientScriptCallback(comp.compid, comp.data.scripts.load).catch(e => console.warn("comp load err", e));
+                    await ctx.runClientScriptCallback(ctx.scriptdeob!, comp.compid, comp.data.scripts.load).catch(e => console.warn("comp load err", e));
                 }
             }
         })();
@@ -499,7 +505,7 @@ export class RsInterfaceComponent {
             childhtml += rsmarkupToSafeHtml(this.data.textdata.text);
         }
         if (this.data.modeldata) {
-            let isplaceholder = this.data.modeldata.modelid == 0x7fff || this.data.modeldata.modelid == 0xffff;
+            let isplaceholder = this.data.modeldata.modelid == 0x7fff || this.data.modeldata.modelid == 0xffff || this.data.modeldata.modelid == -1;
             style += "background:rgba(0,255,0,0.5);outline:blue;";
             childhtml += (isplaceholder ? "placeholder" : this.data.modeldata.modelid);
         }
@@ -539,7 +545,7 @@ export class RsInterfaceComponent {
         if (!this.element) { throw new Error("element not set"); }
         let { style, title } = this.getStyle();
         if (this.data.modeldata) {
-            let isplaceholder = this.data.modeldata.modelid == 0x7fff || this.data.modeldata.modelid == 0xffff;
+            let isplaceholder = this.data.modeldata.modelid == 0x7fff || this.data.modeldata.modelid == 0xffff || this.data.modeldata.modelid == -1;
             if (!isplaceholder && this.ctx.renderer && this.ctx.sceneCache) {
                 this.modelrenderer ??= uiModelRenderer(this.ctx.renderer, this.ctx.sceneCache, this.data.modeldata.positiondata!);
                 this.modelrenderer.setmodel(this.data.modeldata.modelid);
@@ -582,14 +588,12 @@ export class RsInterfaceComponent {
             this.spriteChild.remove();
             this.spriteChild = null;
         }
-        // this.element.style.display = this.data.hidden ? "none" : "block";
         this.element.style.cssText = style;
         this.element.title = title;
     }
 
     getStyle() {
         let style = "";
-        let childhtml = "";
         style += cssPosition(this.data);
         style += cssSize(this.data);
         let clickable = false;
@@ -619,7 +623,7 @@ export class RsInterfaceComponent {
             }
             clickable = true;
         } else if (this.data.containerdata) {
-            //nothing
+            style += "overflow:hidden;";
         } else if (this.data.spritedata) {
         } else if (this.data.modeldata) {
             clickable = true;
@@ -629,6 +633,9 @@ export class RsInterfaceComponent {
         }
         if (clickable) {
             style += "pointer-events:initial;";
+        }
+        if (this.data.hidden) {
+            style += "display:none;";
         }
         let title = this.data.rightclickopts.filter(q => q).join("\n");
 
