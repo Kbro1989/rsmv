@@ -52,7 +52,7 @@ export function useAsyncModelData<ID, T>(getter: (cache: ThreejsSceneCache, id: 
             }
         }
     }, [ctx]);
-    React.useLayoutEffect(() => {
+    React.useEffect(() => {
         if (visible && ctx && !hide) {
             let model = new RSModel(ctx.sceneCache, visible.models, visible.name);
             if (visible.anims.default) {

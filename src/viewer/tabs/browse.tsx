@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from "react";
+import React, { useContext } from "react";
 import { checkObject, delay, stringToFileRange } from "../../utils";
 import { LookupModeProps } from "../scenenodes";
 import { cacheFileJsonModes } from "../../parser/jsondecoders";
@@ -19,6 +19,9 @@ import { CacheFileSource } from "../../cache";
 import { IndexGraphLoader, vartypeToDecoder } from "../../scripts/jsonindexer";
 import { ScriptOutput } from "../../scriptrunner";
 import { ReferencesView } from "../viewers/configview";
+import { identityKitToModel, itemToModel, locToModel, materialToModel, modelToModel, npcBodyToModel, SimpleModelInfo, spotAnimToModel } from "../../3d/scene";
+import { ThreejsSceneCache } from "../../3d/modeltothree";
+import { RSModel } from "../../3d/scene/model";
 
 export type BrowseModes = keyof typeof cacheFileJsonModes | "clientscript" | "interfaceviewer" | "categories" | "sprites" | "sounds" | "music" | "coordgrid";
 
@@ -52,7 +55,7 @@ export function fileIdToIndex(fileid: string) {
 }
 
 
-function AdvancedIdInputSearch(p: { modename: BrowseModes, initialValue: string, initialMode: string, onSearch: (search: string, searchmode: string) => void, onFileSelect: (id: string) => void }) {
+function AdvancedIdInputSearch(p: { modename: BrowseModes, initialValue: string, initialMode: string, onSearch: (search: string, searchmode: string) => void, onFileSelect: (id: string, newtab: boolean) => void }) {
     let mode = (cacheFileDecodeModes[p.modename]?.({}) ?? null) as DecodeMode | null;
     let overrides = modeOverrides[p.modename] ?? {};
     let ctx = useContext(UIRootContext);
@@ -135,7 +138,7 @@ function AdvancedIdInputSearch(p: { modename: BrowseModes, initialValue: string,
                 {searchmode == "id" && !searchresult && <div>Loading ids...</div>}
                 {searchmode == "internalname" && !searchresult && <div>Loading internal names...</div>}
                 {searchmode == "objectname" && !searchresult && <div>Loading object names...</div>}
-                {searchresult && <FileListView files={searchresult} selected={selectedfile} onSelect={v => { p.onFileSelect(v); p.onSearch(searchtext, searchmode); }} />}
+                {searchresult && <FileListView files={searchresult} selected={selectedfile} onSelect={(v, newtab) => { p.onFileSelect(v, newtab); p.onSearch(searchtext, searchmode); }} />}
             </div>
         </React.Fragment>
     );
@@ -189,8 +192,8 @@ export function BrowseUI(p: LookupModeProps) {
     let [id, setId] = React.useState<{ mode: string, search: string, searchmode: string } | null>(checkObject(p.initialId, { mode: "string", search: "string", searchmode: "string" }) ?? null);
     let ctx = useContext(UIRootContext);
 
-    let onFileSelect = React.useCallback((fileid: string) => {
-        ctx.openFile({ type: "browse", id: fileid });
+    let onFileSelect = React.useCallback((fileid: string, newtab: boolean) => {
+        ctx.openFile({ type: "browse", id: fileid }, newtab);
     }, [ctx]);
 
     let onSearch = (search: string, searchmode: string) => {
@@ -271,9 +274,21 @@ export async function scriptRunnerPopup(title: string, runtext: string, run: (sc
     return res.promise;
 }
 
+async function jsonIdToModel(scene: ThreejsSceneCache, { mode, id }: { mode: BrowseModes | "", id: number[] }): Promise<SimpleModelInfo<any, any> | null> {
+    if (mode == "models") { return modelToModel(scene, id[0]); }
+    if (mode == "items") { return itemToModel(scene, id[0]); }
+    if (mode == "npcs") { return npcBodyToModel(scene, id[0]); }
+    if (mode == "locs") { return locToModel(scene, id[0]); }
+    if (mode == "spotanims") { return spotAnimToModel(scene, id[0]); }
+    if (mode == "materials") { return materialToModel(scene, id[0]); }
+    if (mode == "identitykit") { return identityKitToModel(scene, id[0]); }
+    return null;
+}
+
 export function BrowseDisplay(p: { browse: BrowsePageId }) {
     let ctx = useContext(UIRootContext);
-    let engine = useContext(UIEngineContext)?.sceneCache.engine;
+    let render = useContext(UIEngineContext);
+    let engine = render?.sceneCache.engine;
     let index = fileIdToIndex(p.browse.id);
 
     let data = useAwaited(() => {
@@ -331,6 +346,26 @@ export function BrowseDisplay(p: { browse: BrowsePageId }) {
             } as const;
         })()
     }, [index?.mode, index?.index.join("_"), engine], 200);
+
+    let model = useAwaited(async () => {
+        if (render) {
+            let modelinfo = await jsonIdToModel(render.sceneCache, { mode: index?.mode ?? "", id: index?.index ?? [] });
+            if (modelinfo) {
+                let model = new RSModel(render.sceneCache, modelinfo.models, modelinfo.name);
+                if (modelinfo.anims.default) {
+                    model.setAnimation(modelinfo.anims.default);
+                }
+                await model.model;
+                return model;
+            }
+        }
+    }, [index?.mode, index?.index.join("_")]);
+    React.useEffect(() => {
+        if (model && render) {
+            model.addToScene(render.renderer);
+            return () => model.cleanup();
+        }
+    }, [model, render]);
 
     if (!data) { return <div>Loading...</div>; }
     if (data.viewer == "json") {

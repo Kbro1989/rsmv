@@ -348,7 +348,7 @@ export type UIOpenedTab = Toplevel3DView | BrowsePageId | UIOpenedFile;
 
 export type RenderableContext = { source: CacheFileSource, sceneCache: ThreejsSceneCache, renderer: ThreeJsRenderer };
 
-export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, statechange: undefined }> {
+export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, statechange: undefined, preferencesChanged: undefined }> {
 	source: CacheFileSource | null = null;
 	sourceIdentifier: string | null = null;
 	sceneCache: ThreejsSceneCache | null = null;
@@ -358,6 +358,11 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 	rootElement: HTMLElement;
 	renderer: ThreeJsRenderer;
 	useServiceWorker: boolean;
+
+	preferences = {
+		runinterfacescripts: false,
+		splitview: false
+	}
 
 	multitab = multitabManager(this);
 
@@ -535,12 +540,19 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		}
 	}
 
+	setPreferences(prefs: Partial<typeof this.preferences>) {
+		this.preferences = { ...this.preferences, ...prefs };
+		this.emit("preferencesChanged", undefined);
+	}
+
 	@boundMethod
 	objectClick(e: React.MouseEvent<HTMLElement> | MouseEvent) {
 		e.preventDefault();
 		let fileid = (e.currentTarget as HTMLElement).dataset.objectid;
 		if (!fileid) { return; }
 		let isnewtab = e.ctrlKey || e.metaKey || e.button === 1;
+		let isleftclick = e.button == 0;
+		if (!isleftclick && !isnewtab) { return; }
 		this.openFile({ type: "browse", id: fileid }, isnewtab);
 	}
 
@@ -551,7 +563,7 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		if (visibleindex == -1) {
 			newtab = true;
 		}
-		if (newtab) { 
+		if (newtab) {
 			tabindex = visibleindex + 1;
 		}
 		if (tab) {
@@ -559,8 +571,10 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		} else {
 			this.openedTabs.splice(tabindex, 1);
 		}
-		this.visibleTab = tab;
-		this.emit("showTab", tab);
+		if (!newtab || !this.visibleTab) {
+			this.visibleTab = tab;
+		}
+		this.emit("showTab", this.visibleTab);
 		if (!isHistoryNavigation) {
 			this.fixUrl();
 		}
@@ -571,7 +585,9 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		let tabindex = this.visibleTab ? this.openedTabs.indexOf(tab) : -1;
 		if (tabindex != -1) {
 			this.openedTabs.splice(tabindex, 1);
-			this.visibleTab = this.openedTabs[tabindex] ?? this.openedTabs[tabindex - 1] ?? null;
+			if (tab == this.visibleTab) {
+				this.visibleTab = this.openedTabs[tabindex] ?? this.openedTabs[tabindex - 1] ?? null;
+			}
 			this.emit("showTab", this.visibleTab);
 			this.fixUrl();
 		}

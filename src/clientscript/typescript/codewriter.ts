@@ -119,6 +119,7 @@ export class TsWriterContext {
     getCodeDom(node: AstNode, objclick?: (e: MouseEvent) => void) {
         let root = document.createElement("div");
         root.classList.add("mv-codeview");
+        let preventmiddledrag = (e: MouseEvent) => { e.button == 1 && e.preventDefault(); };
 
         let recur = (frag: string | WriteResult, parent: DocumentFragment | HTMLElement) => {
             if (typeof frag == "string") {
@@ -128,7 +129,11 @@ export class TsWriterContext {
                 if (frag.objectid) {
                     group.classList.add(`mv-code__link`);
                     group.dataset.objectid = frag.objectid;
-                    objclick && group.addEventListener("click", objclick);
+                    if (objclick) {
+                        group.addEventListener("click", objclick);
+                        group.addEventListener("auxclick", objclick);
+                        group.addEventListener("mousedown", preventmiddledrag);
+                    }
                 }
                 if (frag.type) {
                     group.classList.add(`mv-code__${frag.type}`);

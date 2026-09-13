@@ -394,9 +394,9 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null }) {
 		}
 	}, [p.fs, addfile, addfolder]);
 
-	let openFile = React.useCallback(async (name: string) => {
+	let openFile = React.useCallback(async (name: string, newtab: boolean) => {
 		let data = await p.fs!.readFileBuffer(`${folder}/${name}`);
-		ctx.openFile({ type: "file", fs: p.fs!, name, data });
+		ctx.openFile({ type: "file", fs: p.fs!, name, data }, newtab);
 	}, [p.fs, ctx, folder]);
 
 
@@ -464,7 +464,7 @@ export function UIScriptFiles(p: { fs?: UIScriptFS | null }) {
 	}
 }
 
-export function FileListView<T>(p: { files: Map<T, string>, selected: T | null, onSelect?: (name: T) => void }) {
+export function FileListView<T>(p: { files: Map<T, string>, selected: T | null, onSelect?: (name: T, newtab: boolean) => void }) {
 	const initialMaxlist = 4000;
 	let [maxlist, setMaxlist] = React.useState(initialMaxlist);
 
@@ -491,17 +491,26 @@ export function FileListView<T>(p: { files: Map<T, string>, selected: T | null, 
 				previous = key;
 			}
 			if (match) {
-				p.onSelect?.(match);
+				p.onSelect?.(match, false);
 			}
 		}
 	}, [p.files, p.selected, p.onSelect]);
 
 	let filelist: React.ReactNode[] = [];
 	let index = 0;
+	let mousedown = (e: React.MouseEvent) => {
+		if (e.button == 1) {
+			e.preventDefault();
+		}
+	};
 	for (let [key, name] of p.files) {
 		if (filelist.length > maxlist) { break; }
+		let click = (e: React.MouseEvent) => {
+			p.onSelect?.(key, e.ctrlKey || e.metaKey || e.button == 1);
+			e.preventDefault();
+		};
 		filelist.push(
-			<div key={index++} onClick={e => p.onSelect?.(key)} style={key == p.selected ? { background: "black" } : undefined}>{name}</div>
+			<div key={index++} onClick={click} onAuxClick={click} onMouseDown={mousedown} style={key == p.selected ? { background: "black" } : undefined}>{name}</div>
 		);
 	}
 

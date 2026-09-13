@@ -516,9 +516,9 @@ class ReferenceGraph {
         }
     }
 
-    async findReferences(mode: ExtendedJsonFieldTypes, logical: LogicalIndex) {
+    async findReferences(mode: ExtendedJsonFieldTypes, logical: LogicalIndex, limit = 1000) {
         let packed = logicalIdToPackedInt(logical, mode);
-        let res = await this.db.findrefs.run(mode, packed, 1000);
+        let res = await this.db.findrefs.run(mode, packed, limit);
         return res.map(q => {
             return {
                 srcdecoder: q.srcdecoder,

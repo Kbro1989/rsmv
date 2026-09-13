@@ -52,8 +52,8 @@ export function GraphSearchView(p: {}) {
         prefix: "Prefix",
     };
 
-    let onSearch = (objid: string) => {
-        ctx.openFile({ type: "browse", id: objid });
+    let onSearch = (objid: string, newtab: boolean) => {
+        ctx.openFile({ type: "browse", id: objid }, newtab);
     };
 
     let activetab = useEmitterProperty(ctx, "showTab", e => e.visibleTab);

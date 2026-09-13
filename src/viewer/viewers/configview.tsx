@@ -451,6 +451,8 @@ export function ObjectLink(p: { prop?: DeepLinkElement, rsmvtype?: ExtendedJsonF
     let value = p.value ?? p.prop?.primitive ?? -1;
     let valuename = p.valuename ?? p.prop?.valuename;
     let ctx = React.useContext(UIRootContext);
+    let mousedown = React.useCallback((e: React.MouseEvent) => e.button == 1 && e.preventDefault(), []);
+
     if (typeof value != "number") { throw new Error("Objectlink primitive type number expected"); }
 
     if (rsmvtype == "" || rsmvtype == "unknown" || rsmvtype == 'int') {
@@ -462,7 +464,7 @@ export function ObjectLink(p: { prop?: DeepLinkElement, rsmvtype?: ExtendedJsonF
     let fileid = makeFileId(rsmvtype, index);
 
     return <span className="mv-objectentry" title={valuename}>
-        <span className={match && "mv-filelink"} data-objectid={fileid} onClick={ctx.objectClick} onAuxClick={ctx.objectClick}>{fileid}</span>
+        <span className={match && "mv-filelink"} data-objectid={fileid} onClick={ctx.objectClick} onAuxClick={ctx.objectClick} onMouseDown={mousedown}>{fileid}</span>
         {valuename ? ` (${valuename})` : null}
     </span>
 }
@@ -610,8 +612,9 @@ export function ReferencesView(p: { browsemode?: BrowseModes, id?: number[] }) {
         if (!Array.isArray(id)) { return null; }
         let graph = await IndexGraphLoader.forCache(ctx.source).load(ctx.source);
         let proptype = Object.entries(vartypeToDecoder).filter(q => q[1] == p.browsemode).map(q => q[0] as ExtendedJsonFieldTypes);
-        let res = (await Promise.all(proptype.map(q => graph.findReferences(q, id)))).flat();
-        return Promise.all(res.map(async q => {
+        let limit = 1000;
+        let sublists = await Promise.all(proptype.map(q => graph.findReferences(q, id, limit)));
+        let links = await Promise.all(sublists.flat().map(async q => {
             let decoder = cacheFileDecodeModes[q.srcdecoder];
             let decoderinst = decoder?.({});
             let rstype = decoderinst.rstype;
@@ -625,16 +628,19 @@ export function ReferencesView(p: { browsemode?: BrowseModes, id?: number[] }) {
             };
             return res;
         }));
+        let truncated = sublists.some(q => q.length >= limit);
+        return { links, truncated };
     }, [ctx.source, p.browsemode, p.id?.join("_")]);
 
     return <div className="mv-proplist">
-        {refs && refs.map((q, i) => <React.Fragment key={i}>
+        {refs && refs.links && refs.links.map((q, i) => <React.Fragment key={i}>
             <div className="mv-proplist__value">
                 <ObjectLink prop={q} />
             </div>
             <div className="mv-proplist__name">{q.name}</div>
         </React.Fragment>)}
-        {refs && refs.length == 0 && <span>No references found</span>}
+        {refs && refs.truncated && <span>Results truncated</span>}
+        {refs && refs.links && refs.links.length == 0 && <span>No references found</span>}
         {!refs && valid && <span>Loading...</span>}
     </div>
 }

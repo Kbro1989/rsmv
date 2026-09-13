@@ -1,12 +1,11 @@
 
-import { ThreeJsRenderer } from "./threejsrender";
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 import { ModelBrowser, RendererControls } from "./scenenodes";
-import { UIContext, CacheSelector, UIOpenedFile, UIRootContext, UIEngineContext, downloadBlob, BrowsePageId, UIOpenedTab } from "./maincomponents";
+import { UIContext, CacheSelector, UIOpenedFile, UIRootContext, UIEngineContext, downloadBlob, BrowsePageId } from "./maincomponents";
 import classNames from "classnames";
 import { exposeDebugToolsInGlobal } from "../consoletools";
-import { DomWrap, useAwaited, useDisposableMemo, useForceUpdate } from "./commoncontrols";
+import { DomWrap, useEmitterProperty, useForceUpdate } from "./commoncontrols";
 import { FileDisplay } from "./viewers/fileviewer";
 import { BrowseDisplay } from "./tabs/browse";
 import { BlobTS } from "../utils";
@@ -46,6 +45,7 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 
 function App(p: {}) {
 	let ctx = React.useContext(UIRootContext);
+	let splitview = useEmitterProperty(ctx, "preferencesChanged", e => ctx.preferences.splitview);
 
 	let redraw = useForceUpdate();
 	React.useEffect(() => {
@@ -70,8 +70,10 @@ function App(p: {}) {
 	return (
 		<UIEngineContext.Provider value={ctx.renderable}>
 			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })}>
-				{ctx.visibleTab ? null : <DomWrap containerref={ctx.renderer.forceFrame} className="mv-canvas" el={ctx.renderer.canvas} />}
-				{ctx.visibleTab && <ModalTabViewer />}
+				<div style={{ display: "flex", flexDirection: "column" }}>
+					{(!ctx.visibleTab || splitview) && <DomWrap style={{ flex: "1" }} containerref={ctx.renderer.forceFrame} className="mv-canvas" el={ctx.renderer.canvas} />}
+					{ctx.visibleTab && <ModalTabViewer />}
+				</div>
 				<div className="mv-sidebar">
 					{!ctx.source && (
 						<React.Fragment>
@@ -97,17 +99,19 @@ function App(p: {}) {
 
 export function FileTabStrip() {
 	let ctx = React.useContext(UIRootContext);
+	let splitview = useEmitterProperty(ctx, "preferencesChanged", e => ctx.preferences.splitview);
 
 	return (
 		<div className="mv-tabbed-head">
 			{ctx.openedTabs.map((tab, index) => (
 				<div key={index} className={classNames("mv-tabbed-tab", { "mv-tabbed-tab--active": ctx.visibleTab === tab })} onClick={() => ctx.openFile(tab)} onAuxClick={() => ctx.closeFile(tab)}>
-					{tab.type == "browse" && `Browse: ${tab.id}`}
-					{tab.type == "view3d" && `3D View: ${tab.id}`}
-					{tab.type == "file" && `File: ${tab.name}`}
-					<span style={{ float: "right", marginLeft: "10px" }} onClick={() => ctx.closeFile(tab)}>x</span>
+					{tab.type == "browse" && tab.id}
+					{tab.type == "view3d" && tab.id}
+					{tab.type == "file" && tab.name}
+					<span style={{ marginLeft: "10px" }} onClick={() => ctx.closeFile(tab)}>x</span>
 				</div>
 			))}
+			<div className="mv-tabbed-btn" onClick={e => ctx.setPreferences({ splitview: !splitview })}>{splitview ? "Split: Enabled" : "Split: Disabled"}</div>
 		</div>
 	)
 }
@@ -116,7 +120,7 @@ export function ModalTabViewer() {
 	let ctx = React.useContext(UIRootContext);
 
 	return (
-		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
+		<div style={{ flex: "1", display: "grid", gridTemplateRows: "auto 1fr", overflow: "hidden" }}>
 			<FileTabStrip />
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
 				{ctx.visibleTab?.type == "file" && <FileDisplay file={ctx.visibleTab} />}
