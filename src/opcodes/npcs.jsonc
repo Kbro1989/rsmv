@@ -80,7 +80,7 @@
 	"0x9B": { "name":                          "unknown_9B", "read": [ "struct", ["unknown_1", "byte"], ["unknown_2", "byte"], ["unknown_3", "byte"], ["unknown_4", "byte"] ] },
 	"0x9E": { "name":                     "aByte3076_set_1", "read": "true" },
 	"0x9F": { "name":                     "aByte3076_set_0", "read": "false" },
-	"0xA0": { "name":                              "quests", "read": [ "array", "unsigned short" ] },
+	"0xA0": { "name":                              "quests", "read": [ "array", "varushort", "unsigned short", "quest"] },
 	"0xA2": { "name":                             "dummy_1", "read": "true" },
 	"0xA3": { "name":                          "unknown_A3", "read": "unsigned byte" },
 	"0xA4": { "name":                          "unknown_A4", "read": [ "struct", ["unknown_1", "unsigned short"], ["unknown_2", "unsigned short"] ] },

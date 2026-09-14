@@ -135,6 +135,25 @@
 	justify-content: center;
 }
 
+.mv-canvasbuttons {
+	position: absolute;
+	top: 5px;
+	left: 5px;
+}
+
+.mv-canvasbutton {
+	width: 20px;
+	height: 20px;
+	border-radius: 6px;
+	color: white;
+	background-color: #0003;
+	cursor: pointer;
+}
+
+.mv-canvasbutton:hover {
+	background-color: #5556
+}
+
 .mv-sidebar {
 	background-color: var(--secondary-bg-colour);
 	min-width: 220px;

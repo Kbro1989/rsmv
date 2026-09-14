@@ -71,7 +71,7 @@ function App(p: {}) {
 		<UIEngineContext.Provider value={ctx.renderable}>
 			<div className={classNames("mv-root", "mv-style", { "mv-root--vertical": vertical })}>
 				<div style={{ display: "flex", flexDirection: "column" }}>
-					{(!ctx.visibleTab || splitview) && <DomWrap style={{ flex: "1" }} containerref={ctx.renderer.forceFrame} className="mv-canvas" el={ctx.renderer.canvas} />}
+					{(!ctx.visibleTab || splitview) && <MainCanvas />}
 					{ctx.visibleTab && <ModalTabViewer />}
 				</div>
 				<div className="mv-sidebar">
@@ -97,6 +97,24 @@ function App(p: {}) {
 	);
 }
 
+function MainCanvas(p: {}) {
+	let ctx = React.useContext(UIRootContext);
+	let ref = React.useCallback((el: HTMLDivElement | null) => {
+		if (el) {
+			el.appendChild(ctx.renderer.canvas);
+			ctx.renderer.forceFrame();
+		}
+	}, [ctx.renderer]);
+	let center = React.useCallback(() => {
+		ctx.renderer.setCameraLimits();
+	}, [ctx.renderer]);
+	return <div ref={ref} className="mv-canvas" style={{ flex: "1" }} >
+		<div className="mv-canvasbuttons">
+			{/* <div className="mv-canvasbutton" onClick={center}>center</div> */}
+		</div>
+	</div>
+}
+
 export function FileTabStrip() {
 	let ctx = React.useContext(UIRootContext);
 	let splitview = useEmitterProperty(ctx, "preferencesChanged", e => ctx.preferences.splitview);
@@ -108,7 +126,7 @@ export function FileTabStrip() {
 					{tab.type == "browse" && tab.id}
 					{tab.type == "view3d" && tab.id}
 					{tab.type == "file" && tab.name}
-					<span style={{ marginLeft: "10px" }} onClick={() => ctx.closeFile(tab)}>x</span>
+					<span style={{ marginLeft: "10px" }} onClick={e => { ctx.closeFile(tab); e.stopPropagation(); }}>x</span>
 				</div>
 			))}
 			<div className="mv-tabbed-btn" onClick={e => ctx.setPreferences({ splitview: !splitview })}>{splitview ? "Split: Enabled" : "Split: Disabled"}</div>
