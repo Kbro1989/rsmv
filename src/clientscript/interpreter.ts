@@ -66,12 +66,15 @@ export class ClientScriptInterpreter {
         this.callscript(script, id);
     }
     async runToEnd() {
-        while (true) {
+        let budget = 1000e3;
+        while (this.scope) {
             let res = this.next();
             if (res instanceof Promise) {
                 res = await res;
             }
-            if (!res) { break; }
+            if (--budget <= 0) {
+                throw new Error(`max execution count reached in runToEnd\n${this.scopeStack.map(q => `at script${q.scriptid}:${q.index}`).join("\n")}`);
+            }
         }
     }
     callscript(script: clientscript, scriptid: number) {
@@ -170,7 +173,7 @@ export class ClientScriptInterpreter {
         }
         let op = this.scope.ops[this.scope.index++];
         let implemented = implementedops.get(op.opcode) ?? getnamedimplementation(op.opcode);
-        
+
         let res: Promise<void> | void = undefined;
         if (op.opcode == namedClientScriptOps.return) {
             this.scopeStack.pop();

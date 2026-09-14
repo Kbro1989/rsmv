@@ -376,7 +376,7 @@ function uiModelRenderer(renderer: ThreeJsRenderer, sceneCache: ThreejsSceneCach
         rotz: camdata.rotate_z,
         translatex: camdata.translate_x / 4,
         translatey: camdata.translate_y / 4,
-        zoom: camdata.zoom * 8
+        zoom: camdata.zoom
     };
     let canvas = document.createElement("canvas");
     canvas.classList.add("rs-model");
@@ -384,13 +384,14 @@ function uiModelRenderer(renderer: ThreeJsRenderer, sceneCache: ThreejsSceneCach
     let model: RSModel | null = null;
     let setmodel = (modelid: number) => {
         model = new RSModel(sceneCache, [{ modelid, mods: {} }], `model_${modelid}`);
-        modelrender.setmodel(model.getSceneElements(), 0);
+        modelrender.setmodel(model);
         model.model.then(render);
     }
     let render = () => {
         let width = canvas.clientWidth;
         let height = canvas.clientHeight;
         if (width == 0 || height == 0) { return; }
+        camconfig.zoom = camdata.zoom * height / 32;
         let img = modelrender.takePicture(width, height, camconfig);
         canvas.width = img.width;
         canvas.height = img.height;

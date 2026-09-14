@@ -46,7 +46,6 @@ export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
 	React.useEffect(() => {
 		let needed = true;
 		let prom = loadRsInterfaceData(ctx, p.interfaceid);
-		console.log("loading", !!ctx, p.interfaceid, refreshcount, !!deob);
 		let rsui = prom.then(ui => {
 			if (!needed) { return; }
 			ctx.scriptdeob = (wantsscripts ? deob ?? null : null);
@@ -57,7 +56,6 @@ export function RsUIViewer(p: { interfaceid: number, subcomponent?: number }) {
 		return () => {
 			needed = false;
 			rsui.then(res => {
-				console.log("disposing", !!ctx, p.interfaceid, refreshcount, !!deob);
 				res?.dispose();
 			});
 		};

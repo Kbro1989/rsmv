@@ -7,8 +7,10 @@ import { boundMethod } from 'autobind-decorator';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { ModelExtras, ClickableMesh } from '../3d/mapsquare';
-import { CubeCamera, AnimationClip, BufferGeometry, Camera, Clock, DoubleSide, Group, LinearFilter, Material, Matrix4, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, RawShaderMaterial, RGBAFormat, Texture, Vector3, WebGLCubeRenderTarget, WebGLRenderer, PlaneGeometry, Timer } from "three";
+import { CubeCamera, AnimationClip, BufferGeometry, Camera, DoubleSide, Group, LinearFilter, Material, Matrix4, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, RawShaderMaterial, RGBAFormat, Texture, Vector3, WebGLCubeRenderTarget, WebGLRenderer, PlaneGeometry, Timer, Box3 } from "three";
 import { UiCameraParams, updateItemCamera } from "./tabs/simplemodes";
+import { RSModel } from "../3d/scene/model";
+import { getModelBoundingBox } from "../3d/modeltothree";
 
 //TODO remove
 globalThis.THREE = THREE;
@@ -673,21 +675,22 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		scene.add(dirLight);
 		scene.add(hemilight);
 		scene.add(modelnode);
-		let clock = new THREE.Clock();
+		let clock = new THREE.Timer();
 		let rendertarget: THREE.WebGLRenderTarget | null = null;
 
-		let currentnode: ThreeJsSceneElement | null = null;
-		let currentcentery = 0;
-		let setmodel = (model: ThreeJsSceneElement | null, centery: number) => {
-			if (currentnode?.modelnode) {
-				modelnode.remove(currentnode.modelnode);
+		let currentnode: RSModel | null = null;
+		let currentbox: Box3 | null = null;
+		let setmodel = (model: RSModel | null) => {
+			if (currentnode) {
+				modelnode.remove(currentnode.rootnode);
 				currentnode = null;
 			}
-			if (model?.modelnode) {
-				modelnode.add(model.modelnode);
+			if (model) {
+				modelnode.add(model.rootnode);
 				currentnode = model;
+				currentbox = getModelBoundingBox(model.loaded?.modeldata);
+				model.model.then(loaded => { if (currentnode == model) { currentbox = getModelBoundingBox(loaded.modeldata) } })
 			}
-			currentcentery = centery
 		}
 
 		let takePicture = (width: number, height: number, params: UiCameraParams) => {
@@ -702,13 +705,14 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 					samples: gl.getParameter(gl.SAMPLES)
 				});
 			}
+			clock.update();
 			let delta = clock.getDelta();
-			currentnode?.updateAnimation?.(delta, clock.elapsedTime);
+			currentnode?.updateAnimation?.(delta, clock.getElapsed());
 
 			let oldtarget = this.renderer.getRenderTarget();
 			this.renderer.setRenderTarget(rendertarget);
 			let itemcam = new THREE.PerspectiveCamera();
-			updateItemCamera(itemcam, width, height, currentcentery, params);
+			updateItemCamera(itemcam, width, height, currentbox, params);
 
 			this.renderer.clearColor();
 			this.renderer.clearDepth();

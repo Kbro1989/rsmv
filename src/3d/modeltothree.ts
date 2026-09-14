@@ -7,7 +7,7 @@ import { convertMaterial, defaultMaterial, materialCacheKey, MaterialData } from
 import * as THREE from "three";
 import { CacheFileSource, CacheIndex, mappedFileIds, oldConfigMaps, SubFile } from "../cache";
 import { CachedObject, CachingFileSource } from "../cache/memorycache";
-import { Bone, BufferAttribute, Mesh, Object3D, Skeleton, SkinnedMesh } from "three";
+import { Bone, Box3, BufferAttribute, Mesh, Object3D, Skeleton, SkinnedMesh } from "three";
 import { cacheFileJsonModes, iterateJsonFiles, parse } from "../parser/jsondecoders";
 import { mapsquare_underlays } from "../../generated/mapsquare_underlays";
 import { mapsquare_overlays } from "../../generated/mapsquare_overlays";
@@ -833,6 +833,16 @@ export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData
 		rootnode.add(...model.debugmeshes);
 	}
 	return rootnode;
+}
+
+export function getModelBoundingBox(modeldata: ModelData | null | undefined) {
+	let boundingbox = new Box3();
+	let temp = new Box3();
+	for (let mesh of modeldata?.meshes ?? []) {
+		temp.setFromBufferAttribute(mesh.attributes.pos);
+		boundingbox.union(temp);
+	}
+	return boundingbox;
 }
 
 export function getModelHashes(model: models, id: number) {

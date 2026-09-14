@@ -1,6 +1,6 @@
-import { ThreejsSceneCache, constModelsIds } from '../../3d/modeltothree';
+import { ThreejsSceneCache, constModelsIds, getModelBoundingBox } from '../../3d/modeltothree';
 import { RGB2HSL, HSL2packHSL, ModelModifications, checkObject } from '../../utils';
-import { Euler, PerspectiveCamera, Quaternion, Vector3 } from "three";
+import { Box3, Euler, PerspectiveCamera, Quaternion, Vector3 } from "three";
 import { internalNameFiles } from "../../constants";
 import * as React from "react";
 import { ThreeJsSceneElementSource } from "../threejsrender";
@@ -129,7 +129,7 @@ export function SceneLocation(p: LookupModeProps) {
     )
 }
 
-export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imgheight: number, centery: number, params: UiCameraParams) {
+export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imgheight: number, boundingbox: Box3 | null, params: UiCameraParams) {
     const defaultcamdist = 16;//found through testing
 
     //fov such that the value 32 ends up in the projection matrix.yy
@@ -160,7 +160,10 @@ export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imghe
     ));
     pos.applyQuaternion(quaty);
     pos.applyQuaternion(quatz);
-    pos.y += centery;
+
+    let center = new Vector3();
+    boundingbox?.getCenter(center);
+    pos.add(center);
     pos.divideScalar(512);
     pos.z = -pos.z;
 
@@ -180,7 +183,7 @@ export type UiCameraParams = {
     zoom: number
 }
 
-function ItemCameraMode({ meta, centery }: { meta?: items, centery: number }) {
+function ItemCameraMode({ meta, model }: { meta?: items, model: RSModel | null }) {
     let [translatex, settranslatex] = React.useState(meta?.modelTranslate_0 ?? 0);
     let [translatey, settranslatey] = React.useState(meta?.modelTranslate_1 ?? 0);
     let [rotx, setrotx] = React.useState(meta?.rotation_0 ?? 0);
@@ -206,7 +209,8 @@ function ItemCameraMode({ meta, centery }: { meta?: items, centery: number }) {
     }
 
     let ctx = React.useContext(UIEngineContext);
-    let cam = ctx && updateItemCamera(ctx.renderer.getItemCamera(), imgwidth, imgheight, centery, params);
+    let boundingbox = React.useMemo(() => getModelBoundingBox(model?.loaded?.modeldata), [model?.loaded]);
+    let cam = ctx && updateItemCamera(ctx.renderer.getItemCamera(), imgwidth, imgheight, boundingbox, params);
 
     React.useEffect(() => {
         if (!ctx) { return; }
@@ -246,8 +250,6 @@ export function SceneItem(p: LookupModeProps) {
     let [enablecam, setenablecam] = React.useState(false);
     // let [histfs, sethistfs] = React.useState<UIScriptFS | null>(null);
 
-    let centery = (model?.loaded ? (model.loaded.modeldata.maxy + model.loaded.modeldata.miny) / 2 : 0);
-
     // let gethistory = async () => {
     // 	if (id == null || !p.ctx) { return; }
     // 	let output = new UIScriptOutput();
@@ -266,7 +268,7 @@ export function SceneItem(p: LookupModeProps) {
             )}
             <div className="mv-sidebar-scroll">
                 <input type="button" className="sub-btn" value={enablecam ? "exit" : "Icon Camera"} onClick={e => setenablecam(!enablecam)} />
-                {enablecam && <ItemCameraMode meta={data?.info.modelitem} centery={centery} />}
+                {enablecam && <ItemCameraMode meta={data?.info.modelitem} model={model} />}
                 <RawTextDisplay text={data?.assetName} />
                 <StructView data={data?.info.item} meta={parse.item.parser.getJsonSchema()} />
             </div>

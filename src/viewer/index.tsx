@@ -141,8 +141,15 @@ export function ModalTabViewer() {
 		<div style={{ flex: "1", display: "grid", gridTemplateRows: "auto 1fr", overflow: "hidden" }}>
 			<FileTabStrip />
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
-				{ctx.visibleTab?.type == "file" && <FileDisplay file={ctx.visibleTab} />}
-				{ctx.visibleTab?.type == "browse" && <BrowseDisplay browse={ctx.visibleTab} />}
+				{ctx.openedTabs.map((tab, i) => {
+					let child: React.ReactElement | null = null;
+					let key = "" + i;//TODO this key is weak, need proper uuid system
+					if (tab.type == "file") { key = tab.name; child = <FileDisplay file={tab} />; }
+					if (tab.type == "browse") { key = tab.id; child = <BrowseDisplay browse={tab} />; }
+					return <div key={key} style={{ display: ctx.visibleTab === tab ? "contents" : "none" }}>
+						{child}
+					</div>;
+				})}
 			</div>
 		</div>
 	);
