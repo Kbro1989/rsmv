@@ -7,7 +7,7 @@ import { boundMethod } from 'autobind-decorator';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { ModelExtras, ClickableMesh } from '../3d/mapsquare';
-import { CubeCamera, AnimationClip, BufferGeometry, Camera, Clock, DoubleSide, Group, LinearFilter, Material, Matrix4, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, RawShaderMaterial, RGBAFormat, Texture, Vector3, WebGLCubeRenderTarget, WebGLRenderer, PlaneGeometry } from "three";
+import { CubeCamera, AnimationClip, BufferGeometry, Camera, Clock, DoubleSide, Group, LinearFilter, Material, Matrix4, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, RawShaderMaterial, RGBAFormat, Texture, Vector3, WebGLCubeRenderTarget, WebGLRenderer, PlaneGeometry, Timer } from "three";
 import { UiCameraParams, updateItemCamera } from "./tabs/simplemodes";
 
 //TODO remove
@@ -65,7 +65,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 	private autoFrameMode: AutoFrameMode = "forced";
 	private contextLossCount = 0;
 	private contextLossCountLastRender = 0;
-	private clock = new Clock(true);
+	private clock = new Timer();
 
 	private sceneElements = new Set<ThreeJsSceneElementSource>();
 	private animationCallbacks = new Set<NonNullable<ThreeJsSceneElement["updateAnimation"]>>();
@@ -373,7 +373,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		// update animations
 		let delta = this.clock.getDelta();
 		delta *= (globalThis.speed ?? 100) / 100;//TODO remove
-		this.animationCallbacks.forEach(q => q(delta, this.clock.elapsedTime));
+		this.animationCallbacks.forEach(q => q(delta, this.clock.getElapsed()));
 
 		this.resizeRendererToDisplaySize();
 		let cam2d = (cam ?? this.getCurrent2dCamera());
@@ -456,7 +456,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 				minFilter: THREE.LinearFilter,
 				magFilter: THREE.LinearFilter,
 				format: THREE.RGBAFormat,
-				colorSpace: (this.camMode != "vr360" ? this.renderer.outputColorSpace : THREE.LinearSRGBColorSpace),
+				colorSpace: (this.camMode != "vr360" ? this.renderer.outputColorSpace as THREE.ColorSpace : THREE.LinearSRGBColorSpace),
 				samples: gl.getParameter(gl.SAMPLES)
 			});
 			// (rendertarget as any).isXRRenderTarget = true;
@@ -489,7 +489,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		let height = rendertarget?.height ?? this.canvas.height;
 		let buf = new Uint8Array(width * height * 4);//node-gl doesn't accept clamped
 		if (rendertarget) {
-			this.renderer.readRenderTargetPixels(rendertarget as any, 0, 0, width, height, buf);
+			this.renderer.readRenderTargetPixels(rendertarget, 0, 0, width, height, buf);
 			rendertarget.dispose();
 		} else {
 			let gl = this.renderer.getContext()
@@ -628,7 +628,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 			let endindex: number = obj.geometry.index?.count ?? obj.geometry.attributes.position.count;
 			let startindex = 0;
 			let clickindex = isct.faceIndex;
-			if (typeof clickindex == "undefined") { throw new Error("???") }
+			if (clickindex == null) { throw new Error("???") }
 			for (let i = 0; i < meshdata.subranges.length; i++) {
 				if (clickindex * 3 < meshdata.subranges[i]) {
 					endindex = meshdata.subranges[i];
@@ -706,7 +706,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 					minFilter: THREE.LinearFilter,
 					magFilter: THREE.LinearFilter,
 					format: THREE.RGBAFormat,
-					colorSpace: this.renderer.outputColorSpace,
+					colorSpace: this.renderer.outputColorSpace as THREE.ColorSpace,
 					samples: gl.getParameter(gl.SAMPLES)
 				});
 			}
@@ -755,7 +755,7 @@ export function disposeThreeTree(node: THREE.Object3D | null) {
 	}
 
 	let count = 0;
-	(node as any).traverse((object: any) => {
+	node.traverse((object: any) => {
 		if (!object.isMesh) return
 
 		count++;
@@ -830,7 +830,7 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 
 export function exportThreeJsStl(node: THREE.Object3D) {
 	let exporter = new STLExporter();
-	let res = exporter.parse(node, { binary: true }) as any as DataView;
+	let res = exporter.parse(node, { binary: true });
 	return Promise.resolve(new Uint8Array(res.buffer, res.byteOffset, res.byteLength));
 }
 
@@ -958,7 +958,7 @@ export class VR360Render {
 			minFilter: LinearFilter,
 			magFilter: LinearFilter,
 			format: RGBAFormat,
-			colorSpace: parent.outputColorSpace,
+			colorSpace: parent.outputColorSpace as THREE.ColorSpace,
 			samples: 0//gl.getParameter(gl.SAMPLES)//three.js crashes if using multisampled here
 		});
 		//threejs always renders non-default render targets in linear, however they programmed in a 

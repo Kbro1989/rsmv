@@ -1502,7 +1502,7 @@ export async function mapsquareOverlays(engine: EngineCache, grid: TileGrid, loc
 		//TODO add either remove this alltogether or add model combining back
 		console.warn("using very inefficient code path for 3d mapscenes");
 
-		let tex = mat.map;
+		let tex = mat.map as THREE.DataTexture;
 
 		const spritescale = 128;
 		let w = tex.image.width * spritescale;

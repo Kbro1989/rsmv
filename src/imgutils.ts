@@ -241,10 +241,11 @@ export function drawTexture(ctx: CanvasRenderingContext2D, img: ImageData | Text
 		cnv.width = img.width;
 		cnv.height = img.height;
 		ctx.putImageData(img, 0, 0);
-	} else if ("source" in img) {
-		cnv.width = img.source.data.width;
-		cnv.height = img.source.data.height;
-		ctx.drawImage(img.source.data, 0, 0);
+	} else if ("isTexture" in img) {
+		let src = img.source as unknown as ImageBitmap | HTMLCanvasElement | HTMLVideoElement;
+		cnv.width = src.width;
+		cnv.height = src.height;
+		ctx.drawImage(src, 0, 0);
 	} else {
 		cnv.width = img.width;
 		cnv.height = img.height
