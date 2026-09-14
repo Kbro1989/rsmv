@@ -371,6 +371,7 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 		this.queuedFrameId = 0;
 
 		// update animations
+		this.clock.update();
 		let delta = this.clock.getDelta();
 		delta *= (globalThis.speed ?? 100) / 100;//TODO remove
 		this.animationCallbacks.forEach(q => q(delta, this.clock.getElapsed()));
@@ -540,17 +541,8 @@ export class ThreeJsRenderer extends TypedEmitter<ThreeJsRendererEvents> {
 
 	setCameraLimits(target?: Vector3) {
 		if (!target) {
-			// compute the box that contains all the stuff
-			// from root and below
-			const box = new THREE.Box3().setFromObject(this.modelnode);
-			let inverseworld = new THREE.Matrix4().copy(this.modelnode.matrixWorld).invert();
-			box.min.applyMatrix4(inverseworld);
-			box.max.applyMatrix4(inverseworld);
-			if (!isFinite(box.min.length()) || !isFinite(box.max.length())) {
-				return;
-			}
-			// don't use box.getCenter since it might be negative size in which case THREE.js returns 0
-			target = new THREE.Vector3().addVectors(box.min, box.max).multiplyScalar(0.5);
+			const box = new THREE.Box3().setFromObject(this.modelnode, true);
+			target = box.getCenter(new THREE.Vector3());
 		}
 
 		// update the Trackball controls to handle the new size

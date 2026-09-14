@@ -104,6 +104,10 @@ export class RSModel extends TypedEmitter<{ loaded: undefined, animchanged: numb
             this.rootnode.add(mesh);
             this.loaded = { mesh, modeldata, nullAnim, matUvAnims };
             if (this.targetAnimId == -1) { this.setAnimation(-1); }
+            // force matrix updates before rendering so load callbacks have access to correct world matrices
+            // without this the camera centering feature breaks on animated meshes
+            this.rootnode.traverse(q => q.updateMatrixWorld());
+
             this.onModelLoaded();
             return this.loaded;
         })();

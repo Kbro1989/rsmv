@@ -66,17 +66,9 @@ export function mountBakedSkeleton(rootnode: Object3D, model: ModelData) {
 	let skeleton = new Skeleton(leafbones, inverses);
 	if (rootbones.length != 0) { rootbone.add(...rootbones); }
 	rootbone.updateMatrixWorld(true);
-	let childbind = new Matrix4().copy(rootbone.matrixWorld);
 	//TODO find out whats wrong with my own inverses
 	skeleton.calculateInverses();
-	rootnode.traverse(node => {
-		if (node instanceof SkinnedMesh) {
-			node.bind(skeleton, childbind);
-			let geo = node.geometry as BufferGeometry;
-			geo.attributes.skinIndex = geo.attributes.RA_skinIndex_bone;
-			geo.attributes.skinWeight = geo.attributes.RA_skinWeight_bone;
-		}
-	});
+	let childbind = new Matrix4().copy(rootbone.matrixWorld);
 	rootnode.traverse(node => {
 		if (node instanceof SkinnedMesh) {
 			let geo = node.geometry as BufferGeometry;

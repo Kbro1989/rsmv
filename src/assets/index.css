@@ -23,7 +23,7 @@
 	left: 0px;
 	right: 0px;
 	display: grid;
-	grid-template-columns: auto min-content;
+	grid-template-columns: minmax(0, 1fr) min-content;
 	grid-template-rows: minmax(0, 1fr);
 }
 
