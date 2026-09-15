@@ -292,58 +292,65 @@ export function BrowseDisplay(p: { browse: BrowsePageId }) {
     let index = fileIdToIndex(p.browse.id);
 
     let data = useAwaited(() => {
-        if (!engine || !index) { return null; }
+        if (!engine || !index) {
+            return { viewer: "error", message: "No file source" } as const;
+        }
         let overrides = index && modeOverrides[index.mode];
 
         return (async () => {
-            if (index.mode == "clientscript") {
-                await clientScriptDeobPopup(engine);
-                let buf = await engine.getFileById(cacheMajors.clientscript, index.index[0]);
-                let { writer, rootfunc } = await renderClientScript(engine, buf, index.index[0], false, false, false);
-                let dom = writer.getCodeDom(rootfunc, ctx.objectClick);
-                globalThis.cs2 = rootfunc;
-                return { viewer: "dom", mode: index.mode, dom } as const;
-            }
-            if (index.mode == "categories") {
+            try {
+                if (index.mode == "clientscript") {
+                    await clientScriptDeobPopup(engine);
+                    let buf = await engine.getFileById(cacheMajors.clientscript, index.index[0]);
+                    let { writer, rootfunc } = await renderClientScript(engine, buf, index.index[0], false, false, false);
+                    let dom = writer.getCodeDom(rootfunc, ctx.objectClick);
+                    globalThis.cs2 = rootfunc;
+                    return { viewer: "dom", mode: index.mode, dom } as const;
+                }
+                if (index.mode == "categories") {
+                    return {
+                        viewer: "json", mode: index.mode, file: JSON.stringify({
+                            $fileid: index.index[0],
+                            $decoder: "categories",
+                            $filename: await engine.getInternalName(internalNameFiles.category, index.index[0])
+                        })
+                    } as const;
+                }
+                if (index.mode == "sprites") {
+                    let file = await engine.getFileById(cacheMajors.sprites, index.index[0]);
+                    let sprite = parseSprite(file);
+                    return { viewer: "sprite", mode: index.mode, sprite } as const;
+                }
+                if (index.mode == "interfaceviewer" || index.mode == "components") {
+                    return { viewer: "interfaces", mode: index.mode, interfaceid: index.index } as const;
+                }
+                if (index.mode == "sounds" || index.mode == "music") {
+                    let major = (index.mode == "sounds" ? cacheMajors.sounds : cacheMajors.music);
+                    let file = await parseMusic(engine, major, index.index[0], null, true);
+                    return { viewer: "audio", mode: index.mode, file } as const;
+                }
+                if (index.mode == "coordgrid") {
+                    return {
+                        viewer: "map",
+                        level: index.index[0],
+                        x: index.index[1],
+                        z: index.index[2],
+                        markers: [{ x: index.index[1], z: index.index[2] }] as MapviewMarker[]
+                    } as const;
+                }
+
+                let jsonfn = cacheFileJsonModes[index.mode];
+                if (!jsonfn) { return null; }
+                let obj = await engine.getObject(index.mode, index.index);
                 return {
-                    viewer: "json", mode: index.mode, file: JSON.stringify({
-                        $fileid: index.index[0],
-                        $decoder: "categories",
-                        $filename: await engine.getInternalName(internalNameFiles.category, index.index[0])
-                    })
+                    viewer: "json",
+                    mode: index.mode,
+                    file: prettyJson(obj),
                 } as const;
-            }
-            if (index.mode == "sprites") {
-                let file = await engine.getFileById(cacheMajors.sprites, index.index[0]);
-                let sprite = parseSprite(file);
-                return { viewer: "sprite", mode: index.mode, sprite } as const;
-            }
-            if (index.mode == "interfaceviewer" || index.mode == "components") {
-                return { viewer: "interfaces", mode: index.mode, interfaceid: index.index } as const;
-            }
-            if (index.mode == "sounds" || index.mode == "music") {
-                let major = (index.mode == "sounds" ? cacheMajors.sounds : cacheMajors.music);
-                let file = await parseMusic(engine, major, index.index[0], null, true);
-                return { viewer: "audio", mode: index.mode, file } as const;
-            }
-            if (index.mode == "coordgrid") {
-                return {
-                    viewer: "map",
-                    level: index.index[0],
-                    x: index.index[1],
-                    z: index.index[2],
-                    markers: [{ x: index.index[1], z: index.index[2] }] as MapviewMarker[]
-                } as const;
+            } catch (e) {
+                return { viewer: "error", message: (e as Error).message } as const;
             }
 
-            let jsonfn = cacheFileJsonModes[index.mode];
-            if (!jsonfn) { return null; }
-            let obj = await engine.getObject(index.mode, index.index);
-            return {
-                viewer: "json",
-                mode: index.mode,
-                file: prettyJson(obj),
-            } as const;
         })()
     }, [index?.mode, index?.index.join("_"), engine], 200);
 
@@ -380,5 +387,8 @@ export function BrowseDisplay(p: { browse: BrowsePageId }) {
         return <RsUIViewer interfaceid={data.interfaceid[0]} subcomponent={data.interfaceid[1]} />
     } else if (data.viewer == "map") {
         return <CheapMapView level={data.level} centerx={data.x} centerz={data.z} markers={data.markers} />
+    } else if (data.viewer == "error") {
+        return <div>Error: {data.message}</div>;
     }
+    return <div>Unknown viewer type</div>;
 }

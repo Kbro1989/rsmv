@@ -526,7 +526,10 @@ export function StructDataView(p: { data: any, meta: JSONSchema6Definition | nul
     let engine = React.useContext(UIEngineContext);
     let source = engine?.source;
     let data = useAwaited(async () => {
-        return source && deepLinkJson(new DeepLinkContext(source), "root", p.data, p.meta);
+        if (!source) { return { status: "error", message: "No file source" } as const; }
+        return deepLinkJson(new DeepLinkContext(source), "root", p.data, p.meta)
+            .then(res => ({ status: "ready", data: res } as const))
+            .catch(err => ({ status: "error", message: (err as Error).message } as const));
     }, [p.data, p.meta, source], 200);
 
     let handlenode = (prop: DeepLinkElement, isroot = false): { isbig: boolean, el: JSX.Element } => {
@@ -581,8 +584,9 @@ export function StructDataView(p: { data: any, meta: JSONSchema6Definition | nul
         }
         return { isbig: false, el: <span>NULL</span> };
     }
-
-    return (data ? handlenode(data, true).el : <span>Loading...</span>);
+    if (!data) { return <span>Loading...</span>; }
+    if (data.status == "error") { return <span>Error loading data: {data.message}</span>; }
+    if (data.status == "ready") { return handlenode(data.data, true).el; }
 }
 
 export function StructView(p: { data: any, meta: JSONSchema6Definition | null | undefined }) {
