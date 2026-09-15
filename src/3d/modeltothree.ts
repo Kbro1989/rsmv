@@ -792,7 +792,7 @@ export function mergeModelDatas(models: ModelData[]) {
 	return r;
 }
 
-export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData) {
+export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData, options?: any) {
 	let rootnode = new Object3D();
 	let nullskeleton: Skeleton = null!;
 	if (model.bonecount != 0 || model.skincount != 0) {

@@ -16,6 +16,7 @@ import { MipScheduler } from "./mipper";
 import { crc32addInt } from "../libs/crc32util";
 import { ChunkrenderContext, ImgNameInfoZoom, MaprenderSquare, MaprenderSquareLoaded, rendermodes, RenderResult, RenderTask } from "./layers";
 import { VariantGroup, VariantInfo, VariantResolver } from "./varianttracker";
+import { mapImageCamera } from "./layers/3d";
 
 type RenderedMapVersionMeta = {
 	buildnr: number,

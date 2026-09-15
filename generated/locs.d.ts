@@ -306,4 +306,5 @@ export type locs = {
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null
+	probably_animation?: number | null
 };
