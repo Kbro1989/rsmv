@@ -11,7 +11,7 @@ function ModalFrame(p: { children: React.ReactNode, title: React.ReactNode, maxW
 			<div className="mv-modal" style={{ maxWidth: p.maxWidth }}>
 				<div className="mv-modal-head">
 					<span>{p.title}</span>
-					<span onClick={p.onClose}>X</span>
+					<span className="mv-closebutton" onClick={p.onClose}></span>
 				</div>
 				<div className="mv-modal-body">
 					{p.children}

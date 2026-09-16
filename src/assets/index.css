@@ -94,6 +94,25 @@
 	border: hidden;
 }
 
+.mv-closebutton {
+	display: inline-flex;
+	overflow: hidden;
+	height: 1em;
+	aspect-ratio: 1;
+	border: 1px solid;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.mv-closebutton::before {
+	content: "×";
+}
+
+.mv-closebutton:hover {
+	background-color: #5556;
+}
+
 .mv-style input[type="text"],
 .mv-style input[type="number"],
 .mv-style select {

@@ -126,7 +126,7 @@ export function FileTabStrip() {
 					{tab.type == "browse" && tab.id}
 					{tab.type == "view3d" && tab.id}
 					{tab.type == "file" && tab.name}
-					<span style={{ marginLeft: "10px" }} onClick={e => { ctx.closeFile(tab); e.stopPropagation(); }}>x</span>
+					<span className="mv-closebutton" style={{ marginLeft: "10px" }} onClick={e => { ctx.closeFile(tab); e.stopPropagation(); }}></span>
 				</div>
 			))}
 			<div className="mv-tabbed-btn" onClick={e => ctx.setPreferences({ splitview: !splitview })}>{splitview ? "Split: Enabled" : "Split: Disabled"}</div>
@@ -161,7 +161,7 @@ export function FileViewer(p: { file: UIOpenedFile, onSelectFile: (f: UIOpenedFi
 			<div className="mv-modal-head">
 				<span>{p.file.name}</span>
 				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => downloadBlob(p.file.name, new BlobTS([p.file.data]))}>download</span>
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
+				<span className="mv-closebutton" style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}></span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
 				<FileDisplay file={p.file} />
@@ -176,7 +176,7 @@ export function BrowseViewer(p: { browse: BrowsePageId, onSelectFile: (f: UIOpen
 		<div style={{ display: "grid", gridTemplateRows: "auto 1fr" }}>
 			<div className="mv-modal-head">
 				<span>{p.browse.id}</span>
-				<span style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}>x</span>
+				<span className="mv-closebutton" style={{ float: "right", marginLeft: "10px" }} onClick={e => p.onSelectFile(null)}></span>
 			</div>
 			<div style={{ overflow: "auto", flex: "1", position: "relative" }}>
 				<BrowseDisplay browse={p.browse} />
