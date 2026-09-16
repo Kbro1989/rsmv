@@ -20,6 +20,7 @@ import { extractClientModuleCode, IsolatedCS2Module } from "./clientscript/types
 import { diffFileDependencyHash } from "./scripts/dependencydiff";
 import { EngineCache } from "./3d/modeltothree";
 import { cacheFileJsonModes } from "./parser/jsondecoders";
+import { preloadDeobs } from "./scripts/preloaddeobs";
 
 
 export type CliApiContext = {
@@ -297,6 +298,18 @@ export function cliApi(ctx: CliApiContext) {
 		}
 	});
 
+	const preloaddeobs = command({
+		name: "preloaddeobs",
+		args: {
+			ncaches: option({ long: "ncaches", short: "n", type: cmdts.number, defaultValue: () => 5 }),
+			maxagedays: option({ long: "maxage", short: "d", type: cmdts.number, defaultValue: () => 30 })
+		},
+		async handler(args) {
+			let output = ctx.getConsole();
+			await output.run(preloadDeobs, args.ncaches, args.maxagedays);
+		}
+	});
+
 	const sequencegroups = command({
 		name: "sequencegroups",
 		args: {
@@ -349,6 +362,7 @@ export function cliApi(ctx: CliApiContext) {
 			edit,
 			historicdecode,
 			openrs2ids,
+			preloaddeobs,
 			filehist,
 			cluecoords,
 			sequencegroups,

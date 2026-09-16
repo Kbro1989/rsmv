@@ -68,8 +68,7 @@ export class ClientScriptDeobLoader {
     }
 
     async loadOrGenerate(source: CacheFileSource, makeScriptOutput?: () => Promise<ScriptOutput>) {
-        if (this.loadStoredPromise) { await this.loadStoredPromise; }
-        if (this.loaded) { return this.loaded; }
+        await this.tryLoadStored(source);
         this.generatePromise ??= (async () => {
             let deob = await ClientscriptObfuscation.create(source);
             let scriptctx = (makeScriptOutput ? await makeScriptOutput() : new CLIScriptOutput());

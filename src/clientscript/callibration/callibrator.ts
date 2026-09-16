@@ -14,7 +14,6 @@ import { dbtables } from "../../../generated/dbtables";
 import { reverseHashes } from "../../libs/rshashnames";
 import { CodeBlockNode, RawOpcodeNode, generateAst } from "../ast";
 import { detectSubtypes as callibrateSubtypes, detectSubtypes } from "./subtypedetector";
-import * as datastore from "idb-keyval";
 import { loadParams } from "../util";
 import { ScriptOutput } from "../../scriptrunner";
 import { ClientScriptDeobLoader } from "..";
@@ -322,12 +321,18 @@ export class ClientscriptObfuscation {
                     stack: StackInOut.fromJson(v.stack)
                 }];
             }));
+            r.foundSubtypes = true;
         } else {
             console.log("no script json provided, no subtype callibration");
-            // let candobj = await r.parseCandidateContents();
-            // callibrateSubtypes(r, candobj);//TODO is this needed?
         }
         return r;
+    }
+
+    async ensureSubtypes(out: ScriptOutput) {
+        if (!this.foundSubtypes) {
+            let candobj = await this.parseCandidateContents(out);
+            callibrateSubtypes(out, this, candobj);
+        }
     }
 
     toJson() {
@@ -370,9 +375,18 @@ export class ClientscriptObfuscation {
             await fs.mkdir("cache", { recursive: true });
             await fs.writeFile(`cache/${opcodename}`, filedata);
             await fs.writeFile(`cache/${scriptname}`, scriptfiledata);
-        } else if (datastore.set) {
-            await datastore.set(opcodename, filedata);
-            await datastore.set(scriptname, scriptfiledata);
+        } else if (navigator.storage?.getDirectory) {
+            let cacheDir = await navigator.storage.getDirectory();
+            let opcodenameHandle = await cacheDir.getFileHandle(opcodename, { create: true });
+            let scriptnameHandle = await cacheDir.getFileHandle(scriptname, { create: true });
+
+            let opcodenameWritable = await opcodenameHandle.createWritable();
+            await opcodenameWritable.write(filedata);
+            await opcodenameWritable.close();
+
+            let scriptnameWritable = await scriptnameHandle.createWritable();
+            await scriptnameWritable.write(scriptfiledata);
+            await scriptnameWritable.close();
         } else {
             console.log(`did not save cs2 callibration since there is no fs and no browser indexeddb`);
         }
@@ -390,10 +404,27 @@ export class ClientscriptObfuscation {
             if (fs.constants) {
                 file = await fs.readFile(`cache/${opcodename}`, "utf8");
                 scriptfile = await fs.readFile(`cache/${scriptname}`, "utf8").catch(() => undefined);
-            } else if (datastore.get) {
-                file = await datastore.get(opcodename);
-                scriptfile = await datastore.get(scriptname).catch(() => undefined);
+            } else if (navigator.storage?.getDirectory) {
+                let cacheDir = await navigator.storage.getDirectory();
+                file = await cacheDir.getFileHandle(opcodename)
+                    .then(q => q.getFile())
+                    .then(q => q.text())
+                    .catch(() => undefined);
+                scriptfile = await cacheDir.getFileHandle(scriptname)
+                    .then(q => q.getFile())
+                    .then(q => q.text())
+                    .catch(() => undefined);
             }
+            if (!file) {
+                // try find prebuild version on runeapps
+                file = await fetch(`https://runeapps.org/data/rsmv/${opcodename}`)
+                    .then(res => res.text())
+                    .catch(() => undefined);
+                scriptfile = await fetch(`https://runeapps.org/data/rsmv/${scriptname}`)
+                    .then(res => res.text())
+                    .catch(() => undefined);
+            }
+
             if (file) {
                 let json = JSON.parse(file);
                 let scriptjson = (scriptfile ? JSON.parse(scriptfile) : null);

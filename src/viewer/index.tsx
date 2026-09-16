@@ -20,7 +20,7 @@ export function unload(obj: { root: ReactDOM.Root, ctx: UIContext }) {
 }
 
 export function start(rootelement: HTMLElement, serviceworker?: boolean) {
-	if (electron) {
+	if (electron.ipcRenderer) {
 		// electron doesn't bind these
 		window.addEventListener("keydown", e => {
 			if (e.altKey && e.key == "ArrowLeft") { navigation.back(); }

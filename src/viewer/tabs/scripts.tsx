@@ -406,7 +406,10 @@ function RawCliScript(p: UiScriptProps) {
             output.setState(res._tag == "error" ? "error" : "done");
         }
         if (res._tag == "error") {
-            output.log(res.error.config.message);
+            let err = res.error.config.message;
+            // Remove ANSI escape codes from the error message
+            let cleanText = err.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+            output.log(cleanText);
         } else {
             output.log("script done");
         }
