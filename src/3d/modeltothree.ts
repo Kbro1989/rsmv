@@ -836,7 +836,11 @@ export async function ob3ModelToThree(scene: ThreejsSceneCache, model: ModelData
 }
 
 export function getModelBoundingBox(modeldata: ModelData | null | undefined) {
+	// i'm still missing something either here or in item camera code, seems to be legacy gower code so could be anything
 	let boundingbox = new Box3();
+	// model origin is implied in rs
+	boundingbox.min.y = 0;
+	boundingbox.max.y = 0;
 	let temp = new Box3();
 	for (let mesh of modeldata?.meshes ?? []) {
 		temp.setFromBufferAttribute(mesh.attributes.pos);

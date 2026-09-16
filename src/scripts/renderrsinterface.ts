@@ -375,7 +375,8 @@ function uiModelRenderer(renderer: ThreeJsRenderer, sceneCache: ThreejsSceneCach
         roty: camdata.rotate_y,
         rotz: camdata.rotate_z,
         translatex: camdata.translate_x / 4,
-        translatey: camdata.translate_y / 4,
+        translatey: 0,
+        translatez: camdata.translate_y / 4,
         zoom: camdata.zoom
     };
     let canvas = document.createElement("canvas");

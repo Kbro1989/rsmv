@@ -130,13 +130,14 @@ export function SceneLocation(p: LookupModeProps) {
 }
 
 export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imgheight: number, boundingbox: Box3 | null, params: UiCameraParams) {
-    const defaultcamdist = 16;//found through testing
-
     //fov such that the value 32 ends up in the projection matrix.yy
     //not sure if coincidence that this is equal to height
     cam.fov = Math.atan(1 / 32) / (Math.PI / 180) * 2;
     cam.aspect = imgwidth / imgheight;
     cam.updateProjectionMatrix();
+
+    let center = new Vector3();
+    boundingbox?.getCenter(center);
 
     let rot = new Quaternion().setFromEuler(new Euler(
         -params.rotx / 2048 * 2 * Math.PI,
@@ -156,14 +157,11 @@ export function updateItemCamera(cam: PerspectiveCamera, imgwidth: number, imghe
     pos.add(new Vector3(
         -params.translatex * 4,
         params.translatey * 4,
-        -params.translatey * 4//yep this is y not z, i don't fucking know
+        -params.translatez * 4
     ));
+    pos.add(center);
     pos.applyQuaternion(quaty);
     pos.applyQuaternion(quatz);
-
-    let center = new Vector3();
-    boundingbox?.getCenter(center);
-    pos.add(center);
     pos.divideScalar(512);
     pos.z = -pos.z;
 
@@ -180,12 +178,14 @@ export type UiCameraParams = {
     rotz: number,
     translatex: number,
     translatey: number,
+    translatez: number,
     zoom: number
 }
 
 function ItemCameraMode({ meta, model }: { meta?: items, model: RSModel | null }) {
     let [translatex, settranslatex] = React.useState(meta?.modelTranslate_0 ?? 0);
     let [translatey, settranslatey] = React.useState(meta?.modelTranslate_1 ?? 0);
+    let [translatez, settranslatez] = React.useState(meta?.modelTranslate_1 ?? 0);//also uses translate_1!!
     let [rotx, setrotx] = React.useState(meta?.rotation_0 ?? 0);
     let [roty, setroty] = React.useState(meta?.rotation_1 ?? 0);
     let [rotz, setrotz] = React.useState(meta?.rotation_2 ?? 0);
@@ -193,11 +193,20 @@ function ItemCameraMode({ meta, model }: { meta?: items, model: RSModel | null }
     let [lastmeta, setlastmeta] = React.useState(meta);
     const imgheight = 32;
     const imgwidth = 36;
-    let params: UiCameraParams = { rotx, roty, rotz, translatex, translatey, zoom };
+    let params: UiCameraParams = {
+        rotx,
+        roty,
+        rotz,
+        translatex,
+        translatey,
+        translatez,
+        zoom
+    };
 
     let reset = () => {
         settranslatex(meta?.modelTranslate_0 ?? 0);
         settranslatey(meta?.modelTranslate_1 ?? 0);
+        settranslatez(meta?.modelTranslate_1 ?? 0);//also uses translate_1!!
         setrotx(meta?.rotation_0 ?? 0);
         setroty(meta?.rotation_1 ?? 0);
         setrotz(meta?.rotation_2 ?? 0);
@@ -239,6 +248,7 @@ function ItemCameraMode({ meta, model }: { meta?: items, model: RSModel | null }
             <div><label><input type="range" value={zoom} onChange={e => setzoom(+e.currentTarget.value)} min={10} max={10000} step={1} />Zoom: {zoom}</label></div>
             <div><label><input type="range" value={translatex} onChange={e => settranslatex(+e.currentTarget.value)} min={-200} max={208} step={1} />Translate x: {translatex}</label></div>
             <div><label><input type="range" value={translatey} onChange={e => settranslatey(+e.currentTarget.value)} min={-200} max={200} step={1} />Translate y: {translatey}</label></div>
+            <div><label><input type="range" value={translatez} onChange={e => settranslatez(+e.currentTarget.value)} min={-200} max={200} step={1} />Translate z: {translatez}</label></div>
         </React.Fragment>
     )
 }
@@ -268,7 +278,7 @@ export function SceneItem(p: LookupModeProps) {
             )}
             <div className="mv-sidebar-scroll">
                 <input type="button" className="sub-btn" value={enablecam ? "exit" : "Icon Camera"} onClick={e => setenablecam(!enablecam)} />
-                {enablecam && <ItemCameraMode meta={data?.info.modelitem} model={model} />}
+                {enablecam && p.canrender && <ItemCameraMode meta={data?.info.modelitem} model={model} />}
                 <RawTextDisplay text={data?.assetName} />
                 <StructView data={data?.info.item} meta={parse.item.parser.getJsonSchema()} />
             </div>
