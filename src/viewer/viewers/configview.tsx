@@ -156,7 +156,7 @@ let resourceloadlimit = taskTrickler(20);
 function SpriteView(p: { id: number }) {
     let enginectx = React.useContext(UIEngineContext);
     let imgurl = useAwaited(abort => {
-        if (!enginectx) { return; }
+        if (!enginectx || p.id == -1) { return; }
         return resourceloadlimit(async () => {
             if (abort.aborted) { return; }
             let file = await enginectx.source.getFileById(cacheMajors.sprites, p.id);
@@ -165,7 +165,7 @@ function SpriteView(p: { id: number }) {
         });
     }, [p.id], 200);
 
-    return <img src={imgurl ?? undefined} />;
+    return <img className="mv-propobject" src={imgurl ?? undefined} />;
 }
 
 function TextureView(p: { id: number }) {
@@ -179,7 +179,7 @@ function TextureView(p: { id: number }) {
         })
     }, [p.id], 200);
 
-    return <img src={imgurl ?? undefined} />;
+    return <img className="mv-propobject" src={imgurl ?? undefined} />;
 }
 
 function CursorView(p: { id: number }) {
@@ -212,7 +212,7 @@ function SoundView(p: { id: number }) {
         if (soundblob) { URL.revokeObjectURL(soundblob); }
     }, [soundblob]);
 
-    return <audio src={soundblob ?? undefined} controls />;
+    return <audio className="mv-propobject" src={soundblob ?? undefined} controls />;
 }
 
 function JsonImgFileView(p: { file: Uint8Array | string }) {
@@ -478,16 +478,16 @@ export function renderPrimitive(prop: DeepLinkElement) {
             return { isbig: false, el: <ColorView hexrgb={prop.primitive} /> };
         }
         if (prop.rsmvtype == "graphic") {
-            return { isbig: false, el: <div><ObjectLink prop={prop} /><br /><SpriteView id={prop.primitive} /></div> };
+            return { isbig: false, el: <div><ObjectLink prop={prop} /><SpriteView id={prop.primitive} /></div> };
         }
         if (prop.rsmvtype == "texture") {
-            return { isbig: false, el: <div><ObjectLink prop={prop} /><br /><TextureView id={prop.primitive} /></div> };
+            return { isbig: false, el: <div><ObjectLink prop={prop} /><TextureView id={prop.primitive} /></div> };
         }
         if (prop.rsmvtype == "cursor") {
-            return { isbig: false, el: <div><ObjectLink prop={prop} /><br /><CursorView id={prop.primitive} /></div> };
+            return { isbig: false, el: <div><ObjectLink prop={prop} /><CursorView id={prop.primitive} /></div> };
         }
         if (prop.rsmvtype == "sound") {
-            return { isbig: false, el: <div><ObjectLink prop={prop} /><br /><SoundView id={prop.primitive} /></div> };
+            return { isbig: false, el: <div><ObjectLink prop={prop} /><SoundView id={prop.primitive} /></div> };
         }
         if (prop.rsmvtype == "boolean") {
             return { isbig: false, el: <span>{prop.primitive ? "true" : "false"}</span> };

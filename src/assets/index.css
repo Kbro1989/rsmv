@@ -499,6 +499,10 @@
 	white-space: nowrap;
 }
 
+.mv-propobject {
+	display: block;
+}
+
 .mv-filelink {
 	color: #438ab5;
 	text-decoration: underline;
