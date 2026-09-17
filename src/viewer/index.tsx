@@ -16,10 +16,11 @@ exposeDebugToolsInGlobal();
 export function unload(obj: { root: ReactDOM.Root, ctx: UIContext }) {
 	obj.root.unmount();
 	obj.ctx.close();
-	globalThis.uicontext = null;
+	navigation.removeEventListener("navigate", obj.ctx.onNavigate);
+	globalThis.rsmvuicontext = null;
 }
 
-export function start(rootelement: HTMLElement, serviceworker?: boolean) {
+export function start(rootelement: HTMLElement, skipnavigationapi?: boolean) {
 	if (electron.ipcRenderer) {
 		// electron doesn't bind these
 		window.addEventListener("keydown", e => {
@@ -30,7 +31,7 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 		});
 	}
 
-	let ctx = new UIContext(rootelement, serviceworker ?? false);
+	let ctx = new UIContext(rootelement);
 	let root = ReactDOM.createRoot(rootelement);
 	root.render(
 		<UIRootContext.Provider value={ctx}>
@@ -38,7 +39,10 @@ export function start(rootelement: HTMLElement, serviceworker?: boolean) {
 		</UIRootContext.Provider>
 	);
 
-	globalThis.uicontext = ctx;
+	if (!skipnavigationapi) {
+		navigation.addEventListener("navigate", ctx.onNavigate);
+	}
+	globalThis.rsmvuicontext = ctx;
 	return { root, ctx };
 }
 

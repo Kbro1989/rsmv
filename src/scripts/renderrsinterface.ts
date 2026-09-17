@@ -168,12 +168,11 @@ export class UiRenderContext extends TypedEmitter<{ hover: RsInterfaceComponent 
 
 function rsInterfaceStyleSheet() {
     let css = "";
-    css += `html{color:white;font-size:12px;}\n`;
     css += ".rs-component{position:absolute;pointer-events:none;}\n";
     css += ".rs-component--highlight{outline:1px solid red;}\n";
     css += ".rs-image{width:100%;height:100%;}\n";
     css += ".rs-image--cover{background-size:100% 100%; background-repeat:no-repeat;}";
-    css += ".rs-interface-container{position:absolute;top:0px;left:0px;right:0px;bottom:0px;display:flex;align-items:center;justify-content:center;}";
+    css += ".rs-interface-container{position:absolute;top:0px;left:0px;right:0px;bottom:0px;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;}";
     css += ".rs-interface-container-sub{position:relative;outline:1px solid green;}";
     css += ".rs-model{position:absolute;top:0px;left:0px;width:100%;height:100%;}";
     css += ".rs-componentmeta{}";

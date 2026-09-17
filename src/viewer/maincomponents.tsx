@@ -357,7 +357,6 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 	renderable: RenderableContext | null = null;
 	rootElement: HTMLElement;
 	renderer: ThreeJsRenderer;
-	useServiceWorker: boolean;
 
 	preferences = {
 		runinterfacescripts: false,
@@ -366,20 +365,18 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 
 	multitab = multitabManager(this);
 
-	constructor(rootelement: HTMLElement, useServiceWorker: boolean) {
+	constructor(rootelement: HTMLElement) {
 		super();
 		this.rootElement = rootelement;
-		this.useServiceWorker = useServiceWorker;
 
-		if (useServiceWorker) {
-			//this service worker holds a reference to the cache fs handle which will keep the handles valid
-			//across tab reloads
-			// this functionality is broken since chrome no longer allows fs access on rs cache files since they are in a "system folder" (AppData)
-			// don't use webpack to bundle the service worker, it will place it in the wrong folder and its plain js anyway
-			// navigator.serviceWorker?.register("contextholder.js", { scope: './', });
-		}
+		// if (useServiceWorker) {
+		// 	this service worker holds a reference to the cache fs handle which will keep the handles valid
+		// 	across tab reloads
+		// 	this functionality is broken since chrome no longer allows fs access on rs cache files since they are in a "system folder" (AppData)
+		// 	don't use webpack to bundle the service worker, it will place it in the wrong folder and its plain js anyway
+		// 	navigator.serviceWorker?.register("contextholder.js", { scope: './', });
+		// }
 
-		navigation.addEventListener("navigate", this.onNavigate);
 		this.setStateFromUrl(new URL(document.location.href));
 
 		let cnv = document.createElement("canvas");
@@ -390,7 +387,6 @@ export class UIContext extends TypedEmitter<{ showTab: UIOpenedTab | null, state
 		this.source?.close();
 		this.multitab.close();
 		this.renderer.dispose();
-		navigation.removeEventListener("navigate", this.onNavigate);
 	}
 
 	@boundMethod
@@ -598,14 +594,14 @@ export const UIRootContext = React.createContext<UIContext>(null!);
 export const UIEngineContext = React.createContext<RenderableContext | null>(null);
 
 export function parseCacheIdentifier(cacheidentifier: string) {
-	let parts = cacheidentifier.split("-");
+	let parts = cacheidentifier.split("_");
 	let type = parts.shift()!;
 	if (type == "upload") {
-		let args = parts.join("-");
+		let args = parts.join("_");
 		if (args.match(/^\d+$/)) {
 			return { type: "blobs", version: +args } as const;
 		} else {
-			let date = new Date(args.replace(/-/g, " "));
+			let date = new Date(args.replace(/_/g, " "));
 			if (!isNaN(+date)) {
 				return { type: "blobs", version: +date / 1000 } as const;
 			}
@@ -620,7 +616,7 @@ export function parseCacheIdentifier(cacheidentifier: string) {
 		return null;
 	}
 	if (type == "fs") {
-		return { type: "fs", location: parts.join("-") } as const;
+		return { type: "fs", location: parts.join("_") } as const;
 	}
 	if (type == "live") {
 		return { type: "live" } as const;
@@ -633,20 +629,20 @@ export async function getCacheIdentifier(cache: CacheFileSource) {
 		let version = await getCacheVersionFingerprint(cache);
 		if (version > +new Date(2000, 0) / 1000) {
 			let cachedate = new Date(version * 1000);
-			let datetext = cachedate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).replace(/ /g, "-");
-			return `upload-${datetext}`;
+			let datetext = cachedate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).replace(/ /g, "_");
+			return `upload_${datetext}`;
 		} else {
-			return `upload-${version}`;
+			return `upload_${version}`;
 		}
 	}
 	if (cache instanceof Openrs2CacheSource) {
-		return `openrs2-${cache.meta.id}`;
+		return `openrs2_${cache.meta.id}`;
 	}
 	if (cache instanceof CacheDownloader) {
 		return `live`;
 	}
 	if (cache instanceof GameCacheLoader) {
-		return `fs-${cache.cachedir}`;
+		return `fs_${cache.cachedir}`;
 	}
 	return null;
 }
