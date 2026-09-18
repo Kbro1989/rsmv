@@ -45,8 +45,8 @@
                                                                         ["varbit","ushort","varbit"],
                                                                         ["varp","ushort","var_player"],
                                                                         ["value","ubyte"],
-                                                                        ["default_ref","ushort","maplabel"],
-                                                                        ["legacy_ref","ushort","maplabel"]
+                                                                        ["default_ref","ushort","mapelement"],
+                                                                        ["legacy_ref","ushort","mapelement"]
                                                                     ] },
 	"0x1c": { "name":                          "unknown_1c", "read": "ubyte" },//maybe scale (50/75/100)
 	"0x1e": { "name":                          "unknown_1e", "read": "ubyte" },
@@ -67,8 +67,8 @@
                                                                         ["varbit","utribyte","varbit"],
                                                                         ["varp","ushort","var_player"],
                                                                         ["value","ubyte"],
-                                                                        ["default_ref","ushort","maplabel"],
-                                                                        ["legacy_ref","ushort","maplabel"]
+                                                                        ["default_ref","ushort","mapelement"],
+                                                                        ["legacy_ref","ushort","mapelement"]
                                                                     ] },
 	
 }
