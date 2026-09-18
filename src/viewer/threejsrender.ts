@@ -781,6 +781,7 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 		"RA_skinWeight_skin"
 	];
 	//there doesn't seem to be any good way to hook the exporter, so just temporarily edit the scene
+	let proms: Promise<void>[] = [];
 	node.traverseVisible(node => {
 		if (node.animations) {
 			anims.push(...node.animations.filter(q => q.duration != 0));
@@ -803,6 +804,22 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 				undolist.push(() => attributes.normal = oldnormal);
 				node.geometry.attributes.normal = cloned;
 			}
+			let mat = node.material as THREE.MeshStandardMaterial;
+			if (mat.normalMap instanceof THREE.DataTexture) {
+				// threejs gltf converter doesn't know about data textures
+				// it tries to repack the normals, so we need to give it a gpu texture
+				let oldmap = mat.normalMap;
+				undolist.push(() => mat.normalMap = oldmap);
+				let threedata = mat.normalMap.image!;
+				let imgdata = makeImageData(new Uint8ClampedArray(threedata.data!.buffer, threedata.data!.byteOffset, threedata.data!.byteLength), threedata.width, threedata.height);
+				proms.push(createImageBitmap(imgdata, { imageOrientation: "flipY" }).then(bitmap => {
+					mat.normalMap = new THREE.Texture(bitmap);
+					mat.normalMap.needsUpdate = true;
+					mat.normalMap.wrapS = oldmap.wrapS;
+					mat.normalMap.wrapT = oldmap.wrapT;
+					mat.normalMap.magFilter = THREE.LinearFilter;
+				}));
+			}
 			//for some reason blender chokes on these
 			for (let attr of hiddenattributes) {
 				if (attributes[attr]) {
@@ -814,6 +831,7 @@ export async function exportThreeJsGltf(node: THREE.Object3D) {
 			}
 		}
 	});
+	await Promise.all(proms);
 	let res = await new Promise<Buffer>((resolve, reject) => {
 		exporter.parse(node, gltf => resolve(gltf as any), reject, {
 			binary: true,
