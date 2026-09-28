@@ -265,9 +265,15 @@ export function parseOb3Model(modelfile: Buffer, source: CacheFileSource) {
 				vertexend: maxindex + 1,
 				indexLODs: [index],
 				materialId: render.material,
-				hasVertexAlpha: !!render.hasVertexAlpha,
+				hasVertexAlpha: !!render.hasVertexAlpha || (mesh.vertexAlpha?.length ?? 0) > 0,
 				needsNormalBlending: false,
-				attributes: attributes
+				attributes: {
+					...attributes,
+					// per-render vertex alpha may differ from per-mesh, so add override
+					...(render.hasVertexAlpha && mesh.vertexAlpha ? {
+						vertexAlpha: new THREE.BufferAttribute(new Uint8Array(mesh.vertexAlpha), 1)
+					} : {})
+				}
 			})
 		}
 	}

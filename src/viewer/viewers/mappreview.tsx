@@ -1,5 +1,5 @@
 import React from "react";
-import { MapRect, rs2ChunkSize } from "../../3d/mapsquare";
+import { MapRect, rs2ChunkSize, getMapsquareData } from "../../3d/mapsquare";
 import { EngineCache } from "../../3d/modeltothree";
 import { UIEngineContext } from "../maincomponents";
 import { cacheMajors } from "../../constants";
@@ -8,14 +8,16 @@ import { packMapsquare, taskTrickler } from "../../utils";
 import { TabStrip, useForceUpdate } from "../commoncontrols";
 import { parse } from "../../parser/jsondecoders";
 import { dumpTexture } from "../../imgutils";
-import { Box2, Matrix3, Vector2 } from "three";
+
+// Re-export EngineCache for overlayXRay function signature
+export type { EngineCache } from "../../3d/modeltothree";
 
 export type MapviewMarker = { x: number, z: number };
 
-function rectToChunks(rect: MapRect, chunksize = rs2ChunkSize) {
+function rectToChunks(rect: MapRect) {
     let chunksids: [number, number][] = [];
-    for (let chunkx = Math.floor(rect.x / chunksize); chunkx < Math.ceil((rect.x + rect.xsize) / chunksize); chunkx++) {
-        for (let chunkz = Math.floor(rect.z / chunksize); chunkz < Math.ceil((rect.z + rect.zsize) / chunksize); chunkz++) {
+    for (let chunkx = Math.floor(rect.x / rs2ChunkSize); chunkx < Math.ceil((rect.x + rect.xsize) / rs2ChunkSize); chunkx++) {
+        for (let chunkz = Math.floor(rect.z / rs2ChunkSize); chunkz < Math.ceil((rect.z + rect.zsize) / rs2ChunkSize); chunkz++) {
             chunksids.push([chunkx, chunkz]);
         }
     }
@@ -91,6 +93,90 @@ export async function renderMapPreview(engine: EngineCache, rect: MapRect, level
     return img;
 }
 
+async function overlayXRay(engine: EngineCache, img: ImageData, chunkx: number, chunkz: number) {
+    const rs2ChunkSize = 64;
+    
+    // Get mapsquare data for collision and objects
+    try {
+        const mapData = await getMapsquareData(engine, chunkx, chunkz);
+        if (!mapData || !mapData.chunk) return;
+        
+        const { tiles, nxttiles, rawlocs } = mapData.chunk;
+        
+        // Draw collision overlay
+        const drawTile = (tx: number, tz: number, plane: number, collision: number) => {
+            if (tx < 0 || tx >= rs2ChunkSize || tz < 0 || tz >= rs2ChunkSize) return;
+            
+            const pixelx = tx;
+            const pixelz = tz;
+            
+            let r = 0, g = 0, b = 0;
+            
+            if (collision & 0x1) {
+                // Blocked
+                r = 220; g = 50; b = 47;
+            } else if (collision & 0x2) {
+                // Bridge
+                r = 33; g = 150; b = 243;
+            } else if (collision & 0x4) {
+                // Roof
+                r = 40; g = 40; b = 60;
+            } else {
+                return; // Walkable, don't overlay
+            }
+            
+            // Blend with existing pixel
+            const idx = (pixelz * img.width + pixelx) * 4;
+            img.data[idx] = Math.round(img.data[idx] * 0.5 + r * 0.5);
+            img.data[idx + 1] = Math.round(img.data[idx + 1] * 0.5 + g * 0.5);
+            img.data[idx + 2] = Math.round(img.data[idx + 2] * 0.5 + b * 0.5);
+        };
+        
+        // Process tiles
+        if (nxttiles) {
+            for (let plane = 0; plane < 4; plane++) {
+                const levelArray = nxttiles[`level${plane}`];
+                if (!levelArray) continue;
+                
+                for (let i = 0; i < levelArray.length; i++) {
+                    const tile = levelArray[i];
+                    if (!tile) continue;
+                    
+                    const tx = Math.floor(i / 66);
+                    const tz = i % 66;
+                    drawTile(tx, tz, plane, tile.flags ?? 0);
+                }
+            }
+        } else if (tiles) {
+            for (const tile of tiles) {
+                drawTile(tile.x ?? 0, tile.z ?? 0, tile.plane ?? 0, tile.flags ?? 0);
+            }
+        }
+        
+        // Draw object overlay
+        if (rawlocs) {
+            for (const loc of rawlocs) {
+                if (!loc.uses) continue;
+                for (const use of loc.uses) {
+                    const tx = use.x ?? 0;
+                    const tz = use.y ?? 0;
+                    
+                    if (tx < 0 || tx >= rs2ChunkSize || tz < 0 || tz >= rs2ChunkSize) continue;
+                    
+                    // Purple for objects
+                    const idx = (tz * img.width + tx) * 4;
+                    img.data[idx] = 108;
+                    img.data[idx + 1] = 113;
+                    img.data[idx + 2] = 196;
+                    img.data[idx + 3] = 255;
+                }
+            }
+        }
+    } catch {
+        // Ignore errors
+    }
+}
+
 async function renderWorldMap42(engine: EngineCache, zoneid: number, scale = 4) {
     let arch = await engine.getArchiveById(cacheMajors.worldmaprender, zoneid);
     let mapfile = arch.find(q => q.fileid == 0);
@@ -143,36 +229,21 @@ async function renderWorldMap42(engine: EngineCache, zoneid: number, scale = 4) 
 
 globalThis.renderWorldMap42 = renderWorldMap42;
 
-function chunkcachekey(x: number, z: number) {
-    return (x << 16) | (z & 0xFFFF);
-}
-
 function simpleMapRenderer(engine: EngineCache | undefined, initialimgsource: "cache" | "runeapps", initialx?: number, initialz?: number, initialpxpertile?: number) {
     let chunkindex: CacheIndexFile | null = null;
-    let layercaches = new Map<string, Map<number, CanvasImageSource | Promise<CanvasImageSource>>>();
-    engine?.getCacheIndex(cacheMajors.mapsquares).then(q => {
-        chunkindex = q;
-        queuerender();
-    });
+    let chunkcache = new Map<number, CanvasImageSource | Promise<CanvasImageSource>>();
+    engine?.getCacheIndex(cacheMajors.mapsquares).then(q => { chunkindex = q; queuerender(); });
 
     let setImgSource = (newsource: "cache" | "runeapps") => {
         res.imgsource = newsource;
-        // chunkcache.clear();
+        chunkcache.clear();
         queuerender();
         res.onChange?.();
     }
 
     let scroll = (e: WheelEvent) => {
-        let bound = res.cnv?.getBoundingClientRect();
-        let mousepos = bound && pxtotile(e.clientX - bound!.left, e.clientY - bound!.top);
         res.pxpertile *= (1 - e.deltaY / 200);
-        res.pxpertile = Math.max(1 / 16, Math.min(64, res.pxpertile));
-        // compensate for zooming around the center
-        if (mousepos && bound) {
-            let newmousepos = bound && pxtotile(e.clientX - bound!.left, e.clientY - bound!.top)!;
-            res.centerx += mousepos[0] - newmousepos[0];
-            res.centerz += mousepos[1] - newmousepos[1];
-        }
+        res.pxpertile = Math.max(1 / 16, Math.min(16, res.pxpertile));
         queuerender();
     }
 
@@ -215,13 +286,6 @@ function simpleMapRenderer(engine: EngineCache | undefined, initialimgsource: "c
         let z = -(tilez - res.centerz) * res.pxpertile + res.cnv!.height / 2;
         return [x, z];
     }
-    let pxtotile = (x: number, y: number) => {
-        if (!res.cnv) { return null; }
-        let tilex = (x - res.cnv.width / 2) / res.pxpertile + res.centerx;
-        let tilez = -(y - res.cnv.height / 2) / res.pxpertile + res.centerz;
-        return [tilex, tilez];
-    }
-
 
     let framereq = 0;
     let queuerender = () => {
@@ -238,97 +302,62 @@ function simpleMapRenderer(engine: EngineCache | undefined, initialimgsource: "c
         res.cnv.width = res.cnv.clientWidth;
         res.cnv.height = res.cnv.clientHeight;
         res.ctx.imageSmoothingEnabled = false;
+        let imgtileoffset = (res.imgsource == "runeapps" ? -16 : 0);
 
         let toosmall = res.pxpertile < 0.9;
 
         let xsize = res.cnv.width / res.pxpertile;
         let zsize = res.cnv.height / res.pxpertile;
         let rect: MapRect = { x: res.centerx - xsize / 2, z: res.centerz - zsize / 2, xsize, zsize }
-
-        let layername = "cache";
-        let zoom = 1;
-        let tiletoimgspace = new Matrix3();
-        if (res.imgsource == "cache") {
-            tiletoimgspace.makeScale(1 / rs2ChunkSize, 1 / rs2ChunkSize);
-        }
-        if (res.imgsource == "runeapps") {
-            let runeappsmap = {
-                maxzoom: 5,
-                minzoom: -5,
-                imgsize: 512,
-            }
-            zoom = Math.ceil(Math.log2(res.pxpertile));
-            zoom = Math.max(runeappsmap.minzoom, Math.min(zoom, runeappsmap.maxzoom));
-            layername = "runeapps-" + zoom;
-            toosmall = false;
-
-            let tilesperimg = runeappsmap.imgsize / Math.pow(2, zoom);
-            tiletoimgspace.identity();
-            // move origin to top left
-            tiletoimgspace.premultiply(new Matrix3().makeTranslation(0, -200 * rs2ChunkSize));
-            // add render offset (offset made the original render cheaper by reducing splillage)
-            tiletoimgspace.premultiply(new Matrix3().makeTranslation(16, 16));
-            // flip y-axis
-            tiletoimgspace.premultiply(new Matrix3().makeScale(1, -1));
-            // scale to chunk size 
-            tiletoimgspace.premultiply(new Matrix3().makeScale(1 / tilesperimg, 1 / tilesperimg));
-        }
-        let chunkcache = layercaches.getOrInsertComputed(layername, () => new Map());
-        let box = new Box2();
-        box.expandByPoint(new Vector2(rect.x, rect.z).applyMatrix3(tiletoimgspace));
-        box.expandByPoint(new Vector2(rect.x + rect.xsize, rect.z + rect.zsize).applyMatrix3(tiletoimgspace));
-        let chunks = rectToChunks({
-            x: box.min.x,
-            z: box.min.y,
-            xsize: box.max.x - box.min.x,
-            zsize: box.max.y - box.min.y
-        }, 1);
-        let imgtotile = new Matrix3().copy(tiletoimgspace).invert();
-        for (let [imgx, imgy] of chunks) {
-            let key = chunkcachekey(imgx, imgy);
-            if (res.imgsource == "cache") {
-                if (imgx < 0 || imgy < 0 || imgx >= 100 * rs2ChunkSize || imgy >= 200 * rs2ChunkSize) {
-                    continue;
-                }
-                if (!chunkindex?.[packMapsquare(imgx, imgy)]) {
-                    continue; //doesn't exist
-                }
+        let chunks = rectToChunks({ x: rect.x - imgtileoffset, z: rect.z - imgtileoffset, xsize: rect.xsize, zsize: rect.zsize });
+        for (let [chunkx, chunkz] of chunks) {
+            if (chunkx < 0 || chunkz < 0 || chunkx >= 100 || chunkz >= 200) { continue; }
+            let key = packMapsquare(chunkx, chunkz);
+            if (!chunkindex?.[key]) {
+                continue; //doesn't exist
             }
             let didrender = false;
             let chunkimg = chunkcache.get(key);
             if (!chunkimg && !toosmall) {
                 chunkcache.set(key, tricklerender(async () => {
-                    if (res.imgsource == "runeapps") {
+                    if (res.imgsource === "runeapps") {
                         let img = new Image();
-                        img.src = `https://runeapps.org/s3/map4/live/topdown-0/${zoom}/${imgx}-${imgy}.webp`;
+                        img.src = `https://runeapps.org/s3/map4/live/topdown-0/3/${chunkx}-${199 - chunkz}.webp`;
                         await img.decode().catch(e => { });
-                        chunkcache.set(key, img);
-                        if (res.imgsource == "runeapps") { queuerender(); }
+                        if (res.imgsource == "runeapps") {
+                            chunkcache.set(key, img);
+                            queuerender();
+                        }
                         return img;
-                    } else if (res.imgsource == "cache") {
-                        let img = await renderMapPreview(engine, { x: imgx * rs2ChunkSize, z: imgy * rs2ChunkSize, xsize: rs2ChunkSize, zsize: rs2ChunkSize }, 0, 1);
+                    } else if (res.imgsource === "cache" || res.imgsource === "xray") {
+                        let img = await renderMapPreview(engine, { x: chunkx * rs2ChunkSize, z: chunkz * rs2ChunkSize, xsize: rs2ChunkSize, zsize: rs2ChunkSize }, 0, 1);
+                        
+                        // X-ray overlay: collision + objects
+                        if (res.imgsource === "xray") {
+                            await overlayXRay(engine, img, chunkx, chunkz);
+                        }
+                        
                         let bmp = await createImageBitmap(img, { imageOrientation: "flipY" });
-                        chunkcache.set(key, bmp);
-                        if (res.imgsource == "cache") { queuerender(); }
+                        if (res.imgsource === "cache" || res.imgsource === "xray") {
+                            chunkcache.set(key, bmp);
+                            queuerender();
+                        }
                         return bmp;
                     }
                     throw new Error(`Unknown imgsource ${res.imgsource}`);
                 }));
             }
-            let tilebox = new Box2();
-            tilebox.expandByPoint(new Vector2(imgx, imgy).applyMatrix3(imgtotile));
-            tilebox.expandByPoint(new Vector2(imgx + 1, imgy + 1).applyMatrix3(imgtotile));
-            let [maxx, maxy] = tiletopx(tilebox.max.x, tilebox.min.y);
-            let [minx, miny] = tiletopx(tilebox.min.x, tilebox.max.y);
             if (chunkimg instanceof ImageBitmap || chunkimg instanceof HTMLImageElement) {
+                let [px, pz] = tiletopx(chunkx * rs2ChunkSize + imgtileoffset, (chunkz + 1) * rs2ChunkSize + imgtileoffset);
                 if (!(chunkimg instanceof HTMLImageElement) || chunkimg.naturalWidth > 0) {
-                    res.ctx.drawImage(chunkimg, minx, miny, maxx - minx, maxy - miny);
+                    res.ctx.drawImage(chunkimg, px, pz, rs2ChunkSize * res.pxpertile, rs2ChunkSize * res.pxpertile);
                 }
                 didrender = true;
             }
             if (!didrender) {
                 res.ctx.fillStyle = "rgba(160,160,160,1)";
-                res.ctx.fillRect(minx, miny, maxx - minx, maxy - miny);
+                let [px, pz] = tiletopx(chunkx * rs2ChunkSize, (chunkz + 1) * rs2ChunkSize);
+                res.ctx.fillRect(px, pz, rs2ChunkSize * res.pxpertile, rs2ChunkSize * res.pxpertile);
             }
         }
         res.ctx.strokeStyle = "rgba(255,255,255,0.5)";
@@ -362,6 +391,7 @@ function simpleMapRenderer(engine: EngineCache | undefined, initialimgsource: "c
         centerz: initialz ?? 50 * rs2ChunkSize,
         imgsource: initialimgsource,
         setImgSource,
+        chunkcache: chunkcache,
         onChange: null as (() => void) | null,
         markers: [] as MapviewMarker[],
     };
@@ -383,7 +413,7 @@ export function CheapMapView(p: { level?: number, centerx?: number, centerz?: nu
 
     return <div style={{ width: "100%", height: "100%", position: "absolute", overflow: "hidden" }}>
         <span style={{ position: "absolute", margin: "4px" }}>
-            <TabStrip value={renderer.imgsource} tabs={{ cache: "Cache", runeapps: "RuneApps" }} onChange={renderer.setImgSource} />
+            <TabStrip value={renderer.imgsource} tabs={{ cache: "Cache", xray: "X-Ray", runeapps: "RuneApps" }} onChange={renderer.setImgSource} />
         </span>
         <canvas className="mv-canvas" ref={renderer.ref} />
     </div>

@@ -183,7 +183,7 @@ export function IdInputSearch(p: { cache: EngineCache | undefined, mode: keyof t
 		</React.Fragment>
 	)
 }
-export function StringInput({ initialid, onChange }: { initialid?: string, onChange: (id: string) => void }) {
+export function StringInput({ initialid, onChange, placeholder }: { initialid?: string, onChange: (id: string) => void, placeholder?: string }) {
 	let [idstate, setId] = React.useState(initialid ?? "");
 	let stale = React.useRef(false);
 
@@ -196,7 +196,7 @@ export function StringInput({ initialid, onChange }: { initialid?: string, onCha
 	};
 	return (
 		<form className="mv-searchbar" onSubmit={submit}>
-			<input type="text" className="mv-searchbar-input" spellCheck="false" value={id} onChange={e => { setId(e.currentTarget.value); stale.current = true; }} />
+			<input type="text" className="mv-searchbar-input" spellCheck="false" value={id} onChange={e => { setId(e.currentTarget.value); stale.current = true; }} placeholder={placeholder} />
 			<input type="submit" style={{ width: "25px", height: "25px" }} value="" className="sub-btn sub-btn-search" />
 		</form>
 	)

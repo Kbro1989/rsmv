@@ -25,6 +25,7 @@ type DiffMesh = {
 	remove: () => void
 }
 
+
 type SceneMapState = {
 	chunkgroups: { chunkx: number, chunkz: number, models: Map<ThreejsSceneCache, RSMapChunk>, diffs: DiffMesh[] }[],
 	center: { x: number, z: number },
@@ -66,6 +67,7 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 		showModal({ title: "Map view" }, <Map2dView chunks={this.state.chunkgroups.map(q => q.models.get(this.props.ctx!.sceneCache)!).filter(q => q)} gridsize={512} mapscenes={true} />);
 	}
 
+	@boundMethod
 	async diffCaches(cachea: ThreejsSceneCache, cacheb: ThreejsSceneCache, floora = 3, floorb = 3) {
 		let group = this.state.chunkgroups[0];
 		if (!this.props.ctx || !group) {
@@ -209,9 +211,6 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 				[...groups].sort((a, b) => a.localeCompare(b)).forEach(q => {
 					if (typeof toggles[q] != "boolean") {
 						toggles[q] = !!q.match(/^(floor|objects)\d+/);
-						// toggles[q] = !!q.match(/^mini_(floor|objects)0/);
-						// toggles[q] = !!q.match(/^mini_(objects)0/);
-						// toggles[q] = !!q.match(/^mini_(floor)0/);
 						changed = true;
 					}
 				});
@@ -233,6 +232,15 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 			let combined = chunk.rootnode;
 			combined.position.add(new Vector3(-center.x, 0, -center.z));
 			chunk.addToScene(renderer);
+
+			// Check if chunk data loaded successfully
+			chunk.chunkdata.catch(e => {
+				console.error(`Failed to load chunk ${chunkx},${chunkz}:`, e);
+				this.setState(prev => {
+					let newgroups = prev.chunkgroups.filter(g => !(g.chunkx == chunkx && g.chunkz == chunkz));
+					return { chunkgroups: newgroups };
+				});
+			});
 
 			let group = prevstate.chunkgroups.find(q => q.chunkx == chunkx && q.chunkz == chunkz);
 			let newstate: Partial<SceneMapState> = {};
@@ -275,7 +283,7 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 				newtoggles[key] = (key == toggle ? value : old.toggles[key]);
 			}
 			this.fixVisibility(newtoggles);
-			return { toggles: newtoggles };
+			return { toggles: newtoggles }
 		})
 	}
 
@@ -373,8 +381,9 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 					<React.Fragment>
 						<StringInput onChange={this.onSubmit} initialid={initid} />
 						<label><input type="checkbox" checked={this.state.extramodels} onChange={e => this.setState({ extramodels: e.currentTarget.checked })} />Load extra modes</label>
-						<p>Input format: x,z[,xsize=1,[zsize=xsize]]</p>
+						<p>Input format: x,z[,xsize=1,[zsize=xsize]] | world: wx,wz | packed: 121699138 | id: 6293 | dev: z,x1,y1,x2,y2 | sextant: ndeg,nmin,ns,edeg,emin,ew</p>
 						<p>Coordinates are in so-called mapsquare coordinates, each mapsquare is 64x64 tiles in size. The entire RuneScape map is laid out in one plane and is 100x200 mapsquares in size.</p>
+						<StringInput onChange={this.onSubmit} initialid="" placeholder="Extended: world|packed|id|dev|sextant" />
 					</React.Fragment>
 				)}
 				{this.state.chunkgroups.length != 0 && (
@@ -453,6 +462,7 @@ class SceneMapModelInner extends React.Component<LookupModeProps & { ctx: Render
 type Map2dState = {
 	cache: Map<RSMapChunk, { render: Promise<string>, src: string | null }>,
 };
+
 export class Map2dView extends React.Component<{ addArea?: (x: number, z: number) => void, chunks: RSMapChunk[], gridsize: number, mapscenes: boolean }, Map2dState> {
 	constructor(p) {
 		super(p);

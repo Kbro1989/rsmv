@@ -1,0 +1,28 @@
+{
+	"compilerOptions": {
+		"moduleResolution": "bundler",
+		"module": "esnext",
+		"lib": ["ESNext", "DOM"],
+		"target": "esnext",
+		"sourceMap": false,
+		"alwaysStrict": true,
+		"jsx": "react",
+		"allowJs": true,
+		"outDir": "./dist-scripts",
+		"rootDir": "..",
+		"esModuleInterop": true,
+		"experimentalDecorators": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"strictNullChecks": false,
+		"noImplicitThis": false,
+		"strictFunctionTypes": false,
+		"strictPropertyInitialization": false,
+		"noImplicitAny": false,
+		"useUnknownInCatchVariables": false,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["**/*.ts", "**/*.tsx"],
+	"exclude": ["node_modules", "dist", "cache", "generated"]
+}

@@ -64,6 +64,7 @@
 		"webpack-dev-server": "^6.0.0"
 	},
 	"dependencies": {
+		"better-sqlite3": "^13.0.3",
 		"cmd-ts": "^0.7.0",
 		"comment-json": "^4.2.2",
 		"lzma": "^2.3.2",

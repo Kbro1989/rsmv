@@ -61,11 +61,56 @@ export function cacheFilenameHash(name: string, oldhash: boolean) {
 }
 
 export function stringToMapArea(str: string) {
-	let [x, z, xsize, zsize] = str.split(/[,\.\/:;]/).map(n => +n);
-	xsize = xsize ?? 1;
-	zsize = zsize ?? xsize;
-	if (isNaN(x) || isNaN(z) || isNaN(xsize) || isNaN(zsize)) { return null; }
-	return { x, z, xsize, zsize };
+	// Parse multiple coordinate formats, all resolving to mapsquare x,z:
+	// 1. "x,z" or "x,z,xsize,zsize" — mapsquare coords (e.g. "50,50" or "50,50,1,1")
+	// 2. "wx,wz" — world coords, auto-detected when >10000 (e.g. "2937,3221")
+	// 3. "121699138" — packed position: (x&0x7FFF)|((z&0x7FFF)<<15)|((plane&3)<<30)
+	// 4. "6293" — mapsquare ID: x=id%100, z=floor(id/100) (overworld only, no interior instances)
+	
+	const rawParts = str.split(/[,\.\/\:\;]/);
+	const parts: (number | string)[] = rawParts.map(p => {
+		const n = +p;
+		return isNaN(n) ? p.trim() : n;
+	}).filter(p => p !== '');
+
+	// Single number: packed position or mapsquare ID
+	if (parts.length === 1 && typeof parts[0] === 'number') {
+		const val = parts[0];
+		if (val > 10000000) {
+			// Packed position
+			return { x: Math.floor((val & 0x7FFF) / 64), z: Math.floor(((val >> 15) & 0x7FFF) / 64), xsize: 1, zsize: 1 };
+		} else if (val > 9999) {
+			// World X with missing Z — not enough info
+			return null;
+		} else {
+			// Mapsquare ID
+			return { x: val % 100, z: Math.floor(val / 100), xsize: 1, zsize: 1 };
+		}
+	}
+
+	// Two numbers: mapsquare x,z OR world wx,wz
+		if (parts.length === 2 && typeof parts[0] === 'number' && typeof parts[1] === 'number') {
+			const [a, b] = parts;
+			// World coords typically exceed mapsquare range (0-100)
+			if (a >= 100 || b >= 100) {
+				return { x: Math.floor(a / 64), z: Math.floor(b / 64), xsize: 1, zsize: 1 };
+			}
+			return { x: a, z: b, xsize: 1, zsize: 1 };
+		}
+
+	// Three numbers: x,z,xsize
+	if (parts.length === 3 && typeof parts[0] === 'number' && typeof parts[1] === 'number' && typeof parts[2] === 'number') {
+		const [a, b, c] = parts;
+		return { x: a, z: b, xsize: c, zsize: c };
+	}
+
+	// Four numbers: x,z,xsize,zsize
+	if (parts.length === 4 && typeof parts[0] === 'number' && typeof parts[1] === 'number' && typeof parts[2] === 'number' && typeof parts[3] === 'number') {
+		const [a, b, c, d] = parts;
+		return { x: a, z: b, xsize: c, zsize: d };
+	}
+
+	return null;
 }
 
 export function stringToFileRange(str: string) {
