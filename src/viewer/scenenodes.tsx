@@ -21,6 +21,7 @@ export type LookupMode = "model" | "item" | "npc" | "object" | "material" | "map
 type ModelBrowserState = { search: unknown, mode: LookupMode }
 
 export function ModelBrowser(p: {}) {
+	let renderable = React.useContext(UIEngineContext);
 	let [state, setMode] = React.useReducer((prev: any, v: LookupMode) => {
 		localStorage.rsmv_lastmode = v;
 		return { search: null, mode: v } as ModelBrowserState;
@@ -50,7 +51,7 @@ export function ModelBrowser(p: {}) {
 	return (
 		<React.Fragment>
 			<TabStrip value={state.mode} tabs={tabs} onChange={setMode} />
-			{ModeComp && <ModeComp initialId={state.search} />}
+			{ModeComp && <ModeComp initialId={state.search} canrender={!!renderable} />}
 		</React.Fragment>
 	);
 }
@@ -287,7 +288,8 @@ export function RendererControls(p: {}) {
 }
 
 export type LookupModeProps = {
-	initialId: unknown
+	initialId: unknown,
+	canrender: boolean
 }
 
 const LookupModeComponentMap: Record<LookupMode, React.ComponentType<LookupModeProps>> = {

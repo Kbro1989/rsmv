@@ -98,7 +98,7 @@ export class FileParser<T> {
 		state.buffer.copyWithin(state.scan, state.endoffset, scratchbuf.byteLength);
 		state.scan += scratchbuf.byteLength - state.endoffset;
 		//do the weird prototype slice since we need a copy, not a ref
-		let r: Buffer = Uint8Array.prototype.slice.call(scratchbuf, 0, state.scan);
+		let r = Buffer.from(scratchbuf.subarray(0, state.scan));
 		//clear it for next use
 		scratchbuf.fill(0, 0, state.scan);
 		return r;
@@ -112,6 +112,7 @@ globalThis.parserTimings = () => {
 }
 
 export const parse = allParsers();
+export const getParsers = () => Promise.resolve(allParsers());
 function allParsers() {
 	return {
 		cacheIndex: FileParser.fromJson<import("../generated/cacheindex").cacheindex>(readJsonc("./opcodes/cacheindex.json")),
@@ -146,7 +147,7 @@ function allParsers() {
 		oldmaterials: FileParser.fromJson<import("../generated/oldmaterials").oldmaterials>(readJsonc("./opcodes/oldmaterials.jsonc")),
 		quickchatCategories: FileParser.fromJson<import("../generated/quickchatcategories").quickchatcategories>(readJsonc("./opcodes/quickchatcategories.jsonc")),
 		quickchatLines: FileParser.fromJson<import("../generated/quickchatlines").quickchatlines>(readJsonc("./opcodes/quickchatlines.jsonc")),
-		environments: FileParser.fromJson<import("../generated/environments").environments>(readJsonc("./opcodes/environments.jsonc")),
+		environments: FileParser.fromJson<{ unk01?: number | null, unk04?: boolean | null, model?: number | null, unk06?: number | null }>(readJsonc("./opcodes/environments.jsonc")),
 		avatars: FileParser.fromJson<import("../generated/avatars").avatars>(readJsonc("./opcodes/avatars.jsonc")),
 		avatarOverrides: FileParser.fromJson<import("../generated/avataroverrides").avataroverrides>(readJsonc("./opcodes/avataroverrides.jsonc")),
 		identitykit: FileParser.fromJson<import("../generated/identitykit").identitykit>(readJsonc("./opcodes/identitykit.jsonc")),
@@ -156,8 +157,8 @@ function allParsers() {
 			"0x01": { "name": "varid", "read": "utribyte" },
 			"0x02": { "name": "bits", "read": ["tuple", "ubyte", "ubyte"] }
 		}),
-		particles_0: FileParser.fromJson<import("../generated/particles_0").particles_0>(readJsonc("./opcodes/particles_0.jsonc")),
-		particles_1: FileParser.fromJson<import("../generated/particles_1").particles_1>(readJsonc("./opcodes/particles_1.jsonc")),
+		particles_0: FileParser.fromJson<import("../generated/experimental/particles_0").particles_0>(readJsonc("./opcodes/particles_0.jsonc")),
+		particles_1: FileParser.fromJson<import("../generated/experimental/particles_1").particles_1>(readJsonc("./opcodes/particles_1.jsonc")),
 		audio: FileParser.fromJson<import("../generated/audio").audio>(readJsonc("./opcodes/audio.jsonc")),
 		proctexture: FileParser.fromJson<import("../generated/proctexture").proctexture>(readJsonc("./opcodes/proctexture.jsonc")),
 		oldproctexture: FileParser.fromJson<import("../generated/oldproctexture").oldproctexture>(readJsonc("./opcodes/oldproctexture.jsonc")),

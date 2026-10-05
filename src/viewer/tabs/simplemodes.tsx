@@ -23,7 +23,8 @@ type AsyncModelData<ID, T> = [
     visible: SimpleModelInfo<T, ID> | null,
     loadedModel: RSModel | null,
     loadedId: ID | null,
-    setter: (id: ID) => void
+    setter: (id: ID) => void,
+    error: string | null
 ];
 
 
@@ -33,22 +34,27 @@ export function useAsyncModelData<ID, T>(getter: (cache: ThreejsSceneCache, id: 
     let [loadedModel, setLoadedModel] = React.useState<RSModel | null>(null);
     let [visible, setVisible] = React.useState<SimpleModelInfo<T, ID> | null>(null);
     let [loadedId, setLoadedId] = React.useState<ID | null>(null);
+    let [loadError, setLoadError] = React.useState<string | null>(null);
     let setter = React.useCallback(async (id: ID) => {
         if (!ctx) { return; }
         pendingId.current = id;
+        setLoadError(null);
         try {
             let res = await getter(ctx.sceneCache, id);
             if (pendingId.current == id) {
                 localStorage.rsmv_lastsearch = JSON.stringify(id);
                 setVisible(res);
                 setLoadedId(id);
+                setLoadError(null);
             }
         } catch (err) {
             if (pendingId.current == id) {
                 localStorage.rsmv_lastsearch = JSON.stringify(id);
                 setVisible(null);
                 setLoadedId(id);
-                console.error(err);//TODO make ui
+                let message = err instanceof Error ? err.message : String(err);
+                setLoadError(message);
+                if (!message.startsWith("Logical file ") || !message.includes(" not found at ")) { console.error(err); }
             }
         }
     }, [ctx]);
@@ -73,7 +79,8 @@ export function useAsyncModelData<ID, T>(getter: (cache: ThreejsSceneCache, id: 
         visible,
         loadedModel,
         loadedId,
-        setter
+        setter,
+        loadError
     ] satisfies AsyncModelData<ID, T>;
 }
 
@@ -255,7 +262,7 @@ function ItemCameraMode({ meta, model }: { meta?: items, model: RSModel | null }
 
 export function SceneItem(p: LookupModeProps) {
     let ctx = React.useContext(UIEngineContext);
-    let [data, model, id, setId] = useAsyncModelData(itemToModel, !p.canrender);
+    let [data, model, id, setId, loadError] = useAsyncModelData(itemToModel, !p.canrender);
     let initid = id ?? (typeof p.initialId == "number" ? p.initialId : 0);
     let [enablecam, setenablecam] = React.useState(false);
     // let [histfs, sethistfs] = React.useState<UIScriptFS | null>(null);
@@ -276,6 +283,7 @@ export function SceneItem(p: LookupModeProps) {
             {id == null && (
                 <p>Enter an item id or search by name.</p>
             )}
+            {loadError && <p className="mv-error" role="status">{loadError}</p>}
             <div className="mv-sidebar-scroll">
                 <input type="button" className="sub-btn" value={enablecam ? "exit" : "Icon Camera"} onClick={e => setenablecam(!enablecam)} />
                 {enablecam && p.canrender && <ItemCameraMode meta={data?.info.modelitem} model={model} />}

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import * as zlib from 'zlib';
 
-function decompress(buffer) {
+function decompress(buffer: Buffer): Buffer {
     if (buffer[0] === 0x5a && buffer[1] === 0x4c && buffer[2] === 0x42) { // ZLB
         return zlib.inflateSync(buffer.subarray(8));
     }
@@ -11,7 +11,7 @@ function decompress(buffer) {
 async function main() {
     const dbPath = "C:\\ProgramData\\Jagex\\RuneScape-BETA\\js5-3.jcache";
     const db = new Database(dbPath, { readonly: true });
-    const row = db.prepare(`SELECT DATA FROM cache WHERE KEY=?`).get(1946);
+    const row = db.prepare<[number], { DATA: Buffer }>(`SELECT DATA FROM cache WHERE KEY=?`).get(1946);
     if (row) {
         const buf = decompress(row.DATA);
         console.log(`Size: ${buf.length}`);

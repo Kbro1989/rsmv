@@ -20,7 +20,11 @@ export type items = {
 	equipId?: number | null
 	unknown_0F?: true | null
 	members?: true | null
+	ground_actions_6?: string | null
 	multiStackSize?: number | null
+	unknown_13?: number | null
+	quest_ids?: number[] | null
+	unknown_16?: number | null
 	maleModels_0?: {
 		id: (number|number),
 		type: (0|number),
@@ -32,6 +36,7 @@ export type items = {
 	} | null
 	femaleModels_1?: (number|number) | null
 	unknown_1B?: number | null
+	unknown_1C?: number | null
 	ground_actions_0?: string | null
 	ground_actions_1?: string | null
 	ground_actions_2?: string | null
@@ -57,6 +62,11 @@ export type items = {
 	nameColor?: number | null
 	recolorDstIndices?: number | null
 	retextureDstIndices?: number | null
+	unknown_32?: number | null
+	unknown_33?: number | null
+	unknown_34?: number | null
+	unknown_36?: number | null
+	stack_info_old_3C?: number | null
 	tradeable?: true | null
 	buy_limit?: number | null
 	maleModels_2?: (number|number) | null
@@ -224,9 +234,17 @@ export type items = {
 	bindTemplate?: number | null
 	combine_info?: number | null
 	combine_template?: number | null
+	unknown_F1?: true | null
+	subops_array?: number[] | null
+	unknown_F6?: [
+		number,
+		number,
+	][] | null
+	unknown_F8?: number | null
 	extra?: {
 		prop: number,
 		intvalue: number | null,
 		stringvalue: string | null,
 	}[] | null
+	unknown_FA?: number | null
 };

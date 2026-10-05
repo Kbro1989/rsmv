@@ -13,6 +13,10 @@ import { CLIScriptOutput, ScriptOutput } from "../scriptrunner";
 
 export { writeClientVarFile, writeOpcodeFile } from "./typescript/codewriter";
 
+export async function prepareClientScript(source: CacheFileSource) {
+    return ClientScriptDeobLoader.forCache(source).loadOrGenerate(source);
+}
+
 export async function compileClientScript(source: CacheFileSource, code: string) {
     let calli = await ClientScriptDeobLoader.forCache(source).loadOrGenerate(source);
 

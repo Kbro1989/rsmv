@@ -27,6 +27,9 @@
 		"skipLibCheck": true,
 		"noEmit": true
 	},
+	"include": [
+		"src/**/*"
+	],
 	"watchOptions": {
 		"excludeDirectories": [
 			"dist",

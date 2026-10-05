@@ -12,7 +12,7 @@ export type animgroupconfigs = {
 	unknown_05?: (number|number) | null
 	unknown_04?: (number|number) | null
 	run?: (number|number) | null
-	unknown_07?: (number|number) | null
+	run_back?: (number|number) | null
 	unknown_08?: (number|number) | null
 	unknown_09?: (number|number) | null
 	unknown_1a?: [
@@ -35,11 +35,10 @@ export type animgroupconfigs = {
 	unknown_32?: (number|number) | null
 	unknown_33?: (number|number) | null
 	idleVariations?: {
-			animid: (number|number),
-			weight: number,
-			probably_chance?: number,
-			always0: (number|0),
-		}[] | null
+		animid: (number|number),
+		weight: number,
+		always0: (number|0),
+	}[] | null
 	unknown_35?: true | null
 	unknown_36?: [
 		number,

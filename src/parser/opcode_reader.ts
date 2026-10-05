@@ -321,7 +321,7 @@ function refgetter(refparent: ChunkParentCallback | null, propname: string, reso
 	}
 }
 
-function structParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef) {
+function structParser(args: unknown[], parent: ChunkParentCallback, typedef: TypeDef, ismini = false) {
 	let refs: Record<string, ResolvedReference[] | undefined> = {};
 	let r: ChunkParser = {
 		read(state) {
@@ -330,8 +330,9 @@ function structParser(args: unknown[], parent: ChunkParentCallback, typedef: Typ
 			state.stack.push(r);
 			state.hiddenstack.push(hidden);
 			if (debugdata && !debugdata.rootstate) { debugdata.rootstate = r; }
+			if (debugdata && ismini) { debugdata.opcodes.push({ op: "struct", index: state.scan, stacksize: state.stack.length }); }
 			for (let key of keys) {
-				if (debugdata) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
+				if (debugdata && !ismini) { debugdata.opcodes.push({ op: key, index: state.scan, stacksize: state.stack.length }); }
 				let v = props[key].read(state);
 				if (v !== undefined) {
 					if (key[0] == "$") {
@@ -1443,6 +1444,10 @@ const hardcodes: Record<string, (args: unknown[], parent: ChunkParentCallback, t
 			}
 		}
 	},
+	varushortbias: function (args) {
+		if (args.length != 0) { throw new Error("varushortbias does not accept arguments"); }
+		return parserPrimitives.varushort;
+	},
 	"tailed varushort": function (args, parent, typedef) {
 		const overflowchunk = 0x7fff;
 		return {
@@ -1701,6 +1706,29 @@ const numberTypes: Record<string, { read: (s: DecodeState) => number, write: (s:
 		},
 		min: 0, max: 2 ** 31 - 1
 	},
+	denseuint: {
+		read(s) {
+			let value = 0;
+			let multiplier = 1;
+			for (let bytecount = 0; bytecount < 5; bytecount++) {
+				let byte = s.buffer.readUInt8(s.scan++);
+				if (bytecount == 4 && (byte & 0xf0) != 0) { throw new Error("invalid denseuint"); }
+				value += (byte & 0x7f) * multiplier;
+				if ((byte & 0x80) == 0) { return value; }
+				multiplier *= 0x80;
+			}
+			throw new Error("invalid denseuint");
+		},
+		write(s, value) {
+			if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) { throw new Error("unsigned 32-bit integer expected"); }
+			while (value >= 0x80) {
+				s.buffer.writeUInt8((value % 0x80) | 0x80, s.scan++);
+				value = Math.floor(value / 0x80);
+			}
+			s.buffer.writeUInt8(value, s.scan++);
+		},
+		min: 0, max: 2 ** 32 - 1
+	},
 	varnullint: {
 		read(s) {
 			let firstWord = s.buffer.readUInt16BE(s.scan);
@@ -1801,8 +1829,26 @@ const parserFunctions = {
 	nullarray: arrayNullTerminatedParser,
 	array: arrayParser,
 	struct: structParser,
+	ministruct: function (args, parent, typedef) { return structParser(args, parent, typedef, true); },
 	tuple: tupleParserFactory(false),
 	typedtuple: tupleParserFactory(true),
+	typed: function (args, parent, typedef) {
+		if (args.length != 2 || typeof args[1] != "string") { throw new Error("typed requires a parser and a type name"); }
+		let parser = buildParser(parent, args[0], typedef);
+		let type = args[1];
+		let typedParser: ChunkParser = {
+			read(state) { return parser.read(state); },
+			write(state, value) { parser.write(state, value); },
+			getTypescriptType(indent) { return parser.getTypescriptType(indent); },
+			getJsonSchema() {
+				let schema = parser.getJsonSchema();
+				if (typeof schema != "object" || schema == null) { return schema; }
+				return { ...schema, "x-rsmv-type": type };
+			}
+		};
+		if (parser.readConst) { typedParser.readConst = state => parser.readConst!(state); }
+		return typedParser;
+	},
 
 	...hardcodes,
 	...parserPrimitives

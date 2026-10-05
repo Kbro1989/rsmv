@@ -603,6 +603,40 @@ export function traverseJsonSchema(meta: JSONSchema6Definition | null | undefine
     return meta.properties[prop];
 }
 
+function selectUnionSchema(variants: JSONSchema6Definition[], data: unknown): JSONSchema6Definition | undefined {
+    let best: JSONSchema6Definition | undefined;
+    let bestscore = -Infinity;
+
+    for (let variant of variants) {
+        if (typeof variant == "boolean") {
+            if (variant && bestscore < 0) { best = variant; bestscore = 0; }
+            continue;
+        }
+
+        let schema = variant as JSONSchema6;
+        let actualtype = data == null ? "null"
+            : ArrayBuffer.isView(data) ? "string"
+                : Array.isArray(data) ? "array"
+                    : typeof data == "object" ? "object"
+                        : typeof data;
+        if (Object.hasOwn(schema, "const") && !Object.is(schema.const, data)) { continue; }
+        if (schema.enum && !schema.enum.some(value => Object.is(value, data))) { continue; }
+        let types = schema.type == undefined ? [] : Array.isArray(schema.type) ? schema.type : [schema.type];
+        if (types.length && !types.includes(actualtype as JSONSchema6["type"]) && !(actualtype == "number" && types.includes("integer"))) { continue; }
+
+        let score = 1;
+        if (actualtype == "object" && data && schema.properties) {
+            let keys = Object.keys(data).filter(key => !key.startsWith("$"));
+            let matched = keys.filter(key => Object.hasOwn(schema.properties!, key)).length;
+            let missingrequired = (schema.required ?? []).filter(key => !keys.includes(key)).length;
+            score += matched * 10 - (keys.length - matched) * 10 - missingrequired * 20;
+        }
+        if (score > bestscore) { best = variant; bestscore = score; }
+    }
+
+    return best ?? variants.find(variant => typeof variant != "object" || variant == null || (variant as JSONSchema6).type != "null") ?? variants[0];
+}
+
 export function iterateTypedJson(objstack: any[], meta: JSONSchema6Definition | null | undefined, data: unknown, nameorindex: string | number) {
     let rsmvtype: ExtendedJsonFieldTypes = meta?.["x-rsmv-type"] ?? "";
 
@@ -610,11 +644,11 @@ export function iterateTypedJson(objstack: any[], meta: JSONSchema6Definition | 
     if (typeof meta == "boolean") { meta = null; }
     // strip nullable type from schema
     if (meta?.oneOf) {
-        meta = meta.oneOf.find(q => (q as JSONSchema6).type != "null") as JSONSchema6;
+        meta = selectUnionSchema(meta.oneOf, data) as JSONSchema6;
         rsmvtype ||= meta?.["x-rsmv-type"];
     }
     if (meta?.anyOf) {
-        meta = meta.anyOf.find(q => (q as JSONSchema6).type != "null") as JSONSchema6;
+        meta = selectUnionSchema(meta.anyOf, data) as JSONSchema6;
         rsmvtype ||= meta?.["x-rsmv-type"];
     }
 

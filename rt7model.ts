@@ -1,10 +1,8 @@
-import { Stream, packedHSL2HSL, HSL2RGB, ushortToHalf } from "./utils";
+import { Stream, packedHSL2HSL, HSL2RGB, ushortToHalf } from "./src/utils";
 import * as THREE from "three";
-import { CacheFileSource } from "./cache";
-import { getParsers } from "./opdecoder";
-
-// Placeholder for gltfutil functions
-const alignedRefOrCopy = (constr, data, offset, len) => data.subarray(offset, offset + len);
+import { CacheFileSource } from "./src/cache";
+import { getParsers } from "./src/opdecoder";
+import { alignedRefOrCopy } from "./src/3d/gltfutil";
 
 export type BoneCenter = {
 	xsum: number,
@@ -44,8 +42,8 @@ export type ModelMeshData = {
 	}
 }
 
-function parsePosData(arr: Int16Array) {
-	return new THREE.BufferAttribute(new Float32Array(arr), 3);
+function parsePosData(arr: Int16Array | Float32Array) {
+	return new THREE.BufferAttribute(arr instanceof Int16Array ? new Float32Array(arr) : arr, 3);
 }
 
 function addBoneIdBuffer(attributes: ModelMeshData["attributes"], boneidBuffer: Uint16Array) {
@@ -98,8 +96,7 @@ function addNormalsBuffer(attributes: ModelMeshData["attributes"], normalBuffer:
 
 export async function parseOb3Model(modelfile: Uint8Array, source: CacheFileSource): Promise<ModelData> {
 	const parsers = await getParsers();
-const modelFileParser = await parsers.models;
-    return modelFileParser.read(buffer, source);
+	const parsed = parsers.models.read(Buffer.from(modelfile), source);
 	let meshes: ModelMeshData[] = [];
 
 	if (parsed.meshes) {
@@ -170,7 +167,7 @@ const modelFileParser = await parsers.models;
 				vertexstart: 0,
 				vertexend: attributes.pos.count,
 				indexLODs: indexlods,
-				materialId: mesh.materialArgument - 1,
+				materialId: mesh.material,
 				hasVertexAlpha: !!mesh.alphaBuffer,
 				needsNormalBlending: false,
 				attributes: attributes
@@ -248,7 +245,7 @@ const modelFileParser = await parsers.models;
 				vertexstart: minindex,
 				vertexend: maxindex + 1,
 				indexLODs: [index],
-				materialId: render.materialArgument - 1,
+				materialId: render.material,
 				hasVertexAlpha: !!render.hasVertexAlpha,
 				needsNormalBlending: false,
 				attributes: attributes

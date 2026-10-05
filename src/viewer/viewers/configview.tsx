@@ -7,7 +7,7 @@ import { JSONSchema6Definition } from "json-schema";
 import { loadParams } from "../../clientscript/util";
 import classNames from "classnames";
 import { BlobTS, HSL2RGB, packedHSL2HSL, RGB2HSL, taskTrickler } from "../../utils";
-import { BlobImage, useAwaited } from "../commoncontrols";
+import { BlobImage, CopyButton, useAwaited } from "../commoncontrols";
 import { parseMusic } from "../../scripts/musictrack";
 import { BrowseModes, makeFileId } from "../tabs/browse";
 import { dbrows } from "../../../generated/dbrows";
@@ -22,7 +22,8 @@ type DeepLinkElement = {
     valuename?: string | undefined,
     primitive?: string | number | boolean | null,
     items?: DeepLinkElement[],
-    array?: DeepLinkElement[]
+    array?: DeepLinkElement[],
+    binary?: { type: string, data: Uint8Array, values?: unknown[] }
 }
 
 class DeepLinkContext {
@@ -90,9 +91,18 @@ async function deepLinkJson(ctx: DeepLinkContext, nameorindex: string | number, 
 
         // === handle data type ===
         if (ArrayBuffer.isView(data)) {
-            // we were handed a typed array, which is only possible if our object hasn't been serialized to JSON yet
-            // force it into a string to simulate json roundtrip
-            data = "" + data;
+            let view = data as ArrayBufferView;
+            let type = Object.getPrototypeOf(view)?.constructor?.name ?? "Binary data";
+            let length = (view as ArrayBufferView & { length?: number }).length;
+            return {
+                name,
+                rsmvtype,
+                binary: {
+                    type,
+                    data: new Uint8Array(view.buffer, view.byteOffset, view.byteLength),
+                    values: typeof length == "number" ? Array.from({ length }, (_, i) => (view as any)[i]) : undefined
+                }
+            };
         }
 
         // === render data ===
@@ -470,6 +480,9 @@ export function ObjectLink(p: { prop?: DeepLinkElement, rsmvtype?: ExtendedJsonF
 }
 
 export function renderPrimitive(prop: DeepLinkElement) {
+    if (prop.binary) {
+        return { isbig: true, el: <BinaryDataView type={prop.binary.type} data={prop.binary.data} /> };
+    }
     if (typeof prop.primitive == "number") {
         if (prop.rsmvtype == "color") {
             return { isbig: false, el: <ColorView hsl={prop.primitive} /> };
@@ -518,6 +531,33 @@ export function renderPrimitive(prop: DeepLinkElement) {
         }
     }
     return null;
+}
+
+function BinaryDataView(p: { type: string, data: Uint8Array, values?: unknown[] }) {
+    let [showBytes, setShowBytes] = React.useState(false);
+    let [visibleCount, setVisibleCount] = React.useState(128);
+    let values = p.values;
+    let total = showBytes || !values ? p.data.length : values.length;
+    let visibleValues = values?.slice(0, visibleCount);
+    let visibleBytes = p.data.subarray(0, visibleCount);
+    let valuesText = JSON.stringify(visibleValues, (_key, value) => typeof value == "bigint" ? `${value}n` : value, 2);
+    let hexText = Array.from(visibleBytes, q => q.toString(16).padStart(2, "0")).join(" ");
+    let copyText = () => showBytes || !values
+        ? Array.from(p.data, q => q.toString(16).padStart(2, "0")).join(" ")
+        : JSON.stringify(values, (_key, value) => typeof value == "bigint" ? `${value}n` : value, 2);
+
+    return (
+        <div className="mv-binary-view">
+            <div>{p.type} - {p.data.byteLength} bytes</div>
+            {values && <input type="button" className="sub-btn" value={showBytes ? "View values" : "View bytes"} onClick={() => setShowBytes(!showBytes)} />}
+            <CopyButton getText={copyText} />
+            <input type="button" className="sub-btn" value="Download bytes" onClick={() => downloadBlob("data.bin", new BlobTS([p.data], { type: "application/octet-stream" }))} />
+            <pre className="mv-json-block">{showBytes || !values ? hexText || "(empty)" : valuesText}</pre>
+            {visibleCount < total && (
+                <input type="button" className="sub-btn" value={`Show more (${visibleCount}/${total})`} onClick={() => setVisibleCount(Math.min(total, visibleCount * 4))} />
+            )}
+        </div>
+    );
 }
 
 export function StructDataView(p: { data: any, meta: JSONSchema6Definition | null | undefined }) {

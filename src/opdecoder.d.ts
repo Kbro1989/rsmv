@@ -14,7 +14,7 @@ export declare const parse: {
     cacheIndex: FileParser<import("../generated/cacheindex").cacheindex>;
     npc: FileParser<import("../generated/npcs").npcs>;
     item: FileParser<import("../generated/items").items>;
-    object: FileParser<import("../generated/objects").objects>;
+    object: FileParser<import("../generated/locs").locs>;
     achievement: FileParser<import("../generated/achievements").achievements>;
     mapsquareTiles: FileParser<import("../generated/mapsquare_tiles").mapsquare_tiles>;
     mapsquareTilesNxt: FileParser<import("../generated/mapsquare_tiles_nxt").mapsquare_tiles_nxt>;
@@ -41,14 +41,14 @@ export declare const parse: {
     oldmaterials: FileParser<import("../generated/oldmaterials").oldmaterials>;
     quickchatCategories: FileParser<import("../generated/quickchatcategories").quickchatcategories>;
     quickchatLines: FileParser<import("../generated/quickchatlines").quickchatlines>;
-    environments: FileParser<import("../generated/environments").environments>;
+    environments: FileParser<{ unk01?: number | null; unk04?: boolean | null; model?: number | null; unk06?: number | null }>;
     avatars: FileParser<import("../generated/avatars").avatars>;
     avatarOverrides: FileParser<import("../generated/avataroverrides").avataroverrides>;
     identitykit: FileParser<import("../generated/identitykit").identitykit>;
     structs: FileParser<import("../generated/structs").structs>;
     params: FileParser<import("../generated/params").params>;
-    particles_0: FileParser<import("../generated/particles_0").particles_0>;
-    particles_1: FileParser<import("../generated/particles_1").particles_1>;
+    particles_0: FileParser<import("../generated/experimental/particles_0").particles_0>;
+    particles_1: FileParser<import("../generated/experimental/particles_1").particles_1>;
     audio: FileParser<import("../generated/audio").audio>;
     proctexture: FileParser<import("../generated/proctexture").proctexture>;
     oldproctexture: FileParser<import("../generated/oldproctexture").oldproctexture>;

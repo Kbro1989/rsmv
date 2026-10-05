@@ -34,13 +34,33 @@ export type Stream = {
 	tee(): Stream
 }
 
-export function checkObject<T extends { [key: string]: "string" | "number" | "boolean" }>(obj: unknown, props: T) {
+// fix typings conflict between nodejs Buffer typings and browser arraybuffer typings
+export const BlobTS = Blob as unknown as {
+	new(data: (BlobPart | Uint8Array<ArrayBufferLike>)[], options?: BlobPropertyBag): Blob,
+	prototype: Blob
+};
+
+export function checkObject<T extends { [key: string]: "string" | "number" | "boolean" | "numberarray" }>(obj: unknown, props: T) {
 	if (!obj || typeof obj != "object") { return null; }
-	const record = obj as Record<string, unknown>;
-	let res: { [key in keyof T]: T[key] extends "string" ? string : T[key] extends "number" ? T[key] extends "boolean" ? boolean : number : never } = {} as any;
+	let res: {
+		[key in keyof T]:
+		T[key] extends "string" ? string :
+		T[key] extends "number" ? number :
+		T[key] extends "boolean" ? boolean :
+		T[key] extends "numberarray" ? number[] :
+		never
+	} = {} as any;
 	for (let [key, type] of Object.entries(props)) {
-		if (!(key in record) || typeof record[key] != type) { return null; }
-		res[key as keyof T] = record[key] as any;
+		if (!(key in obj)) { return null; }
+		let prop = obj[key];
+		if (type == "numberarray") {
+			if (!Array.isArray(prop)) { return null; }
+			if (prop.some(v => typeof v != "number")) { return null; }
+			res[key as keyof T] = prop.slice() as any;
+		} else {
+			if (typeof prop != type) { return null; }
+			res[key as keyof T] = prop;
+		}
 	}
 	return res;
 }
@@ -61,56 +81,11 @@ export function cacheFilenameHash(name: string, oldhash: boolean) {
 }
 
 export function stringToMapArea(str: string) {
-	// Parse multiple coordinate formats, all resolving to mapsquare x,z:
-	// 1. "x,z" or "x,z,xsize,zsize" — mapsquare coords (e.g. "50,50" or "50,50,1,1")
-	// 2. "wx,wz" — world coords, auto-detected when >10000 (e.g. "2937,3221")
-	// 3. "121699138" — packed position: (x&0x7FFF)|((z&0x7FFF)<<15)|((plane&3)<<30)
-	// 4. "6293" — mapsquare ID: x=id%100, z=floor(id/100) (overworld only, no interior instances)
-	
-	const rawParts = str.split(/[,\.\/\:\;]/);
-	const parts: (number | string)[] = rawParts.map(p => {
-		const n = +p;
-		return isNaN(n) ? p.trim() : n;
-	}).filter(p => p !== '');
-
-	// Single number: packed position or mapsquare ID
-	if (parts.length === 1 && typeof parts[0] === 'number') {
-		const val = parts[0];
-		if (val > 10000000) {
-			// Packed position
-			return { x: Math.floor((val & 0x7FFF) / 64), z: Math.floor(((val >> 15) & 0x7FFF) / 64), xsize: 1, zsize: 1 };
-		} else if (val > 9999) {
-			// World X with missing Z — not enough info
-			return null;
-		} else {
-			// Mapsquare ID
-			return { x: val % 100, z: Math.floor(val / 100), xsize: 1, zsize: 1 };
-		}
-	}
-
-	// Two numbers: mapsquare x,z OR world wx,wz
-		if (parts.length === 2 && typeof parts[0] === 'number' && typeof parts[1] === 'number') {
-			const [a, b] = parts;
-			// World coords typically exceed mapsquare range (0-100)
-			if (a >= 100 || b >= 100) {
-				return { x: Math.floor(a / 64), z: Math.floor(b / 64), xsize: 1, zsize: 1 };
-			}
-			return { x: a, z: b, xsize: 1, zsize: 1 };
-		}
-
-	// Three numbers: x,z,xsize
-	if (parts.length === 3 && typeof parts[0] === 'number' && typeof parts[1] === 'number' && typeof parts[2] === 'number') {
-		const [a, b, c] = parts;
-		return { x: a, z: b, xsize: c, zsize: c };
-	}
-
-	// Four numbers: x,z,xsize,zsize
-	if (parts.length === 4 && typeof parts[0] === 'number' && typeof parts[1] === 'number' && typeof parts[2] === 'number' && typeof parts[3] === 'number') {
-		const [a, b, c, d] = parts;
-		return { x: a, z: b, xsize: c, zsize: d };
-	}
-
-	return null;
+	let [x, z, xsize, zsize] = str.split(/[,\.\/:;]/).map(n => +n);
+	xsize = xsize ?? 1;
+	zsize = zsize ?? xsize;
+	if (isNaN(x) || isNaN(z) || isNaN(xsize) || isNaN(zsize)) { return null; }
+	return { x, z, xsize, zsize };
 }
 
 export function stringToFileRange(str: string) {
@@ -138,7 +113,7 @@ export function getOrInsert<K, V>(map: Map<K, V>, key: K, fallback: () => (V ext
 }
 
 export function delay(ms: number) {
-	return new Promise(d => setTimeout(d, ms))
+	return new Promise<void>(d => { setTimeout(d, ms) });
 }
 
 export function posmod(x: number, n: number) {
@@ -196,7 +171,7 @@ export function rsmarkupToSafeHtml(str: string) {
 			}
 		}
 	} catch (e) {
-		console.log(e instanceof Error ? e.message : String(e));
+		console.log(e.message);
 		res = escapeHTML(str);
 	}
 	return res;
@@ -218,7 +193,7 @@ export function constrainedMap<Q>() {
 	}
 }
 
-export const Stream: { new(buf: Buffer, scan?: number): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
+export const Stream: { new(buf: Buffer): Stream, prototype: Stream } = function Stream(this: Stream, data: Buffer, scan = 0) {
 	// Double check the mime type
 	/*if (data[data.length - 4] != 0x4F) // O
 		return null;
@@ -241,7 +216,7 @@ export const Stream: { new(buf: Buffer, scan?: number): Stream, prototype: Strea
 		return res;
 	}
 	this.tee = function () {
-		return new (Stream as unknown as { new(buf: Buffer, scan?: number): Stream })(data, scan);
+		return new Stream(data, scan);
 	}
 	this.eof = function () {
 		if (scan > data.length) { throw new Error("reading past end of buffer"); }
@@ -464,6 +439,16 @@ export function packedHSL2HSL(hsl: number) {
 	return [h, s, l];
 }
 
+export function hsl2hex(hsl: number) {
+	let rgb = HSL2RGB(packedHSL2HSL(hsl));
+	return `#${((rgb[0] << 16) | (rgb[1] << 8) | (rgb[2] << 0)).toString(16).padStart(6, "0")}`;
+}
+
+export function hex2hsl(hex: string) {
+	let n = parseInt(hex.replace(/^#/, ""), 16);
+	return HSL2packHSL(...RGB2HSL((n >> 16) & 0xff, (n >> 8) & 0xff, (n >> 0) & 0xff));
+}
+
 export type Coord = {
 	x: number,
 	z: number,
@@ -475,6 +460,48 @@ export function unpackCoordgrid(coord: number) {
 	let x = (coord >> 14) & 0x3FFF;
 	let z = coord & 0x3FFF;
 	return { level, x, z };
+}
+
+export function packCoordgrid(level: number, x: number, z: number) {
+	return ((level & 0x3) << 28) | ((x & 0x3FFF) << 14) | (z & 0x3FFF);
+}
+
+export function unpackDBTableField(tablefield: number) {
+	let dbtable = (tablefield >> 12) & 0xffff;
+	let columnid = (tablefield >> 4) & 0xff;
+	let subfield = tablefield & 0xf;
+	return { dbtable, columnid, subfield };
+}
+
+export function unpackComponent(comp: number) {
+	let intf = (comp >>> 16) & 0xFFFF;
+	let sub = comp & 0xFFFF;
+	return { intf, sub };
+}
+
+export function packFrameid(file: number, index: number) {
+	return (file << 16) | index;
+}
+export function unpackFrameid(value: number) {
+	let file = (value >>> 16) & 0xFFFF;
+	let index = value & 0xFFFF;
+	return { file, index };
+}
+
+export function packComponent(intf: number, sub: number) {
+	return (intf << 16) | sub;
+}
+
+export function packMapsquare(x: number, z: number) {
+	const worldStride = 128;
+	return (z * worldStride) + x;
+}
+
+export function unpackMapsquare(mapsquare: number) {
+	const worldStride = 128;
+	let x = mapsquare % worldStride;
+	let z = Math.floor(mapsquare / worldStride);
+	return { x, z };
 }
 
 export class TypedEmitter<T extends Record<string, any>> {
@@ -569,6 +596,18 @@ export async function trickleTasksTwoStep<T>(parallel: number, tasks: () => Iter
 	}
 }
 
+export function taskTrickler(maxparallel = 1, delaytime = 1) {
+	let stallindex = 0;
+	let stall = new Array<Promise<any>>(maxparallel).fill(Promise.resolve());
+	return function gate<T>(task: () => Promise<T>) {
+		let res = stall[stallindex].then(() => task());
+		stall[stallindex] = res
+			.finally(() => { delaytime != 0 && delay(delaytime) });
+		stallindex = (stallindex + 1) % maxparallel;
+		return res;
+	}
+}
+
 export class FetchThrottler {
 	private reqQueue: (() => void)[] = [];
 	private activeReqs = 0;
@@ -617,7 +656,7 @@ export class IterableWeakMap<K extends WeakKey, V> {
 	refSet = new Set<WeakRef<K>>();
 	finalizationGroup = new FinalizationRegistry(IterableWeakMap.cleanup);
 
-	static cleanup({ set, ref }: { set: Set<WeakRef<WeakKey>>, ref: WeakRef<WeakKey> }) {
+	static cleanup({ set, ref }) {
 		set.delete(ref);
 	}
 
@@ -740,4 +779,11 @@ export function findParentElement(el: HTMLElement | null, cond: (el: HTMLElement
 		el = el.parentElement;
 	}
 	return fallback;
+}
+
+export function prettyFileSize(size: number) {
+	if (size < 1024) { return size + " B"; }
+	if (size < 1024 * 1024) { return (size / 1024).toFixed(2) + " KB"; }
+	if (size < 1024 * 1024 * 1024) { return (size / (1024 * 1024)).toFixed(2) + " MB"; }
+	return (size / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }

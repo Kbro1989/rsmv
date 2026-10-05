@@ -130,7 +130,7 @@ function annotatedHexDom(data: Buffer, chunks: DecodeErrorJson["chunks"]) {
     return { hexels, textels, labelel };
 }
 
-function UnknownFileViewer(p: { data: Buffer, ext: string }) {
+function UnknownFileViewer(p: { data: Buffer, ext: string, filename?: string }) {
     let finalext = p.ext.split(".").at(-1)!;
     let istext = ["json", "jsonc", "ts", "js", "txt"].includes(finalext);
 
@@ -144,13 +144,14 @@ function UnknownFileViewer(p: { data: Buffer, ext: string }) {
         <React.Fragment>
             <input type="button" className="sub-btn" value={istext ? "View hex" : "View text"} onClick={e => setoverride({ ext: p.ext, istext: !istext })} />
             <CopyButton getText={() => istext ? p.data.toString("utf8") : p.data.toString("hex")} />
+            <input type="button" className="sub-btn" value="Download original" onClick={() => downloadBlob(p.filename ?? `file.${finalext || "bin"}`, new BlobTS([p.data], { type: "application/octet-stream" }))} />
             {istext && <SimpleTextViewer file={p.data.toString("utf8")} />}
             {!istext && <TrivialHexViewer data={p.data} />}
         </React.Fragment>
     )
 }
 
-export function JsonViewer(p: { data?: string, json?: object, jsonmode: string }) {
+export function JsonViewer(p: { data?: string, json?: object, jsonmode: string, filename?: string }) {
     let [rawjson, setrawjson] = React.useState(false);
 
     let filetext = React.useMemo(() => {
@@ -186,6 +187,7 @@ export function JsonViewer(p: { data?: string, json?: object, jsonmode: string }
         <React.Fragment>
             <input type="button" className="sub-btn" value={rawjson ? "View parsed" : "View raw"} onClick={e => setrawjson(!rawjson)} />
             <CopyButton text={filetext} />
+            <input type="button" className="sub-btn" value="Download JSON" onClick={() => downloadBlob(p.filename ?? "data.json", new BlobTS([filetext], { type: "application/json" }))} />
             {!rawjson && <StructView data={parsed?.obj} meta={parsed?.schema} />}
             {rawjson && <SimpleTextViewer file={filetext} />}
         </React.Fragment>
@@ -326,7 +328,7 @@ export function FileDisplay(p: { file: UIOpenedFile }) {
         el = <ClientScriptViewer data={fileText()} />
     } else if (ext == "json") {
         let jsonmode = p.file.name.match(/^(\w+)\-/);
-        el = <JsonViewer data={fileText()} jsonmode={jsonmode?.[1] ?? ""} />
+        el = <JsonViewer data={fileText()} jsonmode={jsonmode?.[1] ?? ""} filename={p.file.name} />
     } else if (ext == "html") {
         el = <iframe srcDoc={fileText()} sandbox="allow-scripts" style={{ width: "95%", height: "95%" }} />;
     } else if (ext == "rstex") {
@@ -353,7 +355,7 @@ export function FileDisplay(p: { file: UIOpenedFile }) {
             console.log("unexpected header", header, header.toString(16));
         }
     } else {
-        el = <UnknownFileViewer data={fileBuffer()} ext={ext} />
+        el = <UnknownFileViewer data={fileBuffer()} ext={ext} filename={p.file.name} />
     }
     return el;
 }
